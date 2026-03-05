@@ -10,18 +10,9 @@
 
 namespace brls {
 
-// Minimal internal HTML node structure
-struct MiniNode {
-    std::string tag;
-    std::string text;
-    std::map<std::string, std::string> attributes;
-    std::vector<MiniNode*> children;
-    bool isText = false;
-
-    ~MiniNode() {
-        for (auto child : children) delete child;
-    }
-};
+MiniNode::~MiniNode() {
+    for (auto child : children) delete child;
+}
 
 HtmlRenderer::HtmlRenderer() {
     setAxis(Axis::COLUMN);
@@ -175,192 +166,182 @@ static bool isInlineNode(MiniNode* node) {
     return std::find(inlineTags.begin(), inlineTags.end(), node->tag) != inlineTags.end();
 }
 
+// Internal recursive builder
+void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* parent, float& baseFontSize, std::optional<NVGcolor>& currentTextColor, const NVGcolor& defaultTextColor, const NVGcolor& accentColor) {
+    if (node->isText) {
+        Label* label = new Label();
+        label->setText(node->text);
+        label->setFontSize(baseFontSize);
+        label->setTextColor(currentTextColor ? *currentTextColor : defaultTextColor);
+        parent->addView(label);
+        return;
+    }
+
+    float oldFontSize = baseFontSize;
+    std::optional<NVGcolor> oldCustomColor = currentTextColor;
+    Box* currentContainer = parent;
+    View* lastCreatedView = nullptr;
+    bool skipChildren = false;
+
+    CssStyle inlineStyle = renderer->parseInlineStyle(node->attributes["style"]);
+
+    if (node->tag == "h1") {
+        baseFontSize = 48.0f;
+        Label* header = new Label();
+        header->setMarginBottom(8);
+        header->setMarginTop(5);
+        lastCreatedView = header;
+    }
+    else if (node->tag == "h2") {
+        baseFontSize = 40.0f;
+        Label* header = new Label();
+        header->setMarginBottom(6);
+        header->setMarginTop(4);
+        lastCreatedView = header;
+    }
+    else if (node->tag == "h3") {
+        baseFontSize = 32.0f;
+        Label* header = new Label();
+        header->setMarginBottom(4);
+        lastCreatedView = header;
+    }
+    else if (node->tag == "p") {
+        baseFontSize = 26.0f;
+        Box* pBox = new Box(Axis::COLUMN);
+        pBox->setMarginBottom(10);
+        currentContainer = pBox;
+        parent->addView(pBox);
+        lastCreatedView = pBox;
+    }
+    else if (node->tag == "strong" || node->tag == "b") {
+        baseFontSize = oldFontSize * 1.1f;
+    }
+    else if (node->tag == "ul" || node->tag == "ol") {
+        Box* listContainer = new Box(Axis::COLUMN);
+        listContainer->setPaddingLeft(30);
+        listContainer->setMarginBottom(15);
+        parent->addView(listContainer);
+        currentContainer = listContainer;
+        lastCreatedView = listContainer;
+    }
+    else if (node->tag == "li") {
+        Box* row = new Box(Axis::ROW);
+        row->setMarginBottom(5);
+        Label* bullet = new Label();
+        bullet->setText(" • ");
+        bullet->setFontSize(baseFontSize);
+        bullet->setTextColor(accentColor);
+        row->addView(bullet);
+        currentContainer = row;
+        parent->addView(row);
+        lastCreatedView = row;
+    }
+    else if (node->tag == "img") {
+        std::string src = node->attributes["src"];
+        if (!src.empty()) {
+            Image* image = new Image();
+            image->setImageFromRes("img/game_bg.jpg");
+            if (src.find("http") == 0) {
+                image->setImageAsync([src](std::function<void(const std::string&, size_t length)> callback) {
+                    SimpleHTTPClient::downloadImage(src, [callback](bool success, const std::string& data) {
+                        if (success) callback(data, data.size());
+                    });
+                });
+            } else {
+                image->setImageFromFile(src);
+            }
+            image->setHeight(300);
+            image->setCornerRadius(10);
+            image->setMarginBottom(10);
+            parent->addView(image);
+            lastCreatedView = image;
+        }
+        skipChildren = true;
+    }
+    else if (node->tag == "a") {
+        std::string href = node->attributes["href"];
+        Label* link = new Label();
+        link->setTextColor(accentColor);
+        link->setFocusable(true);
+        std::string linkText = "";
+        std::function<void(MiniNode*)> collectText = [&](MiniNode* n) {
+            if (n->isText) linkText += n->text;
+            for (auto c : n->children) collectText(c);
+        };
+        for (auto child : node->children) collectText(child);
+        link->setText(linkText);
+        if (!href.empty()) {
+            link->registerClickAction([href](View* v) {
+                Application::getPlatform()->openBrowser(href);
+                return true;
+            });
+        }
+        parent->addView(link);
+        lastCreatedView = link;
+        skipChildren = true;
+    }
+    else if (node->tag == "br") {
+        Box* spacer = new Box();
+        spacer->setHeight(5);
+        parent->addView(spacer);
+        lastCreatedView = spacer;
+        skipChildren = true;
+    }
+    else if (node->tag == "div") {
+         Box* dBox = new Box(Axis::COLUMN);
+         parent->addView(dBox);
+         currentContainer = dBox;
+         lastCreatedView = dBox;
+    }
+    else if (node->tag == "blockquote") {
+        Box* qBox = new Box(Axis::COLUMN);
+        qBox->setPaddingLeft(15);
+        qBox->setPaddingTop(4);
+        qBox->setPaddingBottom(4);
+        qBox->setBackgroundColor(nvgRGBA(128, 128, 128, 25));
+        qBox->setMarginBottom(12);
+        qBox->setMarginTop(4);
+        currentContainer = qBox;
+        parent->addView(qBox);
+        lastCreatedView = qBox;
+    }
+
+    if (lastCreatedView) renderer->applyStyle(lastCreatedView, inlineStyle);
+    if (inlineStyle.color) currentTextColor = inlineStyle.color;
+    if (inlineStyle.fontSize) baseFontSize = *inlineStyle.fontSize;
+
+    if (!skipChildren) {
+        Box* inlineWrapper = nullptr;
+        for (auto child : node->children) {
+            if (isInlineNode(child)) {
+                if (!inlineWrapper) {
+                    inlineWrapper = new Box(Axis::ROW);
+                    inlineWrapper->setAlignItems(AlignItems::CENTER);
+                    currentContainer->addView(inlineWrapper);
+                }
+                buildHtmlViews(renderer, child, inlineWrapper, baseFontSize, currentTextColor, defaultTextColor, accentColor);
+            } else {
+                inlineWrapper = nullptr;
+                buildHtmlViews(renderer, child, currentContainer, baseFontSize, currentTextColor, defaultTextColor, accentColor);
+            }
+        }
+    }
+
+    baseFontSize = oldFontSize;
+    currentTextColor = oldCustomColor;
+}
+
 void HtmlRenderer::renderString(const std::string& html) {
     clearViews();
-    
     MiniNode* root = parseHTMLInternal(html);
-    
     NVGcolor defaultTextColor = getThemeColor("brls/text");
     NVGcolor accentColor = getThemeColor("brls/accent");
     
-    std::function<void(MiniNode*, Box*)> buildViews = [&](MiniNode* node, Box* parent) {
-        if (node->isText) {
-            Label* label = new Label();
-            label->setText(node->text);
-            label->setFontSize(baseFontSize);
-            label->setTextColor(customTextColor ? *customTextColor : defaultTextColor);
-            parent->addView(label);
-            return;
-        }
+    float currentFontSize = baseFontSize;
+    std::optional<NVGcolor> currentTextColor = customTextColor;
 
-        float oldFontSize = baseFontSize;
-        std::optional<NVGcolor> oldCustomColor = customTextColor;
-        Box* currentContainer = parent;
-        View* lastCreatedView = nullptr;
-        bool skipChildren = false;
-
-        CssStyle inlineStyle = parseInlineStyle(node->attributes["style"]);
-
-        if (node->tag == "h1") {
-            baseFontSize = 48.0f;
-            Label* header = new Label();
-            header->setMarginBottom(8);
-            header->setMarginTop(5);
-            lastCreatedView = header;
-        }
-        else if (node->tag == "h2") {
-            baseFontSize = 40.0f;
-            Label* header = new Label();
-            header->setMarginBottom(6);
-            header->setMarginTop(4);
-            lastCreatedView = header;
-        }
-        else if (node->tag == "h3") {
-            baseFontSize = 32.0f;
-            Label* header = new Label();
-            header->setMarginBottom(4);
-            lastCreatedView = header;
-        }
-        else if (node->tag == "p") {
-            baseFontSize = 26.0f;
-            Box* pBox = new Box(Axis::COLUMN);
-            pBox->setMarginBottom(10);
-            currentContainer = pBox;
-            parent->addView(pBox);
-            lastCreatedView = pBox;
-        }
-        else if (node->tag == "strong" || node->tag == "b") {
-            baseFontSize = oldFontSize * 1.1f; // Slight increase for "bold" look
-            // No new box, just recurses into children which will be added to the current row-box
-        }
-        else if (node->tag == "i" || node->tag == "em") {
-            // Placeholder for italic if supported, or just recursive
-        }
-        else if (node->tag == "ul" || node->tag == "ol") {
-            Box* listContainer = new Box(Axis::COLUMN);
-            listContainer->setPaddingLeft(30);
-            listContainer->setMarginBottom(15);
-            parent->addView(listContainer);
-            currentContainer = listContainer;
-            lastCreatedView = listContainer;
-        }
-        else if (node->tag == "li") {
-            Box* row = new Box(Axis::ROW);
-            row->setMarginBottom(5);
-            Label* bullet = new Label();
-            bullet->setText(" • ");
-            bullet->setFontSize(baseFontSize);
-            bullet->setTextColor(accentColor);
-            row->addView(bullet);
-            currentContainer = row;
-            parent->addView(row);
-            lastCreatedView = row;
-        }
-        else if (node->tag == "img") {
-            std::string src = node->attributes["src"];
-            if (!src.empty()) {
-                Image* image = new Image();
-                // Set placeholder first
-                image->setImageFromRes("img/game_bg.jpg");
-                
-                // Load async if it's a URL
-                if (src.find("http") == 0) {
-                    image->setImageAsync([src](std::function<void(const std::string&, size_t length)> callback) {
-                        SimpleHTTPClient::downloadImage(src, [callback](bool success, const std::string& data) {
-                            if (success) {
-                                callback(data, data.size());
-                            }
-                        });
-                    });
-                } else {
-                    image->setImageFromFile(src);
-                }
-                
-                image->setHeight(300);
-                image->setCornerRadius(10);
-                image->setMarginBottom(10);
-                parent->addView(image);
-                lastCreatedView = image;
-            }
-            skipChildren = true;
-        }
-        else if (node->tag == "a") {
-            std::string href = node->attributes["href"];
-            Label* link = new Label();
-            link->setTextColor(accentColor);
-            link->setFocusable(true);
-            
-            std::string linkText = "";
-            std::function<void(MiniNode*)> collectText = [&](MiniNode* n) {
-                if (n->isText) linkText += n->text;
-                for (auto c : n->children) collectText(c);
-            };
-            for (auto child : node->children) collectText(child);
-            link->setText(linkText);
-            
-            if (!href.empty()) {
-                link->registerClickAction([href](View* v) {
-                    Application::getPlatform()->openBrowser(href);
-                    return true;
-                });
-            }
-            
-            parent->addView(link);
-            lastCreatedView = link;
-            skipChildren = true;
-        }
-        else if (node->tag == "br") {
-            Box* spacer = new Box();
-            spacer->setHeight(5);
-            parent->addView(spacer);
-            lastCreatedView = spacer;
-            skipChildren = true;
-        }
-        else if (node->tag == "div") {
-             Box* dBox = new Box(Axis::COLUMN);
-             parent->addView(dBox);
-             currentContainer = dBox;
-             lastCreatedView = dBox;
-        }
-        else if (node->tag == "blockquote") {
-            Box* qBox = new Box(Axis::COLUMN);
-            qBox->setPaddingLeft(15);
-            qBox->setPaddingTop(4);
-            qBox->setPaddingBottom(4);
-            qBox->setBackgroundColor(nvgRGBA(128, 128, 128, 25));
-            qBox->setMarginBottom(12);
-            qBox->setMarginTop(4);
-            currentContainer = qBox;
-            parent->addView(qBox);
-            lastCreatedView = qBox;
-        }
-
-        if (lastCreatedView) applyStyle(lastCreatedView, inlineStyle);
-        if (inlineStyle.color) customTextColor = inlineStyle.color;
-        if (inlineStyle.fontSize) baseFontSize = *inlineStyle.fontSize;
-
-        if (!skipChildren) {
-            Box* inlineWrapper = nullptr;
-            for (auto child : node->children) {
-                if (isInlineNode(child)) {
-                    if (!inlineWrapper) {
-                        inlineWrapper = new Box(Axis::ROW);
-                        inlineWrapper->setAlignItems(AlignItems::CENTER);
-                        currentContainer->addView(inlineWrapper);
-                    }
-                    buildViews(child, inlineWrapper);
-                } else {
-                    inlineWrapper = nullptr;
-                    buildViews(child, currentContainer);
-                }
-            }
-        }
-
-        baseFontSize = oldFontSize;
-        customTextColor = oldCustomColor;
-    };
-
-    buildViews(root, this);
+    buildHtmlViews(this, root, this, currentFontSize, currentTextColor, defaultTextColor, accentColor);
+    
     delete root;
 }
 

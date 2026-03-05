@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 cmake_policy(SET CMP0135 NEW)
 project(lorealis)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
@@ -33,27 +33,60 @@ if(PLATFORM_SWITCH)
     set(LUA_INC ${LUA_INCLUDE_DIRS})
     set(SOL_LUA_VER 501)
 else()
-    # On Desktop, fetch Lua 5.4.6
-    message(STATUS "--- Fetching Lua 5.4.6 for Desktop ---")
+    # On Desktop, fetch Lua 5.1.5
+    message(STATUS "--- Fetching Lua 5.1.5 for Desktop ---")
     FetchContent_Declare(
         lua_src
-        URL "https://github.com/lua/lua/archive/refs/tags/v5.4.6.zip"
+        URL "https://www.lua.org/ftp/lua-5.1.5.tar.gz"
         DOWNLOAD_EXTRACT_TIMESTAMP true
     )
     FetchContent_MakeAvailable(lua_src)
     
-    file(GLOB LUA_SOURCES "${lua_src_SOURCE_DIR}/*.c")
-    list(REMOVE_ITEM LUA_SOURCES 
-        "${lua_src_SOURCE_DIR}/lua.c" 
-        "${lua_src_SOURCE_DIR}/luac.c" 
-        "${lua_src_SOURCE_DIR}/onelua.c"
+    # Lua 5.1 source files (in src/ subdirectory)
+    set(LUA_SRC_DIR ${lua_src_SOURCE_DIR}/src)
+    set(LUA_SOURCES
+        ${LUA_SRC_DIR}/lapi.c
+        ${LUA_SRC_DIR}/lcode.c
+        ${LUA_SRC_DIR}/ldebug.c
+        ${LUA_SRC_DIR}/ldo.c
+        ${LUA_SRC_DIR}/ldump.c
+        ${LUA_SRC_DIR}/lfunc.c
+        ${LUA_SRC_DIR}/lgc.c
+        ${LUA_SRC_DIR}/llex.c
+        ${LUA_SRC_DIR}/lmem.c
+        ${LUA_SRC_DIR}/lobject.c
+        ${LUA_SRC_DIR}/lopcodes.c
+        ${LUA_SRC_DIR}/lparser.c
+        ${LUA_SRC_DIR}/lstate.c
+        ${LUA_SRC_DIR}/lstring.c
+        ${LUA_SRC_DIR}/ltable.c
+        ${LUA_SRC_DIR}/ltm.c
+        ${LUA_SRC_DIR}/lundump.c
+        ${LUA_SRC_DIR}/lvm.c
+        ${LUA_SRC_DIR}/lzio.c
+        ${LUA_SRC_DIR}/lauxlib.c
+        ${LUA_SRC_DIR}/lbaselib.c
+        ${LUA_SRC_DIR}/ldblib.c
+        ${LUA_SRC_DIR}/liolib.c
+        ${LUA_SRC_DIR}/lmathlib.c
+        ${LUA_SRC_DIR}/loslib.c
+        ${LUA_SRC_DIR}/ltablib.c
+        ${LUA_SRC_DIR}/lstrlib.c
+        ${LUA_SRC_DIR}/loadlib.c
+        ${LUA_SRC_DIR}/linit.c
     )
     add_library(liblua STATIC ${LUA_SOURCES})
-    target_include_directories(liblua PUBLIC ${lua_src_SOURCE_DIR})
+    target_include_directories(liblua PUBLIC ${LUA_SRC_DIR})
+    
+    # Create lua.hpp for Lua 5.1 (needed by sol2)
+    if(NOT EXISTS ${LUA_SRC_DIR}/lua.hpp)
+        file(WRITE ${LUA_SRC_DIR}/lua.hpp "#ifndef LUA_HPP\n#define LUA_HPP\nextern \"C\" {\n#include \"lua.h\"\n#include \"lauxlib.h\"\n#include \"lualib.h\"\n}\n#endif\n")
+        message(STATUS "Created lua.hpp for Lua 5.1 compatibility")
+    endif()
     
     set(LUA_LIBS liblua)
-    set(LUA_INC ${lua_src_SOURCE_DIR})
-    set(SOL_LUA_VER 504)
+    set(LUA_INC ${LUA_SRC_DIR})
+    set(SOL_LUA_VER 501)
 endif()
 
 FetchContent_Declare(
@@ -142,6 +175,12 @@ set(APP_SOURCES
 add_executable(lorealis ${APP_SOURCES})
 
 target_include_directories(lorealis PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+
+# Sol2 v3 header path
+FetchContent_GetProperties(sol2)
+if(sol2_POPULATED)
+    target_include_directories(lorealis PRIVATE ${sol2_SOURCE_DIR}/include)
+endif()
 
 # Link against borealis and Lua
 target_include_directories(lorealis BEFORE PRIVATE ${LUA_INC})
@@ -232,7 +271,7 @@ if(PLATFORM_SWITCH)
     
     target_compile_options(lorealis PRIVATE -Wno-error=template-body)
 else()
-    target_compile_definitions(lorealis PRIVATE SOL_LUA_VERSION=504)
+    target_compile_definitions(lorealis PRIVATE SOL_LUA_VERSION=501)
     target_compile_definitions(lorealis PRIVATE SOL_ALL_SAFETIES_ON=1)
 
     message(STATUS "--- Desktop/Win32 Config Detected ---")
