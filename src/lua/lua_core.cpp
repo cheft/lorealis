@@ -63,6 +63,12 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     app["createWindow"] = [](const std::string& title) {
         return brls::Application::createWindow(title);
     };
+    app["loadFontFromFile"] = [](const std::string& fontName, const std::string& filePath) {
+        return brls::Application::loadFontFromFile(fontName, filePath);
+    };
+    app["addFontFallback"] = [](const std::string& fontName, const std::string& fallbackFontName) {
+        brls::Application::addFontFallback(fontName, fallbackFontName);
+    };
     app["pushActivity"] = sol::overload(
         [](brls::View* view) {
             brls::Application::pushActivity(new brls::Activity(view));

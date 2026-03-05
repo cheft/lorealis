@@ -115,7 +115,8 @@ static MiniNode* parseHTML(const std::string& html) {
             size_t end = html.find('<', i);
             std::string raw = html.substr(i, end == std::string::npos ? std::string::npos : end - i);
             i = (end == std::string::npos) ? n : end;
-            if (raw.find_first_not_of(" \t\n\r") == std::string::npos) continue;
+            // PREVIOUSLY: if (raw.find_first_not_of(" \t\n\r") == std::string::npos) continue;
+            // Now we keep whitespace nodes to preserve spaces before links.
             // Check if we are inside <pre>
             bool inPre = false;
             std::stack<MiniNode*> tempStack = stk;
@@ -129,14 +130,22 @@ static MiniNode* parseHTML(const std::string& html) {
                 MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = unescapeHtml(raw);
                 topNode()->children.push_back(tn);
             } else {
-                // normalise whitespace
-                std::string norm; bool sp = false;
+                // normalise whitespace: collapse multiple spaces but keep single leading/trailing spaces
+                // so that "word <a>link</a> word" keeps its spaces.
+                std::string norm; 
+                bool lastWasSpace = false;
                 for (char c : raw) {
-                    if (c == '\n' || c == '\r' || c == '\t') c = ' ';
-                    if (c == ' ') { if (!sp && !norm.empty()) { norm += ' '; sp = true; } }
-                    else { norm += c; sp = false; }
+                    if (isspace((unsigned char)c)) {
+                        if (!lastWasSpace) {
+                            norm += ' ';
+                            lastWasSpace = true;
+                        }
+                    } else {
+                        norm += c;
+                        lastWasSpace = false;
+                    }
                 }
-                if (norm.empty()) continue;
+                if (norm == " " && topNode()->children.empty()) continue; // skip leading space in block
                 MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = unescapeHtml(norm);
                 topNode()->children.push_back(tn);
             }
@@ -334,8 +343,16 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
         std::string src = node->attributes.count("src") ? node->attributes.at("src") : "";
         if (!src.empty()) {
             Image* img = new Image();
-            img->setHeight(240); // Base height scaled to row
-            img->setCornerRadius(6);
+            img->setMarginTop(12);
+            img->setMarginBottom(12);
+            
+            // Force block-level: wrap in a row that takes full width
+            Box* imgContainer = new Box(Axis::ROW);
+            imgContainer->setJustifyContent(JustifyContent::CENTER);
+            imgContainer->setWidthPercentage(100);
+            imgContainer->addView(img);
+            target->addView(imgContainer);
+
             if (src.rfind("http", 0) == 0) {
                 img->setImageAsync([src](std::function<void(const std::string&, size_t)> cb) {
                     SimpleHTTPClient::downloadImage(src, [cb](bool ok, const std::string& d) {
@@ -345,7 +362,6 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
             } else {
                 img->setImageFromFile(src);
             }
-            target->addView(img);
         }
     }
     else {
@@ -663,9 +679,16 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         std::string src = node->attributes.count("src") ? node->attributes.at("src") : "";
         if (!src.empty()) {
             Image* img = new Image();
-            img->setHeight(240);
-            img->setCornerRadius(6);
+            img->setMarginTop(10);
             img->setMarginBottom(10);
+            
+            // Force block-level: wrap in a row that takes full width
+            Box* imgContainer = new Box(Axis::ROW);
+            imgContainer->setJustifyContent(JustifyContent::CENTER);
+            imgContainer->setWidthPercentage(100);
+            imgContainer->addView(img);
+            parent->addView(imgContainer);
+
             if (src.rfind("http", 0) == 0) {
                 img->setImageAsync([src](std::function<void(const std::string&, size_t)> cb) {
                     SimpleHTTPClient::downloadImage(src, [cb](bool ok, const std::string& d) {
@@ -675,7 +698,6 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
             } else {
                 img->setImageFromFile(src);
             }
-            parent->addView(img);
         }
         skip = true;
     }

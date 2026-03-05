@@ -9,6 +9,16 @@ function onInit()
 
     -- Window and App Initialization
     brls.Application.createWindow("NS Dashboard")
+    
+    -- Load Windows Emoji font as fallback (safely after window creation)
+    -- On Switch/other platforms this path won't exist but loadFontFromFile handles it.
+    brls.Application.loadFontFromFile("emoji", "C:\\Windows\\Fonts\\seguiemj.ttf")
+    
+    -- Register emoji fallback for all main fonts
+    brls.Application.addFontFallback("regular", "emoji")
+    brls.Application.addFontFallback("zh-Hans", "emoji")
+    brls.Application.addFontFallback("zh-Hant", "emoji")
+    brls.Application.addFontFallback("korean", "emoji")
     -- brls.Application.getPlatform():setThemeVariant(brls.ThemeVariant.LIGHT)
     brls.Application.setGlobalQuit(false)
     
