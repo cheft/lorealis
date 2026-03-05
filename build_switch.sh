@@ -45,15 +45,15 @@ cmake --build ${BUILD_DIR} -j$(nproc)
 echo "----------------------------------------------------"
 echo "Packaging NRO with debug logs enabled..."
 
-ELF_FILE="${BUILD_DIR}/hello_world.elf"
-NRO_FILE="${BUILD_DIR}/NS_Finder.nro"
+ELF_FILE="${BUILD_DIR}/Lorealis.elf"
+NRO_FILE="${BUILD_DIR}/Lorealis.nro"
 
 if [ -f "$ELF_FILE" ]; then
     # 同步 RomFS 资源到本地目录 (解决 Docker 属性问题)
     echo "Syncing RomFS assets..."
     rm -rf /tmp/romfs_final
     mkdir -p /tmp/romfs_final
-    tar -C resources -cf - . | tar -C /tmp/romfs_final -xf -
+    tar -C res -cf - . | tar -C /tmp/romfs_final -xf -
     
     # 移除可能引起干扰的文件
     find /tmp/romfs_final -name ".gitignore" -delete
@@ -61,7 +61,7 @@ if [ -f "$ELF_FILE" ]; then
     echo "Running elf2nro..."
     elf2nro "$ELF_FILE" "$NRO_FILE" \
         --icon=icon.jpg \
-        --name="NS Finder" \
+        --name="Lorealis" \
         --author="ns-chat" \
         --romfsdir=/tmp/romfs_final
     
