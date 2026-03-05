@@ -14,6 +14,7 @@
 #include <algorithm>
 #include "utils/image_utils.hpp"
 #include <nanovg.h>
+#include <borealis/core/touch/tap_gesture.hpp>
 
 namespace brls {
 
@@ -349,6 +350,11 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
                 Application::getPlatform()->openBrowser(href);
                 return true;
             });
+            lbl->addGestureRecognizer(new TapGestureRecognizer([href](TapGestureStatus status, Sound* soundToPlay) {
+                if (status.state == GestureState::END) {
+                    Application::getPlatform()->openBrowser(href);
+                }
+            }));
         }
         target->addView(lbl);
     }
@@ -365,7 +371,8 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
         if (!src.empty()) {
             Image* img = new Image();
             img->setScalingType(ImageScalingType::FIT);
-            // img->setHeight(300);
+            img->setAspectRatio(16.0f / 9.0f);
+            img->setClipsToBounds(false);
             img->setCornerRadius(6);
             img->setMarginTop(12);
             img->setMarginBottom(12);
@@ -647,6 +654,12 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
                 Application::notify("Copied to clipboard");
                 return true;
             });
+            copyBtn->addGestureRecognizer(new TapGestureRecognizer([captured](TapGestureStatus status, Sound* soundToPlay) {
+                if (status.state == GestureState::END) {
+                    Application::getPlatform()->pasteToClipboard(captured);
+                    Application::notify("Copied to clipboard");
+                }
+            }));
             titleBar->addView(copyBtn);
         }
         preOuter->addView(titleBar);
@@ -698,6 +711,11 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
                 Application::getPlatform()->openBrowser(href);
                 return true;
             });
+            lbl->addGestureRecognizer(new TapGestureRecognizer([href](TapGestureStatus status, Sound* soundToPlay) {
+                if (status.state == GestureState::END) {
+                    Application::getPlatform()->openBrowser(href);
+                }
+            }));
         }
         parent->addView(lbl);
         skip = true;
@@ -709,7 +727,8 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         if (!src.empty()) {
             Image* img = new Image();
             img->setScalingType(ImageScalingType::FIT);
-            // img->setHeight(300);
+            img->setAspectRatio(16.0f / 9.0f);
+            img->setClipsToBounds(false);
             img->setCornerRadius(6);
             img->setMarginTop(10);
             img->setMarginBottom(10);
