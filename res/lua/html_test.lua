@@ -105,23 +105,32 @@ local md_content = [[
 4. Borealis 渲染步骤
 
 ## 3. 表格测试（邮件/报告常用）
-| 功能模块       | 支持状态 | 备注               |
-|----------------|----------|---------------------|
-| HTML 标题      | 支持     | h1-h6 全适配        |
-| 图片渲染       | 支持     | 本地/SD 卡路径      |
-| 表格渲染       | 支持     | 极简样式适配        |
-| JavaScript     | 不支持   | 仅静态渲染          |
+| 功能模块        | 支持状态 | 备注                 |
+|----------------|---------|----------------------|
+| HTML 标题      | 支持     | h1-h6 全适配         |
+| 图片渲染       | 支持     | 本地/SD 卡路径        |
+| 表格渲染       | 支持     | 极简样式适配          |
+| JavaScript    | 不支持    | 仅静态渲染           |
 
 ## 4. 链接与图片测试（Switch 场景）
 ### 链接
 - 本地文档链接：[配置页](sdmc:/switch/borealis/config.html)
-- 外部链接（仅展示）：[阮一峰 RSS 示例](http://www.ruanyifeng.com)
+- 外部链接（仅展示，无跳转）：[阮一峰 RSS 示例](http://www.ruanyifeng.com)
+
+![Switch 图标](E:/Works/Projects/ns-chat/resources/img/demo_icon.jpg)
+> 备注：图片尺寸适配 Borealis 窗口大小
 
 ## 5. 代码块测试（Lua 脚本示例）
 ```lua
 -- Switch 上的 Lua 调用示例
-local md = brls.MarkdownRenderer.new()
-md:renderMarkdown("# Hello World")
+local html_render = require("html_render")
+-- 渲染 Markdown 转换后的 HTML
+local ok, res = html_render.render_file("test_render.html")
+if ok then
+    print("渲染成功：Switch 界面显示内容")
+else
+    print("渲染失败：", res)
+end
 ```
 
 ]]

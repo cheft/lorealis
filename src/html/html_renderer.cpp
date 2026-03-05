@@ -102,16 +102,30 @@ static MiniNode* parseHTML(const std::string& html) {
             std::string raw = html.substr(i, end == std::string::npos ? std::string::npos : end - i);
             i = (end == std::string::npos) ? n : end;
             if (raw.find_first_not_of(" \t\n\r") == std::string::npos) continue;
-            // normalise whitespace
-            std::string norm; bool sp = false;
-            for (char c : raw) {
-                if (c == '\n' || c == '\r' || c == '\t') c = ' ';
-                if (c == ' ') { if (!sp && !norm.empty()) { norm += ' '; sp = true; } }
-                else { norm += c; sp = false; }
+            // Check if we are inside <pre>
+            bool inPre = false;
+            std::stack<MiniNode*> tempStack = stk;
+            while (!tempStack.empty()) {
+                if (tempStack.top()->tag == "pre") { inPre = true; break; }
+                tempStack.pop();
             }
-            if (norm.empty()) continue;
-            MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = norm;
-            topNode()->children.push_back(tn);
+
+            if (inPre) {
+                // Keep raw formatting
+                MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = raw;
+                topNode()->children.push_back(tn);
+            } else {
+                // normalise whitespace
+                std::string norm; bool sp = false;
+                for (char c : raw) {
+                    if (c == '\n' || c == '\r' || c == '\t') c = ' ';
+                    if (c == ' ') { if (!sp && !norm.empty()) { norm += ' '; sp = true; } }
+                    else { norm += c; sp = false; }
+                }
+                if (norm.empty()) continue;
+                MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = norm;
+                topNode()->children.push_back(tn);
+            }
             continue;
         }
         // Tag
@@ -302,6 +316,24 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
         Box* br = new Box(Axis::ROW); br->setHeight(fontSize * 0.5f);
         target->addView(br);
     }
+    else if (t == "img") {
+        std::string src = node->attributes.count("src") ? node->attributes.at("src") : "";
+        if (!src.empty()) {
+            Image* img = new Image();
+            img->setHeight(240); // Base height scaled to row
+            img->setCornerRadius(6);
+            if (src.rfind("http", 0) == 0) {
+                img->setImageAsync([src](std::function<void(const std::string&, size_t)> cb) {
+                    SimpleHTTPClient::downloadImage(src, [cb](bool ok, const std::string& d) {
+                        if (ok) cb(d, d.size());
+                    });
+                });
+            } else {
+                img->setImageFromFile(src);
+            }
+            target->addView(img);
+        }
+    }
     else {
         // Unknown inline / span — just recurse with same style
         renderInlineChildren(node->children, target, fontSize, color);
@@ -312,6 +344,8 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
 static Box* buildInlineRow(MiniNode* node, float fontSize, NVGcolor color) {
     Box* row = new Box(Axis::ROW);
     row->setFlexWrap(true);
+    row->setRowGap(10); // Increases textual line spacing
+    row->setColumnGap(0);
     row->setAlignItems(AlignItems::FLEX_START);
     renderInlineChildren(node->children, row, fontSize, color);
     return row;
@@ -473,6 +507,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
                     if (!inlineRow) {
                         inlineRow = new Box(Axis::ROW);
                         inlineRow->setFlexWrap(true);
+                        inlineRow->setRowGap(10); // Textual line spacing
                         inlineRow->setAlignItems(AlignItems::FLEX_START);
                         rhs->addView(inlineRow);
                     }
@@ -635,6 +670,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
                 if (!iRow) {
                     iRow = new Box(Axis::ROW);
                     iRow->setFlexWrap(true);
+                    iRow->setRowGap(10); // Textual line spacing
                     iRow->setAlignItems(AlignItems::CENTER);
                     cont->addView(iRow);
                 }
