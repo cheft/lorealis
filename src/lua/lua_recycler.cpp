@@ -202,14 +202,14 @@ void LuaManager::registerRecyclerBindings(sol::table& brls_ns) {
             return nullptr;
         });
     };
-    recycler_ut["dequeueReusableCell"] = [this](brls::RecyclerFrame& self, const std::string& identifier) {
+    recycler_ut["dequeueReusableCell"] = [](brls::RecyclerFrame& self, const std::string& identifier) {
         // Cast to LuaRecyclerCell since that's what we always create
         brls::RecyclerCell* cell = self.dequeueReusableCell(identifier);
         if (cell) {
             // All our cells are LuaRecyclerCell, so this cast is safe
-            return this->pushView(static_cast<LuaRecyclerCell*>(cell));
+            return LuaManager::getInstance().pushView(static_cast<LuaRecyclerCell*>(cell));
         }
-        return this->pushView(static_cast<LuaRecyclerCell*>(nullptr));
+        return LuaManager::getInstance().pushView(static_cast<LuaRecyclerCell*>(nullptr));
     };
     recycler_ut["reloadData"] = &brls::RecyclerFrame::reloadData;
 }

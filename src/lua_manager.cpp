@@ -19,9 +19,21 @@ bool LuaManager::init() {
         registerBorealisBindings();
         return true;
     } catch (const std::exception& e) {
-        brls::Logger::error("Failed to initialize Lua: {}", e.what());
+        reportError("Failed to initialize Lua: " + std::string(e.what()));
         return false;
     }
+}
+
+void LuaManager::reportError(const std::string& message) {
+    brls::Logger::error("{}", message);
+    
+    // Show a dialog on the UI thread
+    brls::Application::blockInputs();
+    brls::Dialog* dialog = new brls::Dialog(message);
+    dialog->addButton("OK", []() {
+        brls::Application::unblockInputs();
+    });
+    dialog->open();
 }
 
 void LuaManager::deinit() {
@@ -31,7 +43,7 @@ bool LuaManager::doFile(const std::string& path) {
     auto result = lua.script_file(path);
     if (!result.valid()) {
         sol::error err = result;
-        brls::Logger::error("Lua error loading {}: {}", path, err.what());
+        reportError("Lua error loading " + path + ": " + std::string(err.what()));
         return false;
     }
     return true;
@@ -41,7 +53,7 @@ bool LuaManager::doString(const std::string& script) {
     auto result = lua.script(script);
     if (!result.valid()) {
         sol::error err = result;
-        brls::Logger::error("Lua error: {}", err.what());
+        reportError("Lua error: " + std::string(err.what()));
         return false;
     }
     return true;

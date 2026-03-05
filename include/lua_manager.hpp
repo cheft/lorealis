@@ -22,15 +22,17 @@ public:
     // Call a lua function
     template<typename... Args>
     void call(const std::string& name, Args&&... args) {
-        sol::function func = lua[name];
+        sol::protected_function func = lua[name];
         if (func.valid()) {
             auto result = func(std::forward<Args>(args)...);
             if (!result.valid()) {
                 sol::error err = result;
-                brls::Logger::error("Lua error calling {}: {}", name, err.what());
+                reportError("Lua error calling " + name + ": " + std::string(err.what()));
             }
         }
     }
+
+    static void reportError(const std::string& message);
 
     sol::state& getLuaState() { return lua; }
 
