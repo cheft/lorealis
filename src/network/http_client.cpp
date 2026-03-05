@@ -190,7 +190,7 @@ uint32_t SimpleHTTPClient::downloadImage(const std::string& url, std::function<v
 #ifdef __SWITCH__
         CURL* curl = curl_easy_init();
         if (curl) {
-            CurlData cd = { nullptr, &data, id };
+            CurlData cd = { &data, nullptr, id };
             curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &cd);

@@ -32,12 +32,25 @@ function hello_tab.init(mainView)
         function(v)
             print("HelloTab: HTML test clicked")
             local html_test = require("html_test")
-            local renderer = html_test.init()
+            local renderer = html_test.html()
             v:present(renderer)
             return true
         end
     )
     hello_box:addView(test_html_btn)
+
+    -- Add Markdown Renderer Test Button
+    local test_markdown_btn = brls.Button.new(
+        "Test Markdown Renderer",
+        function(v)
+            print("HelloTab: Markdown test clicked")
+            local html_test = require("html_test")
+            local renderer = html_test.markdown()
+            v:present(renderer)
+            return true
+        end
+    )
+    hello_box:addView(test_markdown_btn)
 
     if button then
         button:onClick(function(v)
