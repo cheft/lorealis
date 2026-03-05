@@ -1,7 +1,6 @@
 -- html_test_view.lua
 local html_test_view = {}
 
--- HTML Renderer Test Script
 local html_content = [[
 <!DOCTYPE html>
 <html lang="en" xmlns="http://www.w3.org/1999/xhtml">
@@ -78,10 +77,12 @@ local html_content = [[
 </html>
 ]]
 
+
 local md_content = [[
 # Borealis 渲染器测试 Demo（一级标题）
 > 测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）
 测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）
+
 ## 1. 基础文本样式（二级标题）
 - 粗体文本：**Switch 手柄导航测试**
 - 斜体文本：*触控缩放适配测试*
@@ -105,54 +106,38 @@ local md_content = [[
 
 ## 3. 表格测试（邮件/报告常用）
 | 功能模块       | 支持状态 | 备注               |
-|----------------|----------|--------------------|
-| HTML 标题      | ✅ 支持  | h1-h6 全适配       |
-| 图片渲染       | ✅ 支持  | 本地/SD 卡路径     |
-| 表格渲染       | ✅ 支持  | 极简样式适配       |
-| JavaScript     | ❌ 不支持 | 仅静态渲染         |
+|----------------|----------|---------------------|
+| HTML 标题      | 支持     | h1-h6 全适配        |
+| 图片渲染       | 支持     | 本地/SD 卡路径      |
+| 表格渲染       | 支持     | 极简样式适配        |
+| JavaScript     | 不支持   | 仅静态渲染          |
 
 ## 4. 链接与图片测试（Switch 场景）
 ### 链接
 - 本地文档链接：[配置页](sdmc:/switch/borealis/config.html)
-- 外部链接（仅展示，无跳转）：[阮一峰 RSS 示例](http://www.ruanyifeng.com)
-
-### 图片（本地路径，Switch 测试用）
-![Switch 图标](E:/Works/Projects/ns-chat/resources/img/demo_icon.jpg)
-> 备注：图片尺寸适配 Borealis 窗口大小
+- 外部链接（仅展示）：[阮一峰 RSS 示例](http://www.ruanyifeng.com)
 
 ## 5. 代码块测试（Lua 脚本示例）
 ```lua
 -- Switch 上的 Lua 调用示例
-local html_render = require("html_render")
--- 渲染 Markdown 转换后的 HTML
-local ok, res = html_render.render_file("test_render.html")
-if ok then
-    print("渲染成功：Switch 界面显示内容")
-else
-    print("渲染失败：", res)
-end
-
+local md = brls.MarkdownRenderer.new()
+md:renderMarkdown("# Hello World")
 ```
 
 ]]
 
 function html_test_view.init(main_view)
-
+    print("Rendering Markdown via MarkdownRenderer...")
     local content = brls.ScrollingFrame.new()
-    local renderer = brls.HtmlRenderer.new()
 
-    -- Test HTML rendering
-    print("Rendering HTML...")
-    renderer:renderString(html_content)
 
-    -- Test Markdown to HTML conversion
-    print("Converting Markdown...")
-    local converted_md = brls.html.markdownToHtml(md_content)
-    -- renderer:renderString(converted_md) -- Uncomment to test MD instead
-    local renderer2 = brls.MarkdownRenderer.new()
-    renderer2:renderString(converted_md)
+    -- local renderer = brls.HtmlRenderer.new()
+    -- renderer:renderString(html_content)
 
-    content:setContentView(renderer2)
+    local renderer = brls.MarkdownRenderer.new()
+    renderer:renderMarkdown(md_content)
+
+    content:setContentView(renderer)
     return content
 end
 
