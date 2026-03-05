@@ -293,7 +293,26 @@ static void renderInlineChildren(const std::vector<MiniNode*>& children, Box* ta
 static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor color) {
     if (node->isText) {
         if (node->text.empty()) return;
-        target->addView(makeLabel(node->text, fontSize, color));
+        std::string txt = node->text;
+        // Detect leading/trailing whitespace and convert to visual margins
+        // because Label auto-sizing doesn't preserve boundary spaces.
+        bool hasLeadingSpace  = !txt.empty() && txt.front() == ' ';
+        bool hasTrailingSpace = !txt.empty() && txt.back() == ' ';
+        // Trim for display
+        size_t start = txt.find_first_not_of(' ');
+        size_t end   = txt.find_last_not_of(' ');
+        if (start == std::string::npos) {
+            // Pure whitespace node — insert a small spacer
+            Box* spacer = new Box(Axis::ROW);
+            spacer->setWidth(fontSize * 0.3f);
+            target->addView(spacer);
+            return;
+        }
+        std::string trimmed = txt.substr(start, end - start + 1);
+        Label* l = makeLabel(trimmed, fontSize, color);
+        if (hasLeadingSpace)  l->setMarginLeft(fontSize * 0.3f);
+        if (hasTrailingSpace) l->setMarginRight(fontSize * 0.3f);
+        target->addView(l);
         return;
     }
 
@@ -325,6 +344,7 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
         lbl->setLineBottom(1);
         lbl->setLineColor(HAN_EMERALD);
         if (!href.empty()) {
+            lbl->setFocusable(true);
             lbl->registerClickAction([href](View*) {
                 Application::getPlatform()->openBrowser(href);
                 return true;
@@ -345,15 +365,16 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
         if (!src.empty()) {
             Image* img = new Image();
             img->setScalingType(ImageScalingType::FIT);
-            img->setHeight(240);
+            // img->setHeight(300);
             img->setCornerRadius(6);
             img->setMarginTop(12);
             img->setMarginBottom(12);
             
-            // Force block-level: wrap in a row that takes full width
+            // Force block-level: 60% width centered container
             Box* imgContainer = new Box(Axis::ROW);
             imgContainer->setJustifyContent(JustifyContent::CENTER);
             imgContainer->setWidthPercentage(100);
+            img->setWidthPercentage(80);
             imgContainer->addView(img);
             target->addView(imgContainer);
 
@@ -688,15 +709,16 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         if (!src.empty()) {
             Image* img = new Image();
             img->setScalingType(ImageScalingType::FIT);
-            img->setHeight(240);
+            // img->setHeight(300);
             img->setCornerRadius(6);
             img->setMarginTop(10);
             img->setMarginBottom(10);
             
-            // Force block-level: wrap in a row that takes full width
+            // Force block-level: 60% width centered container
             Box* imgContainer = new Box(Axis::ROW);
             imgContainer->setJustifyContent(JustifyContent::CENTER);
             imgContainer->setWidthPercentage(100);
+            img->setWidthPercentage(80);
             imgContainer->addView(img);
             parent->addView(imgContainer);
 
