@@ -80,8 +80,8 @@ local html_content = [[
 
 local md_content = [[
 # Borealis 渲染器测试 Demo（一级标题）
-> 测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）
-
+> 测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）
+测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）测试场景：Switch 平台 Markdown/HTML 渲染验证（块引用）
 ## 1. 基础文本样式（二级标题）
 - 粗体文本：**Switch 手柄导航测试**
 - 斜体文本：*触控缩放适配测试*
@@ -149,7 +149,10 @@ function html_test_view.init(main_view)
     print("Converting Markdown...")
     local converted_md = brls.html.markdownToHtml(md_content)
     -- renderer:renderString(converted_md) -- Uncomment to test MD instead
-    content:setContentView(renderer)
+    local renderer2 = brls.MarkdownRenderer.new()
+    renderer2:renderString(converted_md)
+
+    content:setContentView(renderer2)
     return content
 end
 

@@ -8,6 +8,7 @@
 #include <borealis/views/cells/cell_slider.hpp>
 #include <borealis/views/cells/cell_input.hpp>
 #include "view/html_renderer.hpp"
+#include "view/markdown_renderer.hpp"
 
 bool LuaManager::init() {
     try {
@@ -104,6 +105,7 @@ sol::object LuaManager::pushView(brls::View* view) {
     if (auto* luaImage = dynamic_cast<LuaImage*>(view)) return sol::make_object(lua, luaImage);
     if (auto* image = dynamic_cast<brls::Image*>(view)) return sol::make_object(lua, image);
     if (auto* label = dynamic_cast<brls::Label*>(view)) return sol::make_object(lua, label);
+    if (auto* md = dynamic_cast<brls::MarkdownRenderer*>(view)) return sol::make_object(lua, md);
     if (auto* html = dynamic_cast<brls::HtmlRenderer*>(view)) return sol::make_object(lua, html);
     
     return sol::make_object(lua, view);

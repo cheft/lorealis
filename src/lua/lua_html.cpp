@@ -1,5 +1,6 @@
 #include "lua_bindings.hpp"
 #include "view/html_renderer.hpp"
+#include "view/markdown_renderer.hpp"
 #include "html/format_converters.hpp"
 #include "lua_manager.hpp"
 
@@ -11,6 +12,14 @@ void LuaManager::registerHtmlBindings(sol::table& brls_ns) {
         "renderString", &brls::HtmlRenderer::renderString,
         "renderFile", &brls::HtmlRenderer::renderFile,
         "setBaseFontSize", &brls::HtmlRenderer::setBaseFontSize
+    );
+
+    // Bind MarkdownRenderer
+    brls_ns.new_usertype<brls::MarkdownRenderer>("MarkdownRenderer",
+        sol::base_classes, sol::bases<brls::HtmlRenderer, brls::Box, brls::View>(),
+        "new", sol::factories(&brls::MarkdownRenderer::create),
+        "renderMarkdown", &brls::MarkdownRenderer::renderMarkdown,
+        "renderMarkdownFile", &brls::MarkdownRenderer::renderMarkdownFile
     );
 
     // Bind Format Converters

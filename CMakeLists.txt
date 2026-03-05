@@ -168,6 +168,7 @@ set(APP_SOURCES
     src/xml_loader.cpp
     src/zip_loader.cpp
     src/html/html_renderer.cpp
+    src/html/markdown_renderer.cpp
     src/html/format_converters.cpp
     src/lua/lua_html.cpp
     src/utils/image_utils.cpp
