@@ -60,7 +60,7 @@ if [ -f "$ELF_FILE" ]; then
 
     echo "Running elf2nro..."
     elf2nro "$ELF_FILE" "$NRO_FILE" \
-        --icon=icon.jpg \
+        --icon=res/img/demo_icon.jpg \
         --name="Lorealis" \
         --author="ns-chat" \
         --romfsdir=/tmp/romfs_final
