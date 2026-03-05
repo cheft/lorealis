@@ -68,6 +68,20 @@ static std::string strTrim(const std::string& s) {
     return s.substr(a, b - a + 1);
 }
 
+static std::string unescapeHtml(const std::string& s) {
+    std::string res; res.reserve(s.size());
+    for (size_t i = 0; i < s.size(); ++i) {
+        if (s[i] == '&') {
+            if (s.compare(i, 4, "&lt;") == 0) { res += '<'; i += 3; continue; }
+            if (s.compare(i, 4, "&gt;") == 0) { res += '>'; i += 3; continue; }
+            if (s.compare(i, 5, "&amp;") == 0) { res += '&'; i += 4; continue; }
+            if (s.compare(i, 6, "&quot;") == 0) { res += '"'; i += 5; continue; }
+        }
+        res += s[i];
+    }
+    return res;
+}
+
 static std::string collectText(MiniNode* n) {
     if (n->isText) return n->text;
     std::string r; for (auto* c : n->children) r += collectText(c); return r;
@@ -111,8 +125,8 @@ static MiniNode* parseHTML(const std::string& html) {
             }
 
             if (inPre) {
-                // Keep raw formatting
-                MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = raw;
+                // Keep raw formatting but unescape entities
+                MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = unescapeHtml(raw);
                 topNode()->children.push_back(tn);
             } else {
                 // normalise whitespace
@@ -123,7 +137,7 @@ static MiniNode* parseHTML(const std::string& html) {
                     else { norm += c; sp = false; }
                 }
                 if (norm.empty()) continue;
-                MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = norm;
+                MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = unescapeHtml(norm);
                 topNode()->children.push_back(tn);
             }
             continue;

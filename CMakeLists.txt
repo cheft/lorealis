@@ -207,6 +207,7 @@ message(STATUS "--- Adding Borealis subproject ---")
 set(BRLS_RESOURCES_DIR "./res")
 list(APPEND BOREALIS_INCLUDE ${WebP_INCLUDE_DIRS})
 add_subdirectory(lib/borealis/library)
+target_include_directories(borealis PUBLIC ${WebP_INCLUDE_DIRS})
 # On Switch, zlib is already linked via 'z' (see Switch section below)
 
 # Ensure everything is linked statically
