@@ -146,6 +146,7 @@ static MiniNode* parseHTML(const std::string& html) {
                     }
                 }
                 if (norm == " " && topNode()->children.empty()) continue; // skip leading space in block
+                if (norm.empty()) continue;
                 MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = unescapeHtml(norm);
                 topNode()->children.push_back(tn);
             }
@@ -343,6 +344,9 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
         std::string src = node->attributes.count("src") ? node->attributes.at("src") : "";
         if (!src.empty()) {
             Image* img = new Image();
+            img->setScalingType(ImageScalingType::FIT);
+            img->setHeight(240);
+            img->setCornerRadius(6);
             img->setMarginTop(12);
             img->setMarginBottom(12);
             
@@ -618,8 +622,8 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
             copyBtn->setFocusable(true);
             const std::string captured = codeText;
             copyBtn->registerClickAction([captured](View*) {
-                // Desktop: put in clipboard if possible (no-op on Switch)
-                Logger::info("Copy: {} chars", captured.size());
+                Application::getPlatform()->pasteToClipboard(captured);
+                Application::notify("Copied to clipboard");
                 return true;
             });
             titleBar->addView(copyBtn);
@@ -667,9 +671,13 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         std::string href = node->attributes.count("href") ? node->attributes.at("href") : "";
         Label* lbl = makeLabel(collectText(node), baseFontSize, HAN_EMERALD);
         lbl->setLineBottom(1); lbl->setLineColor(HAN_EMERALD);
-        if (!href.empty()) lbl->registerClickAction([href](View*) {
-            Application::getPlatform()->openBrowser(href); return true;
-        });
+        if (!href.empty()) {
+            lbl->setFocusable(true);
+            lbl->registerClickAction([href](View*) {
+                Application::getPlatform()->openBrowser(href);
+                return true;
+            });
+        }
         parent->addView(lbl);
         skip = true;
     }
@@ -679,6 +687,9 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         std::string src = node->attributes.count("src") ? node->attributes.at("src") : "";
         if (!src.empty()) {
             Image* img = new Image();
+            img->setScalingType(ImageScalingType::FIT);
+            img->setHeight(240);
+            img->setCornerRadius(6);
             img->setMarginTop(10);
             img->setMarginBottom(10);
             

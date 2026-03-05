@@ -182,6 +182,22 @@ std::string MarkdownRenderer::markdownToHtml(const std::string& md) {
             continue;
         }
 
+        // ── Raw HTML block ─────────────────────────────────────
+        // Detect lines starting with an HTML tag and pass them through
+        if (trimmed[0] == '<' && trimmed.size() > 1 && (std::isalpha(trimmed[1]) || trimmed[1] == '/')) {
+            // Collect all lines until we hit an empty line or end of input
+            std::string htmlBlock;
+            while (i < N) {
+                std::string hl = lines[i];
+                std::string ht = trimStr(hl);
+                if (ht.empty()) { i++; break; }
+                htmlBlock += hl + "\n";
+                i++;
+            }
+            html += htmlBlock;
+            continue;
+        }
+
         // ── ATX Headings (#) ───────────────────────────────────
         if (trimmed[0] == '#') {
             int level = 0;
@@ -328,7 +344,13 @@ std::string MarkdownRenderer::markdownToHtml(const std::string& md) {
                 i++;
             }
             if (!paraContent.empty()) {
-                html += "<p>" + processInline(paraContent) + "</p>\n";
+                // Check if it looks like raw HTML — if so, pass through without <p>
+                std::string pt = trimStr(paraContent);
+                if (!pt.empty() && pt[0] == '<' && pt.size() > 1 && (std::isalpha(pt[1]) || pt[1] == '/')) {
+                    html += paraContent + "\n";
+                } else {
+                    html += "<p>" + processInline(paraContent) + "</p>\n";
+                }
             }
         }
     }
