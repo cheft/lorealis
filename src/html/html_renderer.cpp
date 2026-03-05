@@ -375,14 +375,25 @@ static void buildTable(MiniNode* tableNode, Box* parent) {
 
     for (auto& [hdr, row] : rows) {
         Box* rowBox = new Box(Axis::ROW);
+        int cols = 0;
+        for (auto* c : row->children) {
+            if (c->tag == "td" || c->tag == "th") cols++;
+        }
+        if (cols == 0) cols = 1;
+
         for (auto* cell : row->children) {
             if (cell->tag != "td" && cell->tag != "th") continue;
             bool isHdr = (cell->tag == "th") || hdr;
             Box* cellBox = new Box(Axis::COLUMN);
             cellBox->setGrow(1.0f);
+            cellBox->setWidthPercentage(100.0f / cols);
             cellBox->setPadding(8, 16, 8, 16);
             cellBox->setBorderThickness(1);
             cellBox->setBorderColor(HAN_BORDER_DDD);
+            cellBox->setMarginTop(0);
+            cellBox->setMarginBottom(0);
+            cellBox->setMarginLeft(0);
+            cellBox->setMarginRight(0);
             if (isHdr) cellBox->setBackgroundColor(HAN_TH_BG);
 
             Box* content = buildInlineRow(cell, BASE * 0.85f,
@@ -481,15 +492,23 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         for (auto* liNode : node->children) {
             if (liNode->tag != "li") continue;
 
+            bool hasContent = false;
+            for (auto* c : liNode->children) {
+                if (isInlineNode(c)) { hasContent = true; break; }
+            }
+            if (liNode->children.empty()) hasContent = true; // empty bullet
+
             Box* row = new Box(Axis::ROW);
             row->setAlignItems(AlignItems::FLEX_START);
             row->setMarginBottom(6);
 
             // Bullet / counter
-            Label* marker = makeLabel(
-                ordered ? (std::to_string(counter++) + ". ") : "• ",
-                BASE, textCol);
-            row->addView(marker);
+            if (hasContent) {
+                Label* marker = makeLabel(
+                    ordered ? (std::to_string(counter++) + ". ") : "• ",
+                    BASE, textCol);
+                row->addView(marker);
+            }
 
             // Right side: column for inline text + potential nested list
             Box* rhs = new Box(Axis::COLUMN);

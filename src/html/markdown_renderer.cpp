@@ -41,7 +41,7 @@ static std::string escapeHtml(const std::string& s) {
             case '&':  result += "&amp;";  break;
             case '<':  result += "&lt;";   break;
             case '>':  result += "&gt;";   break;
-            case '"':  result += "&quot;"; break;
+            // Removed &quot; escaping to preserve raw JSON/code formatting
             default:   result += c;        break;
         }
     }
