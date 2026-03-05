@@ -1,0 +1,83 @@
+<brls:Box
+    width="auto"
+    height="auto"
+    axis="column">
+
+    <!-- Header with RSS Source Selector -->
+    <brls:Box
+        width="auto"
+        height="auto"
+        axis="column"
+        paddingTop="14"
+        paddingBottom="6"
+        paddingLeft="@style/brls/sidebar/padding_left"
+        paddingRight="@style/brls/sidebar/padding_right">
+
+        <!-- Source Selector Row with Management Buttons -->
+        <brls:Box
+            width="auto"
+            height="auto"
+            axis="row"
+            alignItems="center"
+            gap="10">
+
+            <!-- Source Selector (Button with Dropdown) -->
+            <brls:Button
+                id="source_selector"
+                width="630"
+                height="auto"
+                text="Select Source"
+                style="bordered"
+            />
+
+
+            <brls:Button
+                id="add_rss_button"
+                width="60"
+                height="auto"
+                text="+"
+                style="bordered"
+                fontSize="20"
+                cornerRadius="20"/>
+
+            <!-- Delete RSS Button -->
+            <brls:Button
+                id="delete_rss_button"
+                width="60"
+                height="auto"
+                text="-"
+                style="bordered"
+                fontSize="20"
+                cornerRadius="20"/>
+
+        </brls:Box>
+
+        <!-- RSS URL Input (hidden, triggered by add button) -->
+        <brls:InputCell
+            id="rss_url_input"
+            width="auto"
+            height="auto"
+            marginTop="10"
+            visibility="gone"/>
+
+        <brls:Label
+            width="auto"
+            height="auto"
+            text="点击上方按钮选择、增加、删除资讯源"
+            fontSize="14"
+            textColor="#888888"
+            marginTop="10"/>
+
+    </brls:Box>
+
+    <!-- News Recycler -->
+    <brls:RecyclerFrame
+        id="recycler"
+        width="auto"
+        height="auto"
+        grow="1.0"
+        paddingRight="@style/brls/sidebar/padding_right"
+        paddingBottom="@style/brls/sidebar/padding_bottom"
+        paddingLeft="@style/brls/sidebar/padding_left"/>
+
+</brls:Box>

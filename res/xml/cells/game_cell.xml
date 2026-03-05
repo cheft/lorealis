@@ -1,0 +1,103 @@
+<brls:Box
+    width="auto"
+    height="auto"
+    focusable="true"
+    paddingTop="10"
+    paddingBottom="10"
+    paddingLeft="15"
+    paddingRight="15">
+
+    <!-- Game Thumbnail -->
+    <brls:Image
+        id="thumbnail"
+        width="120px"
+        height="68px"
+        marginRight="15"
+        scalingType="fit"
+        cornerRadius="4"/>
+
+    <!-- Content Container -->
+    <brls:Box
+        width="auto"
+        height="auto"
+        grow="1.0"
+        axis="column"
+        justifyContent="spaceBetween">
+
+        <!-- Title and Genre Row -->
+        <brls:Box
+            width="auto"
+            height="auto"
+            axis="row"
+            alignItems="center">
+
+            <brls:Label
+                id="title"
+                width="auto"
+                height="auto"
+                grow="1.0"
+                fontSize="20"
+                singleLine="true"/>
+
+            <brls:Label
+                id="genre"
+                width="auto"
+                height="auto"
+                fontSize="14"
+                textColor="#888888"
+                marginLeft="10"/>
+        </brls:Box>
+
+        <!-- Short Description -->
+        <brls:Label
+            id="description"
+            width="auto"
+            height="auto"
+            fontSize="14"
+            textColor="#aaaaaa"
+            singleLine="true"
+            marginTop="4"
+            marginBottom="4"/>
+
+        <!-- Metadata Row: Platform | Publisher | Release Date -->
+        <brls:Box
+            width="auto"
+            height="auto"
+            axis="row"
+            alignItems="center">
+
+            <brls:Label
+                id="platform"
+                width="auto"
+                height="auto"
+                fontSize="12"
+                textColor="#666666"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                text=" | "
+                fontSize="12"
+                textColor="#555555"
+                marginLeft="8"
+                marginRight="8"/>
+
+            <brls:Label
+                id="publisher"
+                width="auto"
+                height="auto"
+                fontSize="12"
+                textColor="#666666"
+                singleLine="true"
+                grow="1.0"/>
+
+            <brls:Label
+                id="release_date"
+                width="auto"
+                height="auto"
+                fontSize="12"
+                textColor="#666666"/>
+        </brls:Box>
+    </brls:Box>
+
+</brls:Box>

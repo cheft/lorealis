@@ -1,0 +1,88 @@
+<brls:Box
+    width="auto"
+    height="auto"
+    focusable="true"
+    paddingTop="10"
+    paddingBottom="10"
+    paddingLeft="15"
+    paddingRight="15">
+
+    <!-- News Thumbnail -->
+    <brls:Image
+        id="thumbnail"
+        width="120px"
+        height="80px"
+        marginRight="15"
+        scalingType="fill"
+        cornerRadius="6"/>
+
+    <!-- Content Container -->
+    <brls:Box
+        width="auto"
+        height="auto"
+        grow="1.0"
+        axis="column"
+        justifyContent="spaceBetween">
+
+        <!-- Title Row -->
+        <brls:Label
+            id="title"
+            width="auto"
+            height="auto"
+            grow="1.0"
+            fontSize="20"
+            singleLine="true"/>
+
+        <!-- Description -->
+        <brls:Label
+            id="description"
+            width="auto"
+            height="auto"
+            fontSize="14"
+            textColor="#aaaaaa"
+            singleLine="false"
+            marginTop="4"
+            marginBottom="4"/>
+
+        <!-- Metadata Row: Category | Author | Date -->
+        <brls:Box
+            width="auto"
+            height="auto"
+            axis="row"
+            alignItems="center">
+
+            <brls:Label
+                id="category"
+                width="auto"
+                height="auto"
+                fontSize="12"
+                textColor="#2E5BFF"/>
+
+            <brls:Label
+                width="auto"
+                height="auto"
+                text=" | "
+                fontSize="12"
+                textColor="#555555"
+                marginLeft="8"
+                marginRight="8"/>
+
+            <brls:Label
+                id="author"
+                width="auto"
+                height="auto"
+                fontSize="12"
+                textColor="#666666"
+                singleLine="true"
+                grow="1.0"/>
+
+            <brls:Label
+                id="pub_date"
+                width="auto"
+                height="auto"
+                fontSize="12"
+                textColor="#888888"/>
+        </brls:Box>
+    </brls:Box>
+
+</brls:Box>

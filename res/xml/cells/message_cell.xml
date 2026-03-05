@@ -1,0 +1,15 @@
+<brls:Box
+    width="auto"
+    height="auto"
+    alignItems="center"
+    justifyContent="center">
+
+    <brls:Label
+        id="message_label"
+        width="auto"
+        height="auto"
+        fontSize="18"
+        textColor="#969696"
+        horizontalAlign="center"/>
+
+</brls:Box>

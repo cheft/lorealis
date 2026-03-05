@@ -1,0 +1,42 @@
+<brls:Box
+    width="auto"
+    height="auto"
+    axis="column">
+
+    <!-- Search Bar Container -->
+    <!-- <brls:Box
+        width="auto"
+        height="auto"
+        axis="row"
+        alignItems="center"
+        paddingTop="15"
+        paddingBottom="10"
+        paddingLeft="@style/brls/sidebar/padding_left"
+        paddingRight="@style/brls/sidebar/padding_right">
+
+        <brls:Label
+            width="auto"
+            height="auto"
+            text="Search:"
+            fontSize="18"
+            marginRight="10"/>
+
+        <brls:InputCell
+            id="search_input"
+            width="auto"
+            height="40"
+            grow="1.0"/>
+
+    </brls:Box> -->
+
+    <!-- Games Recycler -->
+    <brls:RecyclerFrame
+        id="recycler"
+        width="auto"
+        height="auto"
+        grow="1.0"
+        paddingRight="@style/brls/sidebar/padding_right"
+        paddingBottom="@style/brls/sidebar/padding_bottom"
+        paddingLeft="@style/brls/sidebar/padding_left"/>
+
+</brls:Box>

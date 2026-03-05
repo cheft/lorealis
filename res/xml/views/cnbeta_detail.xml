@@ -1,0 +1,143 @@
+<brls:Box
+    width="100%"
+    height="100%">
+
+    <!-- Background Image (Dimmed) -->
+    <brls:Image
+        id="background_image"
+        positionType="absolute"
+        width="100%"
+        height="100%"
+        scalingType="fill"
+        imageAlign="center"/>
+
+    <!-- Dark Overlay -->
+    <brls:Box
+        id="overlay"
+        positionType="absolute"
+        width="100%"
+        height="100%"
+        backgroundColor="#000000C0"/>
+
+    <!-- Main Content Container with Scrolling -->
+    <brls:ScrollingFrame
+        id="scroll_frame"
+        width="100%"
+        height="100%">
+
+        <brls:Box
+            id="detail_box"
+            width="100%"
+            height="auto"
+            axis="column"
+            padding="60">
+
+            <!-- Header Row: Thumbnail and Core Info -->
+            <brls:Box
+                width="auto"
+                height="auto"
+                axis="row"
+                alignItems="flexStart"
+                gap="40"
+                marginBottom="30">
+
+                <!-- News Thumbnail: Acts as Top Focus boundary -->
+                <brls:Image
+                    id="thumbnail"
+                    width="320"
+                    height="180"
+                    scalingType="fill"
+                    cornerRadius="12"
+                    shadowType="generic"
+                    focusable="true"
+                    hideHighlight="true"
+                    focusUp="thumbnail"
+                    focusLeft="thumbnail"
+                    focusRight="thumbnail" />
+
+                <!-- Info Area -->
+                <brls:Box
+                    width="auto"
+                    height="auto"
+                    grow="1.0"
+                    axis="column">
+
+                    <brls:Label
+                        id="title"
+                        width="auto"
+                        height="auto"
+                        fontSize="48"
+                        marginBottom="15"/>
+
+                    <!-- Meta Row -->
+                    <brls:Box
+                        width="auto"
+                        height="auto"
+                        axis="row"
+                        gap="25"
+                        marginBottom="15">
+                        
+                        <brls:Label id="category" fontSize="18" textColor="#2E5BFF"/>
+                        <brls:Label id="author" fontSize="18" textColor="#AAAAAA"/>
+                        <brls:Label id="pub_date" fontSize="18" textColor="#AAAAAA"/>
+                    </brls:Box>
+
+                    <!-- Source Link -->
+                    <brls:Label
+                        id="source_hint"
+                        width="auto"
+                        height="auto"
+                        fontSize="14"
+                        textColor="#666666"
+                        text="点击「阅读全文」按钮查看完整内容"/>
+                </brls:Box>
+            </brls:Box>
+
+            <!-- Description/Summary -->
+            <brls:Label
+                id="description"
+                width="auto"
+                height="auto"
+                grow="1.0"
+                fontSize="20"
+                textColor="#DDDDDD"
+                lineHeight="1.6"
+                marginBottom="40"/>
+
+            <!-- Bottom Action Bar -->
+            <brls:Box
+                width="auto"
+                height="auto"
+                axis="row"
+                gap="30"
+                justifyContent="center">
+
+                <brls:Button
+                    id="read_button"
+                    width="240"
+                    height="60"
+                    text="阅读全文"
+                    backgroundColor="#2E5BFF"
+                    cornerRadius="30"
+                    fontSize="20"
+                    textColor="#FFFFFF"
+                    focusDown="read_button"
+                    focusLeft="read_button"
+                    focusRight="close_button"/>
+
+                <brls:Button
+                    id="close_button"
+                    width="160"
+                    height="60"
+                    text="返回"
+                    backgroundColor="#333333"
+                    cornerRadius="30"
+                    fontSize="20"
+                    textColor="#CCCCCC"
+                    focusDown="close_button"
+                    focusRight="close_button"
+                    focusLeft="read_button"/>
+            </brls:Box>
+        </brls:Box>
+    </brls:ScrollingFrame>
+</brls:Box>

@@ -1,0 +1,126 @@
+<brls:Box
+    width="100%"
+    height="100%">
+
+    <!-- Immersive Background (Dimmed) -->
+    <brls:Image
+        id="background_image"
+        positionType="absolute"
+        width="100%"
+        height="100%"
+        scalingType="fill"
+        imageAlign="center"/>
+
+    <!-- Dark Cinematic Overlay -->
+    <brls:Box
+        id="overlay"
+        positionType="absolute"
+        width="100%"
+        height="100%"
+        backgroundColor="#000000B0"/>
+
+    <!-- Main Content Container -->
+    <brls:Box
+        width="100%"
+        height="100%"
+        axis="column"
+        padding="80">
+
+        <!-- Header Row: Poster and Core Info -->
+        <brls:Box
+            width="auto"
+            height="auto"
+            axis="row"
+            alignItems="flexStart"
+            gap="60"
+            marginBottom="40">
+
+            <!-- Native 365x206 Cover Art -->
+            <brls:Image
+                id="thumbnail"
+                width="365"
+                height="206"
+                scalingType="fill"
+                cornerRadius="12"
+                shadowType="generic"/>
+
+            <!-- info area -->
+            <brls:Box
+                width="auto"
+                height="auto"
+                grow="1.0"
+                axis="column">
+
+                <brls:Label
+                    id="title"
+                    width="auto"
+                    height="auto"
+                    fontSize="56"
+                    marginBottom="20"
+                    singleLine="true"/>
+
+                <!-- Meta Row -->
+                <brls:Box
+                    width="auto"
+                    height="auto"
+                    axis="row"
+                    gap="30"
+                    marginBottom="20">
+                    
+                    <brls:Label id="genre" fontSize="20" textColor="#2E5BFF"/>
+                    <brls:Label id="platform" fontSize="20" textColor="#AAAAAA"/>
+                    <brls:Label id="release_date" fontSize="20" textColor="#AAAAAA"/>
+                </brls:Box>
+
+                <!-- Developer/Publisher -->
+                <brls:Box
+                    width="auto"
+                    height="auto"
+                    axis="row"
+                    gap="30">
+                    <brls:Label id="developer" fontSize="16" textColor="#666666"/>
+                    <brls:Label id="publisher" fontSize="16" textColor="#666666"/>
+                </brls:Box>
+            </brls:Box>
+        </brls:Box>
+
+        <!-- Description (Centered or Expanded) -->
+        <brls:Label
+            id="description"
+            width="auto"
+            height="auto"
+            grow="1.0"
+            fontSize="22"
+            textColor="#DDDDDD"
+            lineHeight="1.6"
+            marginBottom="50"/>
+
+        <!-- Bottom Action Bar -->
+        <brls:Box
+            width="auto"
+            height="auto"
+            axis="row"
+            gap="30">
+
+            <brls:Button
+                id="play_button"
+                width="240"
+                height="60"
+                text="PLAY NOW"
+                backgroundColor="#2E5BFF"
+                cornerRadius="30"
+                fontSize="20"
+                textColor="#FFFFFF" />
+
+            <brls:Button
+                id="close_button"
+                width="160"
+                height="60"
+                text="BACK"
+                backgroundColor="#333333"
+                cornerRadius="30"
+                fontSize="20"
+                textColor="#CCCCCC"/>
+        </brls:Box>
+    </brls:Box>
+</brls:Box>

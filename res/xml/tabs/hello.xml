@@ -1,0 +1,38 @@
+<brls:Box
+    width="auto"
+    height="auto">
+
+    <brls:ScrollingFrame
+        width="auto"
+        height="auto"
+        grow="1.0"
+    >
+        <brls:Box
+            id="hello_box"
+            paddingTop="24px"
+            paddingBottom="24px"
+            paddingLeft="24px"
+            paddingRight="24px"
+            gap="10px"
+            width="auto"
+            height="auto"
+            axis="column">
+
+            <brls:Label
+                id="hello_label"
+                width="auto"
+                height="auto"
+                text="test"
+                marginBottom="10px" />
+
+            <brls:Button
+                id="hello_button"
+                width="auto"
+                height="auto"
+                style="bordered"
+                text="test"
+                focusDown="button_bordered" />
+        </brls:Box>
+
+    </brls:ScrollingFrame>
+</brls:Box>

@@ -1,0 +1,29 @@
+<brls:Box
+    axis="column"
+    justifyContent="center"
+    alignItems="center"
+    width="100%"
+    height="100%"
+    backgroundColor="#2C3E50"
+    gap="20px"
+>
+
+    <brls:Label
+        id="main_label"
+        text="Hello from XML!"
+        fontSize="40"
+        marginBottom="50px" />
+
+    <brls:Button
+        id="main_button"
+        text="Click Me!"
+        width="200px"
+        height="60px" />
+
+    <brls:Button
+        id="test_button"
+        text="Test Me!"
+        width="200px"
+        height="60px" />
+
+</brls:Box>

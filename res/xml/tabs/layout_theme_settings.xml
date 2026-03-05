@@ -1,0 +1,848 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Layout & Theme Configuration Testing Module (layout_theme_settings)
+    Comprehensive showcase of borealis framework capabilities
+    
+    Sections:
+    1. Theme System Configuration (colors, variants, high contrast)
+    2. Window Management (resolutions, DPI scaling, window modes)
+    3. Typography Controls (fonts, sizing, spacing)
+    4. Layout Geometry (BoxLayout, GridLayout, AbsoluteLayout)
+    5. Spacing & Margins
+    6. Animation Timing Controls
+    7. Rendering Optimizations
+    8. Visual Sandbox Preview Panel
+    9. Theme Import/Export
+    10. Stress Testing & Edge Cases
+    11. Runtime Style Inspection
+-->
+<brls:Box
+    id="layout_theme_root"
+    width="auto"
+    height="auto"
+    axis="row"
+    alignItems="stretch">
+
+    <!-- Main Configuration Panel -->
+    <brls:ScrollingFrame
+        id="config_scroll"
+        width="50%"
+        height="auto"
+        axis="column"
+        alignItems="stretch"
+        scrollingBehavior="centered"
+        grow="0.6">
+
+        <brls:Box
+            width="auto"
+            height="auto"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="@style/brls/sidebar/padding_top"
+            paddingRight="30"
+            paddingBottom="@style/brls/sidebar/padding_bottom"
+            paddingLeft="@style/brls/sidebar/padding_left">
+
+            <!-- Section 1: Theme System Configuration -->
+            <brls:Header
+                id="theme_header"
+                title="Theme System Configuration"
+                subtitle="Color palettes, variants, and accessibility"/>
+
+            <!-- Theme Variant Selection -->
+            <brls:SelectorCell
+                id="theme_variant_selector"
+                title="Theme Variant"/>
+
+            <!-- High Contrast Mode -->
+            <brls:BooleanCell
+                id="high_contrast_toggle"
+                title="High Contrast Mode"/>
+
+            <!-- Auto Theme Mode -->
+            <brls:BooleanCell
+                id="auto_theme_toggle"
+                title="Auto Theme (Follow System)"/>
+
+            <!-- Primary Color Picker -->
+            <brls:DetailCell
+                id="primary_color_picker"
+                title="Primary Color"/>
+
+            <!-- Accent Color Picker -->
+            <brls:DetailCell
+                id="accent_color_picker"
+                title="Accent Color"/>
+
+            <!-- Background Color Picker -->
+            <brls:DetailCell
+                id="background_color_picker"
+                title="Background Color"/>
+
+            <!-- Text Color Picker -->
+            <brls:DetailCell
+                id="text_color_picker"
+                title="Text Color"/>
+
+            <!-- Highlight Color Picker -->
+            <brls:DetailCell
+                id="highlight_color_picker"
+                title="Highlight Color"/>
+
+            <!-- Border Color Picker -->
+            <brls:DetailCell
+                id="border_color_picker"
+                title="Border Color"/>
+
+            <!-- Shadow Color Picker -->
+            <brls:DetailCell
+                id="shadow_color_picker"
+                title="Shadow Color"/>
+
+            <!-- Sub-Theme Selection -->
+            <brls:SelectorCell
+                id="subtheme_selector"
+                title="Sub-Theme Variant"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 2: Window Management -->
+            <brls:Header
+                id="window_header"
+                title="Window Management"
+                subtitle="Resolution, DPI, and display modes"/>
+
+            <!-- Resolution Preset Selector -->
+            <brls:SelectorCell
+                id="resolution_preset"
+                title="Resolution Preset"/>
+
+            <!-- Custom Width Input -->
+            <brls:InputNumericCell
+                id="custom_width"
+                title="Custom Width"/>
+
+            <!-- Custom Height Input -->
+            <brls:InputNumericCell
+                id="custom_height"
+                title="Custom Height"/>
+
+            <!-- DPI Scale Factor -->
+            <brls:SliderCell
+                id="dpi_scale_slider"
+                title="DPI Scale Factor"/>
+
+            <!-- Window Mode -->
+            <brls:SelectorCell
+                id="window_mode_selector"
+                title="Window Mode"/>
+
+            <!-- Aspect Ratio Lock -->
+            <brls:BooleanCell
+                id="aspect_ratio_lock"
+                title="Lock Aspect Ratio"/>
+
+            <!-- Viewport Snapping Grid -->
+            <brls:BooleanCell
+                id="viewport_snapping"
+                title="Viewport Snapping Grid"/>
+
+            <!-- Always On Top -->
+            <brls:BooleanCell
+                id="always_on_top"
+                title="Always On Top"/>
+
+            <!-- Fullscreen Borderless -->
+            <brls:BooleanCell
+                id="fullscreen_borderless"
+                title="Fullscreen Borderless"/>
+
+            <!-- Monitor Selection -->
+            <brls:SelectorCell
+                id="monitor_selector"
+                title="Monitor Selection"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 3: Typography Configuration -->
+            <brls:Header
+                id="typography_header"
+                title="Typography Controls"
+                subtitle="Fonts, sizing, spacing, and alignment"/>
+
+            <!-- Font Family Selector -->
+            <brls:SelectorCell
+                id="font_family_selector"
+                title="Font Family"/>
+
+            <!-- Header Font Size -->
+            <brls:SliderCell
+                id="header_font_size"
+                title="Header Font Size"/>
+
+            <!-- Body Font Size -->
+            <brls:SliderCell
+                id="body_font_size"
+                title="Body Font Size"/>
+
+            <!-- Caption Font Size -->
+            <brls:SliderCell
+                id="caption_font_size"
+                title="Caption Font Size"/>
+
+            <!-- Monospace Font Toggle -->
+            <brls:BooleanCell
+                id="monospace_font_toggle"
+                title="Use Monospace Font"/>
+
+            <!-- Font Fallback Chain -->
+            <brls:InputCell
+                id="font_fallback_chain"
+                title="Font Fallback Chain"/>
+
+            <!-- Dynamic Font Scaling -->
+            <brls:BooleanCell
+                id="dynamic_font_scaling"
+                title="Dynamic Font Scaling (WCAG)"/>
+
+            <!-- Letter Spacing -->
+            <brls:SliderCell
+                id="letter_spacing"
+                title="Letter Spacing"/>
+
+            <!-- Line Height Multiplier -->
+            <brls:SliderCell
+                id="line_height"
+                title="Line Height Multiplier"/>
+
+            <!-- Text Alignment -->
+            <brls:SelectorCell
+                id="text_alignment"
+                title="Default Text Alignment"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 4: Layout Geometry -->
+            <brls:Header
+                id="layout_header"
+                title="Layout Geometry"
+                subtitle="Flexbox, grid, and positioning systems"/>
+
+            <!-- Layout Type -->
+            <brls:SelectorCell
+                id="layout_type_selector"
+                title="Layout Type"/>
+
+            <!-- Flex Direction -->
+            <brls:SelectorCell
+                id="flex_direction_selector"
+                title="Flex Direction"/>
+
+            <!-- Justify Content -->
+            <brls:SelectorCell
+                id="justify_content_selector"
+                title="Justify Content"/>
+
+            <!-- Align Items -->
+            <brls:SelectorCell
+                id="align_items_selector"
+                title="Align Items"/>
+
+            <!-- BoxLayout Stretch Factor -->
+            <brls:SliderCell
+                id="stretch_factor"
+                title="Stretch Factor (Grow)"/>
+
+            <!-- Shrink Factor -->
+            <brls:SliderCell
+                id="shrink_factor"
+                title="Shrink Factor"/>
+
+            <!-- Position Type -->
+            <brls:SelectorCell
+                id="position_type_selector"
+                title="Position Type"/>
+
+            <!-- Percentage Positioning X -->
+            <brls:SliderCell
+                id="position_x_percent"
+                title="Position X (%)"/>
+
+            <!-- Percentage Positioning Y -->
+            <brls:SliderCell
+                id="position_y_percent"
+                title="Position Y (%)"/>
+
+            <!-- Absolute Coordinates X -->
+            <brls:InputNumericCell
+                id="absolute_x"
+                title="Absolute X"/>
+
+            <!-- Absolute Coordinates Y -->
+            <brls:InputNumericCell
+                id="absolute_y"
+                title="Absolute Y"/>
+
+            <!-- Aspect Ratio -->
+            <brls:SliderCell
+                id="aspect_ratio_slider"
+                title="Aspect Ratio (W/H)"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 5: Spacing & Margins -->
+            <brls:Header
+                id="spacing_header"
+                title="Spacing & Margins"
+                subtitle="Padding, margins, and spacing micro-management"/>
+
+            <!-- Padding Top -->
+            <brls:SliderCell
+                id="padding_top"
+                title="Padding Top"/>
+
+            <!-- Padding Right -->
+            <brls:SliderCell
+                id="padding_right"
+                title="Padding Right"/>
+
+            <!-- Padding Bottom -->
+            <brls:SliderCell
+                id="padding_bottom"
+                title="Padding Bottom"/>
+
+            <!-- Padding Left -->
+            <brls:SliderCell
+                id="padding_left"
+                title="Padding Left"/>
+
+            <!-- Margin Top -->
+            <brls:SliderCell
+                id="margin_top"
+                title="Margin Top"/>
+
+            <!-- Margin Right -->
+            <brls:SliderCell
+                id="margin_right"
+                title="Margin Right"/>
+
+            <!-- Margin Bottom -->
+            <brls:SliderCell
+                id="margin_bottom"
+                title="Margin Bottom"/>
+
+            <!-- Margin Left -->
+            <brls:SliderCell
+                id="margin_left"
+                title="Margin Left"/>
+
+            <!-- Separator Thickness -->
+            <brls:SliderCell
+                id="separator_thickness"
+                title="Separator Thickness"/>
+
+            <!-- Scroll Indicator Offset -->
+            <brls:SliderCell
+                id="scroll_indicator_offset"
+                title="Scroll Indicator Offset"/>
+
+            <!-- Focus Border Inset -->
+            <brls:SliderCell
+                id="focus_border_inset"
+                title="Focus Border Inset"/>
+
+            <!-- Glow Radius -->
+            <brls:SliderCell
+                id="glow_radius"
+                title="Glow/Highlight Radius"/>
+
+            <!-- Safe Area Top (Notch) -->
+            <brls:SliderCell
+                id="safe_area_top"
+                title="Safe Area Top (Notch)"/>
+
+            <!-- Safe Area Bottom -->
+            <brls:SliderCell
+                id="safe_area_bottom"
+                title="Safe Area Bottom"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 6: Animation Timing -->
+            <brls:Header
+                id="animation_header"
+                title="Animation Timing"
+                subtitle="Easing, durations, and transitions"/>
+
+            <!-- Easing Function -->
+            <brls:SelectorCell
+                id="easing_function_selector"
+                title="Easing Function"/>
+
+            <!-- Transition Duration -->
+            <brls:SliderCell
+                id="transition_duration"
+                title="Transition Duration (ms)"/>
+
+            <!-- Stagger Delay -->
+            <brls:SliderCell
+                id="stagger_delay"
+                title="List Stagger Delay (ms)"/>
+
+            <!-- Highlight Animation Speed -->
+            <brls:SliderCell
+                id="highlight_speed"
+                title="Highlight Animation Speed"/>
+
+            <!-- Shake Amplitude -->
+            <brls:SliderCell
+                id="shake_amplitude"
+                title="Shake Amplitude"/>
+
+            <!-- Micro-interaction Duration -->
+            <brls:SliderCell
+                id="micro_duration"
+                title="Micro-interaction Duration (ms)"/>
+
+            <!-- Frame Rate Independent Animations -->
+            <brls:BooleanCell
+                id="frame_rate_independent"
+                title="Frame Rate Independent"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 7: Rendering Optimizations -->
+            <brls:Header
+                id="rendering_header"
+                title="Rendering Optimizations"
+                subtitle="Graphics quality and performance"/>
+
+            <!-- Texture Filtering -->
+            <brls:SelectorCell
+                id="texture_filtering"
+                title="Texture Filtering Mode"/>
+
+            <!-- MSAA Level -->
+            <brls:SelectorCell
+                id="msaa_level"
+                title="MSAA Level"/>
+
+            <!-- Transparency Blending -->
+            <brls:SelectorCell
+                id="transparency_blending"
+                title="Transparency Blending"/>
+
+            <!-- HDR Brightness -->
+            <brls:SliderCell
+                id="hdr_brightness"
+                title="HDR Brightness Multiplier"/>
+
+            <!-- FPS Limit -->
+            <brls:SelectorCell
+                id="fps_limit"
+                title="FPS Limit"/>
+
+            <!-- VSync -->
+            <brls:BooleanCell
+                id="vsync_toggle"
+                title="VSync Enabled"/>
+
+            <!-- Debug Layer -->
+            <brls:BooleanCell
+                id="debug_layer_toggle"
+                title="Debug Layer Visible"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 8: Theme Import/Export -->
+            <brls:Header
+                id="import_export_header"
+                title="Theme Import/Export"
+                subtitle="Save and share configurations"/>
+
+            <!-- Export Theme -->
+            <brls:DetailCell
+                id="export_theme"
+                title="Export Theme to JSON"/>
+
+            <!-- Import Theme -->
+            <brls:DetailCell
+                id="import_theme"
+                title="Import Theme from JSON"/>
+
+            <!-- Reset to Default -->
+            <brls:DetailCell
+                id="reset_default"
+                title="Reset to Default"/>
+
+            <!-- Create A/B Snapshot -->
+            <brls:DetailCell
+                id="ab_snapshot"
+                title="Create A/B Snapshot"/>
+
+            <!-- Compare A/B States -->
+            <brls:DetailCell
+                id="ab_compare"
+                title="Compare A/B States"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 9: Stress Testing -->
+            <brls:Header
+                id="stress_header"
+                title="Stress Testing & Edge Cases"
+                subtitle="Performance and boundary testing"/>
+
+            <!-- Rapid Theme Cycling -->
+            <brls:DetailCell
+                id="rapid_theme_cycling"
+                title="Rapid Theme Cycling"/>
+
+            <!-- Resolution Boundary Test -->
+            <brls:DetailCell
+                id="resolution_boundary_test"
+                title="Resolution Boundary Test"/>
+
+            <!-- Zero Dimension Test -->
+            <brls:DetailCell
+                id="zero_dimension_test"
+                title="Zero Dimension Window Test"/>
+
+            <!-- Negative Scaling Test -->
+            <brls:DetailCell
+                id="negative_scaling_test"
+                title="Negative Scaling Test"/>
+
+            <!-- Maximum Recursion Test -->
+            <brls:DetailCell
+                id="max_recursion_test"
+                title="Maximum Recursion Depth Test"/>
+
+            <!-- Memory Leak Detection -->
+            <brls:BooleanCell
+                id="memory_leak_detection"
+                title="Memory Leak Detection"/>
+
+            <!-- 60FPS Stability Monitor -->
+            <brls:BooleanCell
+                id="fps_stability_monitor"
+                title="60FPS Stability Monitor"/>
+
+            <brls:Rectangle
+                width="auto"
+                height="2"
+                marginTop="20"
+                marginBottom="20"
+                color="@theme/brls/sidebar/separator"/>
+
+            <!-- Section 10: Runtime Inspection -->
+            <brls:Header
+                id="inspection_header"
+                title="Runtime Style Inspection"
+                subtitle="Enumerate objects and attributes"/>
+
+            <!-- List All Styles -->
+            <brls:DetailCell
+                id="list_all_styles"
+                title="List All Style Metrics"/>
+
+            <!-- List All Theme Colors -->
+            <brls:DetailCell
+                id="list_all_colors"
+                title="List All Theme Colors"/>
+
+            <!-- List All View Types -->
+            <brls:DetailCell
+                id="list_all_view_types"
+                title="List All View Types"/>
+
+            <!-- List XML Attributes -->
+            <brls:DetailCell
+                id="list_xml_attributes"
+                title="List XML Attributes"/>
+
+            <!-- Current Focus Info -->
+            <brls:DetailCell
+                id="current_focus_info"
+                title="Current Focus Info"/>
+
+            <!-- View Tree Hierarchy -->
+            <brls:DetailCell
+                id="view_tree_hierarchy"
+                title="View Tree Hierarchy"/>
+
+            <brls:RadioCell/>
+            <brls:RadioCell/>
+
+        </brls:Box>
+
+    </brls:ScrollingFrame>
+
+    <!-- Visual Sandbox Preview Panel -->
+    <brls:Box
+        id="preview_panel"
+        width="50%"
+        height="100%"
+        axis="column"
+        alignItems="stretch"
+        grow="0.4"
+        backgroundColor="@theme/brls/background"
+        borderColor="@theme/brls/sidebar/separator"
+        borderThickness="2">
+
+        <!-- Preview Header -->
+        <brls:Box
+            width="auto"
+            height="60"
+            axis="row"
+            alignItems="center"
+            justifyContent="spaceBetween"
+            paddingTop="10"
+            paddingRight="15"
+            paddingBottom="10"
+            paddingLeft="15"
+            backgroundColor="@theme/brls/sidebar/separator">
+
+            <brls:Label
+                id="preview_title"
+                text="Visual Sandbox"
+                fontSize="22"
+                textColor="@theme/brls/text"/>
+
+            <brls:SelectorCell
+                id="preview_mode"
+                width="150"
+                title="Mode"/>
+
+        </brls:Box>
+
+        <!-- Split-Screen Mode Container -->
+        <brls:Box
+            id="split_screen_container"
+            width="auto"
+            height="0"
+            axis="row"
+            alignItems="stretch"
+            grow="1.0">
+
+            <!-- Preview A (Current Settings) -->
+            <brls:Box
+                id="preview_a_container"
+                width="50%"
+                height="auto"
+                axis="column"
+                alignItems="stretch"
+                grow="0.5">
+
+                <brls:Label
+                    id="preview_a_label"
+                    width="auto"
+                    height="30"
+                    text="Current (A)"
+                    fontSize="14"
+                    horizontalAlign="center"
+                    textColor="@theme/brls/header/subtitle"/>
+
+                <brls:Box
+                    id="preview_a_content"
+                    width="auto"
+                    height="auto"
+                    axis="column"
+                    alignItems="center"
+                    justifyContent="center"
+                    grow="1.0"
+                    padding="20">
+
+                    <!-- Sample Button -->
+                    <brls:Button
+                        id="sample_button_a"
+                        text="Sample Button"
+                        marginBottom="15"/>
+
+                    <!-- Sample Label -->
+                    <brls:Label
+                        id="sample_label_a"
+                        text="Typography Sample"
+                        fontSize="18"
+                        marginBottom="15"/>
+
+                    <!-- Sample Rectangle -->
+                    <brls:Rectangle
+                        id="sample_rect_a"
+                        width="100"
+                        height="60"
+                        color="@theme/brls/accent"
+                        cornerRadius="8"
+                        shadowType="generic"/>
+
+                </brls:Box>
+
+            </brls:Box>
+
+            <!-- Preview B (Compare Settings) -->
+            <brls:Box
+                id="preview_b_container"
+                width="50%"
+                height="auto"
+                axis="column"
+                alignItems="stretch"
+                grow="0.5"
+                borderColor="@theme/brls/sidebar/separator"
+                borderThickness="1"
+                lineLeft="1">
+
+                <brls:Label
+                    id="preview_b_label"
+                    width="auto"
+                    height="30"
+                    text="Compare (B)"
+                    fontSize="14"
+                    horizontalAlign="center"
+                    textColor="@theme/brls/header/subtitle"/>
+
+                <brls:Box
+                    id="preview_b_content"
+                    width="auto"
+                    height="auto"
+                    axis="column"
+                    alignItems="center"
+                    justifyContent="center"
+                    grow="1.0"
+                    padding="20">
+
+                    <!-- Sample Button B -->
+                    <brls:Button
+                        id="sample_button_b"
+                        text="Sample Button"
+                        marginBottom="15"/>
+
+                    <!-- Sample Label B -->
+                    <brls:Label
+                        id="sample_label_b"
+                        text="Typography Sample"
+                        fontSize="18"
+                        marginBottom="15"/>
+
+                    <!-- Sample Rectangle B -->
+                    <brls:Rectangle
+                        id="sample_rect_b"
+                        width="100"
+                        height="60"
+                        color="@theme/brls/accent"
+                        cornerRadius="8"
+                        shadowType="generic"/>
+
+                </brls:Box>
+
+            </brls:Box>
+
+        </brls:Box>
+
+        <!-- Live Metrics Display -->
+        <brls:Box
+            width="auto"
+            height="80"
+            axis="column"
+            alignItems="stretch"
+            paddingTop="10"
+            paddingRight="15"
+            paddingBottom="10"
+            paddingLeft="15"
+            backgroundColor="@theme/brls/backdrop">
+
+            <brls:Label
+                id="metrics_fps"
+                text="FPS: --"
+                fontSize="14"
+                textColor="@theme/brls/text"/>
+
+            <brls:Label
+                id="metrics_resolution"
+                text="Resolution: --"
+                fontSize="14"
+                textColor="@theme/brls/text"/>
+
+            <brls:Label
+                id="metrics_dpi_scale"
+                text="DPI Scale: --"
+                fontSize="14"
+                textColor="@theme/brls/text"/>
+
+            <brls:Label
+                id="metrics_theme"
+                text="Theme: --"
+                fontSize="14"
+                textColor="@theme/brls/text"/>
+
+        </brls:Box>
+
+        <!-- Status Bar -->
+        <brls:Box
+            width="auto"
+            height="40"
+            axis="row"
+            alignItems="center"
+            justifyContent="spaceBetween"
+            paddingTop="5"
+            paddingRight="15"
+            paddingBottom="5"
+            paddingLeft="15"
+            backgroundColor="@theme/brls/sidebar/separator">
+
+            <brls:Label
+                id="status_label"
+                text="Ready"
+                fontSize="12"
+                textColor="@theme/brls/header/subtitle"/>
+
+            <brls:ProgressSpinner
+                id="status_spinner"
+                width="20"
+                height="20"
+                visibility="gone"/>
+
+        </brls:Box>
+
+    </brls:Box>
+
+</brls:Box>
