@@ -22,7 +22,9 @@
                 id="hello_label"
                 width="auto"
                 height="auto"
-                text="test"
+                fontSize="24px"
+                horizontalAlign="center"
+                text="功能测试页(整个Demo程序都已失现 Lua+XML 全动态编写)"
                 marginBottom="10px" />
 
             <brls:Button
@@ -30,7 +32,7 @@
                 width="auto"
                 height="auto"
                 style="bordered"
-                text="test"
+                text="测试动态插件 pkgs/hello_view.blpkg"
                 focusDown="button_bordered" />
         </brls:Box>
 

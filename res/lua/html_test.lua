@@ -2,224 +2,122 @@
 local html_test_view = {}
 
 local html_content = [[
-<!DOCTYPE html>
-<html lang="en" xmlns="http://www.w3.org/1999/xhtml" xmlns:o="urn:schemas-microsoft-com:office:office">
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
 
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="x-apple-disable-message-reformatting">
-  <title>Streamline Your China Logistics</title>
-  <!--[if mso]>
-    <noscript>
-        <xml>
-            <o:OfficeDocumentSettings>
-                <o:PixelsPerInch>96</o:PixelsPerInch>
-            </o:OfficeDocumentSettings>
-        </xml>
-    </noscript>
-    <![endif]-->
-  <style>
-    table,
-    td,
-    div,
-    h1,
-    p {
-      font-family: Arial, sans-serif;
-    }
-
-    table,
-    td {
-      border: 0;
-      border-collapse: collapse;
-    }
-
-    /* Responsive adjustments */
-    @media screen and (max-width: 530px) {
-      .col-3 {
-        width: 100% !important;
-        display: block !important;
-        margin-bottom: 20px !important;
-        padding: 0 !important;
-      }
-
-      .padding-mobile {
-        padding: 20px !important;
-      }
-    }
-  </style>
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+    <title>Email Render Test Template</title>
 </head>
 
-<body style="margin:0;padding:0;background-color:#f4f7f9;">
-  <center style="width: 100%; table-layout: fixed; background-color: #f4f7f9;">
-    <div style="max-width: 600px; margin: 0 auto; background-color: #ffffff; box-shadow: 0 4px 6px rgba(0,0,0,0.05);">
-
-      <!-- Header -->
-      <table role="presentation" width="100%" style="border-bottom: 3px solid #34a671;">
+<body style="margin: 0; padding: 0; background-color: #f7f9fc; font-family: Arial, Helvetica, sans-serif; font-size: 14px; line-height: 1.6; color: #333333;">
+    <table width="100%" border="0" cellpadding="0" cellspacing="0" style="background-color: #f7f9fc;">
         <tr>
-          <td align="center" style="padding: 30px 0; background-color: #ffffff;">
-            <table role="presentation" cellpadding="0" cellspacing="0" border="0">
-              <tr>
-                <td valign="middle" style="padding-right: 12px;">
-                  <img src="https://loflog.com/logo.png" width="" height="28" style="display: block;" />
-                </td>
-                <td valign="middle">
-                  <span
-                    style="color: #294686; font-size: 18px; letter-spacing: 3px; text-transform: uppercase; font-weight: bold;">Lofeng
-                    International Logistics</span>
-                </td>
-              </tr>
-            </table>
-          </td>
+            <td align="center" valign="top" style="padding: 20px 0;">
+                <!-- 主容器 -->
+                <table width="600" border="0" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); overflow: hidden;">
+                    <!-- 头部 -->
+                    <tr>
+                        <td align="center" valign="middle" style="padding: 25px 20px; background-color: #4285f4; color: #ffffff;">
+                            <h1 style="margin: 0; font-size: 24px; font-weight: 600; line-height: 1.2;">Email 渲染测试模板 | Test Template</h1>
+                            <p style="margin: 10px 0 0; font-size: 16px; opacity: 0.9;">行内样式全场景验证 | Inline Style Full Test</p>
+                        </td>
+                    </tr>
+                    <!-- 内容区 -->
+                    <tr>
+                        <td style="padding: 30px 25px;">
+                            <!-- 文本测试 -->
+                            <div style="margin-bottom: 25px;">
+                                <h2 style="margin: 0 0 15px; font-size: 20px; color: #202124; font-weight: 600;">1. 文本格式测试 | Text Formatting</h2>
+                                <p style="margin: 0 0 10px;">普通文本：这是一封测试邮件，包含中英文混合内容，用于验证邮件客户端对行内样式的渲染效果。</p>
+                                <p style="margin: 0 0 10px;"><strong>粗体文本 | Bold Text</strong>：LÖVE2D 框架适配测试，Sol2 绑定性能验证。</p>
+                                <p style="margin: 0 0 10px;"><em>斜体文本 | Italic Text</em>：水浒卡牌游戏开发进度更新，108好汉牌型设计完成。</p>
+                                <p style="margin: 0 0 10px;"><span style="text-decoration: line-through; color: #70757a;">删除线 | Strikethrough</span>：已废弃的渲染方案，改用行内样式实现。</p>
+                                <p style="margin: 0; color: #1a73e8; font-weight: 500;">链接色文本 | Link Color：<a href="https://love2d.org" style="color: #1a73e8; text-decoration: none; border-bottom: 1px solid #1a73e8;">LÖVE2D 官网</a></p>
+                            </div>
+                            <!-- 列表测试 -->
+                            <div style="margin-bottom: 25px;">
+                                <h2 style="margin: 0 0 15px; font-size: 20px; color: #202124; font-weight: 600;">2. 列表测试 | List Test</h2>
+                                <ul style="margin: 0 0 15px; padding-left: 20px; list-style: disc;">
+                                    <li style="margin: 0 0 8px;">无序列表项 1：修复图片拉伸问题（Image Stretch Fix）</li>
+                                    <li style="margin: 0 0 8px;">无序列表项 2：实现剪贴板复制功能（Clipboard Copy）</li>
+                                    <li style="margin: 0;">嵌套列表：
+                                        <ul style="margin: 5px 0 0; padding-left: 20px; list-style: circle;">
+                                            <li style="margin: 0;">子项 1：Emoji 单色渲染验证</li>
+                                            <li style="margin: 0;">子项 2：Markdown 链接空格恢复</li>
+                                        </ul>
+                                    </li>
+                                </ul>
+                                <ol style="margin: 0; padding-left: 20px; list-style: decimal;">
+                                    <li style="margin: 0 0 8px;">有序列表项 1：测试行内样式优先级</li>
+                                    <li style="margin: 0;">有序列表项 2：验证跨客户端兼容性（Outlook/Gmail/QQ邮箱）</li>
+                                </ol>
+                            </div>
+                            <!-- 按钮测试 -->
+                            <div style="margin-bottom: 25px; text-align: center;">
+                                <h2 style="margin: 0 0 15px; font-size: 20px; color: #202124; font-weight: 600;">3. 按钮测试 | Button Test</h2>
+                                <a href="https://example.com/test" style="display: inline-block; padding: 12px 24px; background-color: #4285f4; color: #ffffff; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 16px; line-height: 1; mso-padding-alt: 0; text-transform: none;">
+                                    测试按钮 | Test Button
+                                </a>
+                                <a href="https://example.com/secondary" style="display: inline-block; margin-left: 10px; padding: 12px 24px; background-color: #ffffff; color: #4285f4; border: 1px solid #4285f4; text-decoration: none; border-radius: 4px; font-weight: 500; font-size: 16px; line-height: 1; mso-padding-alt: 0;">
+                                    次要按钮 | Secondary Button
+                                </a>
+                            </div>
+                            <!-- 图片测试 -->
+                            <div style="margin-bottom: 25px; text-align: center;">
+                                <h2 style="margin: 0 0 15px; font-size: 20px; color: #202124; font-weight: 600;">4. 图片测试 | Image Test</h2>
+                                <img src="https://picsum.photos/500/200?random=1" alt="Test Image" style="width: 100%; max-width: 550px; height: auto; border-radius: 4px; display: block; margin: 0 auto; border: 0;" />
+                                <p style="margin: 10px 0 0; color: #70757a; font-size: 13px;">图片说明：测试自适应宽度与圆角样式 | Image Caption: Responsive & Border Radius</p>
+                            </div>
+                            <!-- 表格测试 -->
+                            <div style="margin-bottom: 25px;">
+                                <h2 style="margin: 0 0 15px; font-size: 20px; color: #202124; font-weight: 600;">5. 表格测试 | Table Test</h2>
+                                <table width="100%" border="0" cellpadding="8" cellspacing="0" style="border-collapse: collapse;">
+                                    <tr style="background-color: #f8f9fa;">
+                                        <th style="text-align: left; font-weight: 600; color: #202124; border-bottom: 2px solid #dadce0;">功能模块 | Module</th>
+                                        <th style="text-align: center; font-weight: 600; color: #202124; border-bottom: 2px solid #dadce0;">状态 | Status</th>
+                                        <th style="text-align: right; font-weight: 600; color: #202124; border-bottom: 2px solid #dadce0;">进度 | Progress</th>
+                                    </tr>
+                                    <tr>
+                                        <td style="border-bottom: 1px solid #dadce0; color: #333;">文本渲染 | Text Render</td>
+                                        <td style="text-align: center; border-bottom: 1px solid #dadce0; color: #333;">完成 | Done</td>
+                                        <td style="text-align: right; border-bottom: 1px solid #dadce0; color: #333;">100%</td>
+                                    </tr>
+                                    <tr style="background-color: #f8f9fa;">
+                                        <td style="border-bottom: 1px solid #dadce0; color: #333;">图片适配 | Image Adapt</td>
+                                        <td style="text-align: center; border-bottom: 1px solid #dadce0; color: #333;">完成 | Done</td>
+                                        <td style="text-align: right; border-bottom: 1px solid #dadce0; color: #333;">100%</td>
+                                    </tr>
+                                    <tr>
+                                        <td style="color: #333;">Emoji 渲染 | Emoji Render</td>
+                                        <td style="text-align: center; color: #333;">进行中 | Ongoing</td>
+                                        <td style="text-align: right; color: #333;">80%</td>
+                                    </tr>
+                                </table>
+                            </div>
+                            <!-- 代码行测试 -->
+                            <div style="margin-bottom: 0;">
+                                <h2 style="margin: 0 0 15px; font-size: 20px; color: #202124; font-weight: 600;">6. 代码行测试 | Code Line Test</h2>
+                                <div style="padding: 15px; background-color: #f8f9fa; border-radius: 4px; font-family: 'Courier New', monospace; font-size: 13px; color: #202124; line-height: 1.5;">
+                                    <code style="color: #d73a4a;">local emojiFont = love.graphics.newFont("C:\\Windows\\Fonts\\seguiemj.ttf", 24)</code><br/>
+                                    <code style="color: #005cc5;">function love.draw() love.graphics.print("🎴 水浒卡牌 🃏", 100, 100) end</code>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    <!-- 页脚 -->
+                    <tr>
+                        <td align="center" valign="middle" style="padding: 20px 25px; background-color: #f8f9fa; border-top: 1px solid #dadce0;">
+                            <p style="margin: 0 0 8px; color: #70757a; font-size: 13px;">© 2026 测试团队 | Test Team - 行内样式仅用于邮件渲染测试</p>
+                            <p style="margin: 0; color: #9aa0a6; font-size: 12px;">如果无法正常查看，请切换至网页版 | View in browser if display is abnormal</p>
+                        </td>
+                    </tr>
+                </table>
+            </td>
         </tr>
-      </table>
-
-      <!-- Hero Image Section -->
-      <table role="presentation" width="100%">
-        <tr>
-          <td style="background-color: #004494; text-align: center; padding: 0;">
-            <!-- Industry Standard High Quality Stock Image for Logistics/Shipping -->
-            <img src="https://loflog.com/email-header.png" alt="Global Logistics" width="600"
-              style="width: 100%; max-width: 600px; height: auto; display: block;">
-          </td>
-        </tr>
-      </table>
-
-      <!-- Main Content Area -->
-      <table role="presentation" width="100%">
-        <tr>
-          <td class="padding-mobile" style="padding: 40px 40px 20px 40px; text-align: left;">
-            <h1 style="margin: 0 0 20px 0; font-size: 24px; line-height: 1.3; color: #294686; font-weight: bold;">
-              Import from China with <span style="color: #34a671;">Zero-Risk, US-Backed Confidence</span>.
-            </h1>
-            <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #555555;">
-              Dear Friend,
-            </p>
-            <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #555555;">
-              China’s factories offer unmatched <strong>product diversity</strong> and
-              <strong>cost-performance</strong>—but only if you know exactly whom to trust. We do. Hundreds of U.S.
-              companies already rely on <strong>Lofeng International Logistics (Loflog)</strong> to turn that potential
-              into profit.
-            </p>
-            <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.6; color: #555555;">
-              Our teams in Anaheim, CA and across China coordinate pickup, customs, and final delivery while your
-              cargo—and your cash—stay protected by U.S. law from day one. No delays, no hidden fees, no surprises.
-            </p>
-          </td>
-        </tr>
-      </table>
-
-      <!-- Value Proposition Grid (3 Columns) -->
-      <table role="presentation" width="100%"
-        style="background-color: #f8fbfd; border-top: 1px solid #eef2f5; border-bottom: 1px solid #eef2f5;">
-        <tr>
-          <td class="padding-mobile" style="padding: 30px 20px;">
-            <table role="presentation" width="100%">
-              <tr>
-                <!-- Item 1 -->
-                <td class="col-3" width="33%" valign="top" style="padding: 0 10px; text-align: center;">
-                  <div style="font-size: 32px; margin-bottom: 15px;">🇺🇸</div>
-                  <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #34a671;">US Legal Entity
-                  </h3>
-                  <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.5;">
-                    Sign contracts with our US company in Anaheim, CA. Zero-risk guarantee: full cargo value covered
-                    under U.S.
-                  </p>
-                </td>
-                <!-- Item 2 -->
-                <td class="col-3" width="33%" valign="top" style="padding: 0 10px; text-align: center;">
-                  <div style="font-size: 32px; margin-bottom: 15px;">💰</div>
-                  <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #34a671;">Competitive Rates
-                  </h3>
-                  <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.5;">
-                    Our high-volume shipping unlocks big-business pricing.
-                    No language barriers, and the famously fast Chinese-style response efficiency everyone knows.
-                  </p>
-                </td>
-                <!-- Item 3 -->
-                <td class="col-3" width="33%" valign="top" style="padding: 0 10px; text-align: center;">
-                  <div style="font-size: 32px; margin-bottom: 15px;">🏭</div>
-                  <h3 style="margin: 0 0 10px 0; font-size: 16px; color: #34a671;">Factory-to-Door
-                  </h3>
-                  <p style="margin: 0; font-size: 13px; color: #666; line-height: 1.5;">
-                    Let us take the hassle out of every step for you.
-                    We handle pickup, customs, and final delivery. Full visibility from the factory
-                    floor to your warehouse.
-                  </p>
-                </td>
-              </tr>
-            </table>
-          </td>
-        </tr>
-      </table>
-
-      <!-- Social Proof & Services -->
-      <table role="presentation" width="100%">
-        <tr>
-          <td class="padding-mobile" style="padding: 40px 40px 20px 40px; text-align: center;">
-            <h2 style="margin: 0 0 20px 0; font-size: 20px; color: #294686;">Trusted by American
-              Manufacturers</h2>
-            <p
-              style="margin: 0 0 30px 0; font-size: 15px; line-height: 1.6; color: #555555; max-width: 500px; display: inline-block;">
-              We are already helping businesses like yours reduce landed costs and improve transit
-              reliability. Whether you need <strong>Air Freight for speed</strong> or <strong>Ocean
-                Freight for volume</strong>, we have the network.
-            </p>
-
-            <!-- CTA Button -->
-            <div>
-              <!-- 直接回复按钮：点击即可在收件人栏自动填入我方地址，方便客户一键回信 -->
-              <a href="mailto:services@loflog.com?subject=Logistics Quote Request&body=Hi Loflog,%0D%0A%0D%0APlease send me a free quote. Here are my requirements:%0D%0A%0D%0A1. Product(s):%0D%0A2. Volume/Weight:%0D%0A3. Pickup City in China:%0D%0A4. Delivery Zip in the US:%0D%0A5. Preferred mode (Air/Ocean):%0D%0A%0D%0AThank you!"
-                style="background-color: #64748b; border: 1px solid #64748b; color: #ffffff; padding: 15px 35px; text-decoration: none; border-radius: 50px; font-weight: bold; font-size: 16px; display: inline-block; mso-padding-alt:0;">
-                <!--[if mso]>
-                                <i style="letter-spacing: 25px; mso-font-width: -100%; mso-text-raise: 30pt;">&nbsp;</i>
-                                <![endif]-->
-                <span style="mso-text-raise: 15pt;">Reply Now for Free Quote</span>
-                <!--[if mso]>
-                                <i style="letter-spacing: 25px; mso-font-width: -100%;">&nbsp;</i>
-                                <![endif]-->
-              </a>
-            </div>
-          </td>
-        </tr>
-      </table>
-
-      <!-- Divider -->
-      <table role="presentation" width="100%">
-        <tr>
-          <td style="padding: 0 40px;">
-            <div style="border-top: 1px solid #e6e6e6; margin: 20px 0;"></div>
-          </td>
-        </tr>
-      </table>
-
-      <!-- Footer -->
-      <table role="presentation" width="100%">
-        <tr>
-          <td style="padding: 20px 40px 40px 40px; text-align: center; color: #888888; font-size: 12px;">
-            <p style="margin: 0 0 10px 0;"><strong>Lofeng International Logistics</strong></p>
-            <!-- <p style="margin: 0 0 10px 0;">
-              5701 E. Santa Ana Canyon Rd, Suite T, Anaheim, CA 92807<br>
-              Shenzhen, China
-            </p> -->
-            <p style="margin: 0;">
-              <a href="https://loflog.com" style="color: #34a671; text-decoration: underline;">https://loflog.com</a>
-              &nbsp;|&nbsp;
-              <a href="mailto:services@loflog.com"
-                style="color: #34a671; text-decoration: underline;">services@loflog.com</a>
-            </p>
-            <p style="margin: 20px 0 0 0;">
-              © 2025 Loflog. All rights reserved. <br>
-              <a href="#" style="color: #888888; text-decoration: underline;">Unsubscribe</a>
-            </p>
-          </td>
-        </tr>
-      </table>
-
-    </div>
-  </center>
+    </table>
 </body>
-
 </html>
 ]]
 

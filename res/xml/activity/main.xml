@@ -6,11 +6,11 @@
         title="@i18n/demo/title"
         icon="@res/img/borealis_96.png">
 
-        <brls:Tab label="Hello">
+        <brls:Tab label="Hello Lua">
             <HelloTab />
         </brls:Tab>
 
-        <brls:Tab label="资讯">
+        <brls:Tab label="RSS Reader">
             <CnBetaListTab />
         </brls:Tab>
 
@@ -18,9 +18,9 @@
             <GameListTab />
         </brls:Tab>
         
-        <brls:Tab label="Layout &amp; Theme">
+        <!-- <brls:Tab label="Layout &amp; Theme">
             <LayoutThemeSettingsTab />
-        </brls:Tab>
+        </brls:Tab> -->
 
         <brls:Separator />
 
