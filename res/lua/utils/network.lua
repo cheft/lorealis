@@ -36,11 +36,11 @@ function network.get(url, callback)
     
     print("Network: GET " .. url)
     
-    return brls.Network.get(url, function(success, response)
+    return brls.Network.get(url, function(success, statusCode, response)
         if success then
             print("Network: Success, received " .. #response .. " bytes")
         else
-            print("Network: Request failed")
+            print("Network: Request failed with status " .. tostring(statusCode))
         end
         
         if callback then

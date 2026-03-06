@@ -58,7 +58,7 @@ function hello_tab.init(mainView)
         function(v)
             local dialog = brls.Dialog.new("Fetch Website HTML")
             local input = brls.InputCell.new()
-            input:init("URL", "https://thebookofshaders.com/?lan=ch", function(text) end, "https://thebookofshaders.com/?lan=ch", "Enter full URL")
+            input:init("URL", "https://thebookofshaders.com/?lan=ch", function(text) end, "https://thebookofshaders.com/?lan=ch", "Enter full URL", 256)
             dialog:addView(input)
             
             dialog:addButton("Fetch", function()

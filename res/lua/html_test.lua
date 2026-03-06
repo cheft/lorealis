@@ -121,167 +121,100 @@ local html_content = [[
 
 
 local md_content = [[
-# ❤️ ✨ Welcome to Markdown Viewer
-
-## ✨ Key Features
-- **Live Preview** with GitHub styling
-- **Smart Import/Export** (MD, HTML, PDF)
-- **Mermaid Diagrams** for visual documentation
-- **LaTeX Math Support** for scientific notation
-- **Emoji Support** 😄 👍 🎉
-
-## 💻 Code with Syntax Highlighting
-```javascript
-  function renderMarkdown() {
-    const markdown = markdownEditor.value;
-    const html = marked.parse(markdown);
-    const sanitizedHtml = DOMPurify.sanitize(html);
-    markdownPreview.innerHTML = sanitizedHtml;
-    
-    // Apply syntax highlighting to code blocks
-    markdownPreview.querySelectorAll('pre code').forEach((block) => {
-        hljs.highlightElement(block);
-    });
-  }
-```
-
-## 🧮 Mathematical Expressions
-Write complex formulas with LaTeX syntax:
-
-Inline equation: $$E = mc^2$$
-
-Display equations:
-$$\frac{\partial f}{\partial x} = \lim_{h \to 0} \frac{f(x+h) - f(x)}{h}$$
-
-$$\sum_{i=1}^{n} i^2 = \frac{n(n+1)(2n+1)}{6}$$
-
-## 📊 Mermaid Diagrams
-Create powerful visualizations directly in markdown:
-
-```mermaid
-flowchart LR
-    A[Start] --> B{Is it working?}
-    B -->|Yes| C[Great!]
-    B -->|No| D[Debug]
-    C --> E[Deploy]
-    D --> B
-```
-
-### Sequence Diagram Example
-```mermaid
-sequenceDiagram
-    User->>Editor: Type markdown
-    Editor->>Preview: Render content
-    User->>Editor: Make changes
-    Editor->>Preview: Update rendering
-    User->>Export: Save as PDF
-```
-
-## 📋 Task Management
-- [ ] Create responsive layout
-- [x] Implement live preview with GitHub styling
-- [x] Add syntax highlighting for code blocks
-- [x] Support math expressions with LaTeX
-- [ ] Enable mermaid diagrams
-
-## 🆚 Feature Comparison
-
-| Feature                  | Markdown Viewer (Ours) | Other Markdown Editors  |
-|:-------------------------|:----------------------:|:-----------------------:|
-| Live Preview             | ✅ GitHub-Styled       | ✅                     |
-| Sync Scrolling           | ✅ Two-way             | 🔄 Partial/None        |
-| Mermaid Support          | ✅                     | ❌/Limited             |
-| LaTeX Math Rendering     | ✅                     | ❌/Limited             |
-
-### 📝 Multi-row Headers Support
-
-<table>
-  <thead>
-    <tr>
-      <th rowspan="2">Document Type</th>
-      <th colspan="2">Support</th>
-    </tr>
-    <tr>
-      <th>Markdown Viewer (Ours)</th>
-      <th>Other Markdown Editors</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Technical Docs</td>
-      <td>Full + Diagrams</td>
-      <td>Limited/Basic</td>
-    </tr>
-    <tr>
-      <td>Research Notes</td>
-      <td>Full + Math</td>
-      <td>Partial</td>
-    </tr>
-    <tr>
-      <td>Developer Guides</td>
-      <td>Full + Export Options</td>
-      <td>Basic</td>
-    </tr>
-  </tbody>
-</table>
-
-## 📝 Text Formatting Examples
-
-### Text Formatting
-
-Text can be formatted in various ways for ~~strikethrough~~, **bold**, *italic*, or ***bold italic***.
-
-For highlighting important information, use <mark>highlighted text</mark> or add <u>underlines</u> where appropriate.
-
-### Superscript and Subscript
-
-Chemical formulas: H<sub>2</sub>O, CO<sub>2</sub>  
-Mathematical notation: x<sup>2</sup>, e<sup>iπ</sup>
-
-### Keyboard Keys
-
-Press <kbd>Ctrl</kbd> + <kbd>B</kbd> for bold text.
-
-### Abbreviations
-
-<abbr title="Graphical User Interface">GUI</abbr>  
-<abbr title="Application Programming Interface">API</abbr>
-
-### Text Alignment
-
-<div style="text-align: center">
-Centered text for headings or important notices
-</div>
-
-<div style="text-align: right">
-Right-aligned text (for dates, signatures, etc.)
-</div>
-
-### **Lists**
-
-Create bullet points:
-* Item 1
-* Item 2
-  * Nested item
-    * Nested further
-
-### **Links and Images**
-
-Add a  [link](https://github.com/ThisIs-Developer/Markdown-Viewer) to important resources.
-
-Embed an image:
-![Markdown Logo](https://godotengine.org/assets/download/download-background-4.x.webp)
-
-### **Blockquotes**
-
-Quote someone famous:
-> "The best way to predict the future is to invent it." - Alan Kay
-
+---
+# frontmatter: https://jekyllrb.com/docs/front-matter/
+layout: post
+title: Blogging Like a Hacker
 ---
 
-## 🛡️ Security Note
+## Markdown Basic Syntax
 
-This is a fully client-side application. Your content never leaves your browser and stays secure on your device.
+I just love **bold text**. Italicized text is the _cat's meow_. At the command prompt, type `nano`.
+
+My favorite markdown editor is [ByteMD](https://github.com/bytedance/bytemd).
+
+1. First item
+2. Second item
+3. Third item
+
+> Dorothy followed her through many of the beautiful rooms in her castle.
+
+```js
+import gfm from '@bytemd/plugin-gfm'
+import { Editor, Viewer } from 'bytemd'
+
+const plugins = [
+  gfm(),
+  // Add more plugins here
+]
+
+const editor = new Editor({
+  target: document.body, // DOM to render
+  props: {
+    value: '',
+    plugins,
+  },
+})
+
+editor.on('change', (e) => {
+  editor.$set({ value: e.detail.value })
+})
+```
+
+## GFM Extended Syntax
+
+Automatic URL Linking: https://github.com/bytedance/bytemd
+
+~~The world is flat.~~ We now know that the world is round.
+
+- [x] Write the press release
+- [ ] Update the website
+- [ ] Contact the media
+
+| Syntax    | Description |
+| --------- | ----------- |
+| Header    | Title       |
+| Paragraph | Text        |
+
+## Footnotes
+
+Here's a simple footnote,[^1] and here's a longer one. bignote
+
+[^1]: This is the first footnote.
+[^bignote]: Here's one with multiple paragraphs and code.
+
+    Indent paragraphs to include them in the footnote.
+
+    `{ my code }`
+
+    Add as many paragraphs as you like.
+
+## Gemoji
+
+Thumbs up: :+1:, thumbs down: :-1:.
+
+Families: :family_man_man_boy_boy:
+
+Long flags: :wales:, :scotland:, :england:.
+
+## Math Equation
+
+Inline math equation: $a+b$
+
+$$
+\displaystyle \left( \sum_{k=1}^n a_k b_k \right)^2 \leq \left( \sum_{k=1}^n a_k^2 \right) \left( \sum_{k=1}^n b_k^2 \right)
+$$
+
+## Mermaid Diagrams
+
+```mermaid
+graph TD;
+  A-->B;
+  A-->C;
+  B-->D;
+  C-->D;
+```
+
 
 ]]
 
