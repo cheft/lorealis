@@ -10,7 +10,7 @@ void LuaManager::registerNetworkBindings(sol::table& brls_ns) {
     network["get"] = [](const std::string& url, sol::protected_function callback) {
         return SimpleHTTPClient::get(url, [callback](bool success, int statusCode, const std::string& response) {
             if (callback.valid()) {
-                auto res = callback(success, response);
+                auto res = callback(success, statusCode, response);
                 if (!res.valid()) {
                     sol::error err = res;
                     brls::Logger::warning("Lua error in Network.get callback: {}", err.what());

@@ -52,6 +52,55 @@ function hello_tab.init(mainView)
     )
     hello_box:addView(test_markdown_btn)
 
+    -- Add Fetch Website HTML Button
+    local fetch_website_btn = brls.Button.new(
+        "Fetch Website HTML",
+        function(v)
+            local dialog = brls.Dialog.new("Fetch Website HTML")
+            local input = brls.InputCell.new()
+            input:init("URL", "https://thebookofshaders.com/?lan=ch", function(text) end, "https://thebookofshaders.com/?lan=ch", "Enter full URL")
+            dialog:addView(input)
+            
+            dialog:addButton("Fetch", function()
+                local url = input:getValue()
+                if url == "" then return end
+                
+                brls.Application.notify("Fetching " .. url .. "...")
+                brls.Network.get(url, function(success, statusCode, response)
+                    if success then
+                        local content = brls.ScrollingFrame.new()
+                        local renderer = brls.HtmlRenderer.new()
+                        renderer:renderString(response)
+                        renderer:setPadding(64)
+                        content:setContentView(renderer)
+                        v:present(content)
+                    else
+                        local errorMsg = "Status: " .. tostring(statusCode)
+                        if statusCode < 0 then
+                            local winErr = -statusCode
+                            if winErr == 12007 then errorMsg = "DNS Error (12007)"
+                            elseif winErr == 12029 then errorMsg = "Connection Refused (12029)"
+                            elseif winErr == 12002 then errorMsg = "Timeout (12002)"
+                            elseif winErr == 12157 then errorMsg = "SSL/TLS Error (12157)"
+                            else errorMsg = "WinInet Error " .. tostring(winErr)
+                            end
+                        end
+                        brls.Application.notify("Failed to fetch: " .. errorMsg)
+                        print("Fetch Error: URL=" .. url .. " " .. errorMsg)
+                    end
+                end)
+            end)
+            
+            dialog:addButton("Cancel", function()
+                dialog:close()
+            end)
+            
+            dialog:open()
+            return true
+        end
+    )
+    hello_box:addView(fetch_website_btn)
+
     if button then
         button:onClick(function(v)
             print("HelloTab: button clicked")

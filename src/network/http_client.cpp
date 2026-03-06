@@ -113,8 +113,18 @@ uint32_t SimpleHTTPClient::get(const std::string& url, std::function<void(bool s
                     buffer[bytesRead] = '\0';
                     response += buffer;
                 }
-                success = !response.empty() && !NetworkRegistry::isCancelled(id);
+                DWORD code = 0;
+                DWORD codeSize = sizeof(code);
+                if (HttpQueryInfoA(hConnect, HTTP_QUERY_STATUS_CODE | HTTP_QUERY_FLAG_NUMBER, &code, &codeSize, NULL)) {
+                    statusCode = (int)code;
+                }
+                
+                success = (statusCode >= 200 && statusCode < 300) && !response.empty() && !NetworkRegistry::isCancelled(id);
+                if (!success && !response.empty() && statusCode > 0) success = true; // Still allow rendering if we got content
                 InternetCloseHandle(hConnect);
+            } else {
+                statusCode = -(int)GetLastError();
+                brls::Logger::error("WinInet InternetOpenUrlA failed for {}: error {}", url, -statusCode);
             }
             InternetCloseHandle(hInternet);
         }

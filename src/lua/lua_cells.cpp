@@ -114,7 +114,9 @@ void LuaManager::registerCellBindings(sol::table& brls_ns) {
 
     // 6. InputCell
     auto input_cell_ut = brls_ns.new_usertype<brls::InputCell>("InputCell",
-        sol::no_construction(),
+        sol::factories(
+            []() { return new brls::InputCell(); }
+        ),
         sol::base_classes, sol::bases<brls::DetailCell, brls::RecyclerCell, brls::Box, brls::View>()
     );
     input_cell_ut["title"] = sol::property([](brls::InputCell& self) { return (brls::Label*)self.title; });
@@ -128,6 +130,7 @@ void LuaManager::registerCellBindings(sol::table& brls_ns) {
         }, placeholder, hint, maxInputLength.value_or(32));
     };
     input_cell_ut["setValue"] = &brls::InputCell::setValue;
+    input_cell_ut["getValue"] = &brls::InputCell::getValue;
     input_cell_ut["openKeyboard"] = [](brls::InputCell& self, sol::optional<int> maxInputLength) {
         // This simulates the behavior of Clicking on the cell
         brls::Application::getImeManager()->openForText([&self](std::string text) {

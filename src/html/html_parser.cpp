@@ -84,17 +84,29 @@ MiniNode* HtmlParser::parseHTML(const std::string& html) {
                 MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = unescapeHtml(raw);
                 topNode()->children.push_back(tn);
             } else {
-                std::string norm;
-                bool lastWasSpace = false;
-                for (char c : raw) {
-                    if (isspace((unsigned char)c)) {
-                        if (!lastWasSpace) { norm += ' '; lastWasSpace = true; }
-                    } else { norm += c; lastWasSpace = false; }
+                // Filter out content inside script and style tags
+                bool skipContent = false;
+                std::stack<MiniNode*> filterStack = stk;
+                while (!filterStack.empty()) {
+                    std::string t = filterStack.top()->tag;
+                    if (t == "script" || t == "style") { skipContent = true; break; }
+                    filterStack.pop();
                 }
-                if (norm == " " && topNode()->children.empty()) continue;
-                if (norm.empty()) continue;
-                MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = unescapeHtml(norm);
-                topNode()->children.push_back(tn);
+
+                if (!skipContent) {
+                    std::string norm;
+                    bool lastWasSpace = false;
+                    for (char c : raw) {
+                        if (isspace((unsigned char)c)) {
+                            if (!lastWasSpace) { norm += ' '; lastWasSpace = true; }
+                        } else { norm += c; lastWasSpace = false; }
+                    }
+                    if (norm == " " && topNode()->children.empty()) { /* skip leading space */ }
+                    else if (!norm.empty()) {
+                        MiniNode* tn = new MiniNode(); tn->isText = true; tn->text = unescapeHtml(norm);
+                        topNode()->children.push_back(tn);
+                    }
+                }
             }
             continue;
         }
