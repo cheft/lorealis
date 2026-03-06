@@ -73,7 +73,7 @@ docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/d
       border-radius: 4px;       /* 可选：圆角更美观 */
     }
     /* 适配手机：小屏幕自动变1列 */
-    @media (max-width: 600px) {
+    @media (max-width: 375px) {
       .two-col-waterfall {
         column-count: 1;
       }
