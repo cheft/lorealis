@@ -399,14 +399,14 @@ static void applyTextAlign(Box* row, const std::string& align) {
 // ============================================================
 // Inline renderer
 // ============================================================
-static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor color, bool strikethrough = false);
+static void renderInline(HtmlRenderer* renderer, MiniNode* node, Box* target, float fontSize, NVGcolor color, bool strikethrough = false);
 
-static void renderInlineChildren(const std::vector<MiniNode*>& children, Box* target,
+static void renderInlineChildren(HtmlRenderer* renderer, const std::vector<MiniNode*>& children, Box* target,
                                   float fontSize, NVGcolor color, bool strikethrough = false) {
-    for (auto* c : children) renderInline(c, target, fontSize, color, strikethrough);
+    for (auto* c : children) renderInline(renderer, c, target, fontSize, color, strikethrough);
 }
 
-static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor color, bool strikethrough) {
+static void renderInline(HtmlRenderer* renderer, MiniNode* node, Box* target, float fontSize, NVGcolor color, bool strikethrough) {
     if (node->isText) {
         if (node->text.empty()) return;
         std::string txt = node->text;
@@ -430,13 +430,13 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
     const std::string& t = node->tag;
 
     if (t == "strong" || t == "b") {
-        renderInlineChildren(node->children, target, fontSize, HAN_STRONG_TEXT, strikethrough);
+        renderInlineChildren(renderer, node->children, target, fontSize, HAN_STRONG_TEXT, strikethrough);
     }
     else if (t == "em" || t == "i") {
-        renderInlineChildren(node->children, target, fontSize, nvgRGB(0x55,0x55,0x55), strikethrough);
+        renderInlineChildren(renderer, node->children, target, fontSize, nvgRGB(0x55,0x55,0x55), strikethrough);
     }
     else if (t == "del" || t == "s") {
-        renderInlineChildren(node->children, target, fontSize, HAN_DEL_TEXT, true);
+        renderInlineChildren(renderer, node->children, target, fontSize, HAN_DEL_TEXT, true);
     }
     else if (t == "span") {
         // Check for inline style on span
@@ -444,17 +444,11 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
         NVGcolor spanColor = color;
         bool spanStrike = strikethrough;
         if (!styleStr.empty()) {
-            // Quick parse just for color / text-decoration
-            std::istringstream ss(styleStr); std::string seg;
-            while (std::getline(ss, seg, ';')) {
-                size_t c = seg.find(':'); if (c == std::string::npos) continue;
-                std::string k = strTrim(toLower(seg.substr(0,c)));
-                std::string v = strTrim(seg.substr(c+1));
-                if (k == "color") { auto col = parseColor(v); if (col) spanColor = *col; }
-                if (k == "text-decoration" && v.find("line-through") != std::string::npos) spanStrike = true;
-            }
+            CssStyle sSt = renderer->parseInlineStyle(styleStr);
+            if (sSt.color) spanColor = *sSt.color;
+            if (sSt.textDecorationLine && *sSt.textDecorationLine) spanStrike = true;
         }
-        renderInlineChildren(node->children, target, fontSize, spanColor, spanStrike);
+        renderInlineChildren(renderer, node->children, target, fontSize, spanColor, spanStrike);
     }
     else if (t == "code") {
         // Check for per-code colour (used in monospace div blocks)
@@ -477,32 +471,44 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
     }
     else if (t == "a") {
         std::string href = node->attributes.count("href") ? node->attributes.at("href") : "";
-        // Check if this is a styled button (has background-color in style)
         std::string styleStr = node->attributes.count("style") ? node->attributes.at("style") : "";
-        bool isButton = styleStr.find("background-color") != std::string::npos &&
-                        styleStr.find("#ffffff") == std::string::npos &&
-                        styleStr.find("white") == std::string::npos;
-        NVGcolor linkColor = HAN_LINK_BLUE;
-        if (!styleStr.empty()) {
-            std::istringstream ss(styleStr); std::string seg;
-            while (std::getline(ss, seg, ';')) {
-                size_t c = seg.find(':'); if (c == std::string::npos) continue;
-                std::string k = strTrim(toLower(seg.substr(0,c)));
-                std::string v = strTrim(seg.substr(c+1));
-                if (k == "color") { auto col = parseColor(v); if (col) linkColor = *col; }
+        CssStyle aSt = renderer->parseInlineStyle(styleStr);
+        
+        bool isButton = aSt.backgroundColor.has_value() || aSt.borderWidth.has_value() || aSt.paddingTop.has_value() ||
+                        styleStr.find("padding") != std::string::npos; // Fallback heuristic
+
+        if (isButton) {
+            Box* btnBox = new Box(Axis::ROW);
+            btnBox->setJustifyContent(JustifyContent::CENTER);
+            btnBox->setAlignItems(AlignItems::CENTER);
+            renderer->applyStyle(btnBox, aSt);
+
+            NVGcolor lblColor = aSt.color ? *aSt.color : (aSt.backgroundColor ? nvgRGB(255,255,255) : HAN_LINK_BLUE);
+            float lblSize = aSt.fontSize ? *aSt.fontSize : fontSize;
+            Label* lbl = makeLabel(collectText(node), lblSize, lblColor);
+            btnBox->addView(lbl);
+
+            if (!href.empty()) {
+                btnBox->setFocusable(true);
+                btnBox->registerClickAction([href](View*) { Application::getPlatform()->openBrowser(href); return true; });
+                btnBox->addGestureRecognizer(new TapGestureRecognizer([href](TapGestureStatus s, Sound*) {
+                    if (s.state == GestureState::END) Application::getPlatform()->openBrowser(href);
+                }));
             }
+            target->addView(btnBox);
+        } else {
+            NVGcolor linkColor = aSt.color ? *aSt.color : HAN_LINK_BLUE;
+            Label* lbl = makeLabel(collectText(node), fontSize, linkColor);
+            lbl->setLineBottom(1); lbl->setLineColor(linkColor);
+            if (!href.empty()) {
+                lbl->setFocusable(true);
+                lbl->registerClickAction([href](View*) { Application::getPlatform()->openBrowser(href); return true; });
+                lbl->addGestureRecognizer(new TapGestureRecognizer([href](TapGestureStatus s, Sound*) {
+                    if (s.state == GestureState::END) Application::getPlatform()->openBrowser(href);
+                }));
+            }
+            target->addView(lbl);
         }
-        std::string txt = collectText(node);
-        Label* lbl = makeLabel(txt, fontSize, linkColor);
-        lbl->setLineBottom(1); lbl->setLineColor(linkColor);
-        if (!href.empty()) {
-            lbl->setFocusable(true);
-            lbl->registerClickAction([href](View*) { Application::getPlatform()->openBrowser(href); return true; });
-            lbl->addGestureRecognizer(new TapGestureRecognizer([href](TapGestureStatus s, Sound*) {
-                if (s.state == GestureState::END) Application::getPlatform()->openBrowser(href);
-            }));
-        }
-        target->addView(lbl);
     }
     else if (t == "br") {
         Box* br = new Box(Axis::ROW); br->setHeight(fontSize * 0.5f);
@@ -519,7 +525,7 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
             Box* imgContainer = new Box(Axis::ROW);
             imgContainer->setJustifyContent(JustifyContent::CENTER);
             imgContainer->setWidthPercentage(100);
-            img->setWidthPercentage(80);
+            img->setWidthPercentage(100);
             imgContainer->addView(img);
             target->addView(imgContainer);
             if (src.rfind("http", 0) == 0) {
@@ -530,11 +536,11 @@ static void renderInline(MiniNode* node, Box* target, float fontSize, NVGcolor c
         }
     }
     else {
-        renderInlineChildren(node->children, target, fontSize, color, strikethrough);
+        renderInlineChildren(renderer, node->children, target, fontSize, color, strikethrough);
     }
 }
 
-static Box* buildInlineRow(MiniNode* node, float fontSize, NVGcolor color,
+static Box* buildInlineRow(HtmlRenderer* renderer, MiniNode* node, float fontSize, NVGcolor color,
                             const std::string& align = "left") {
     Box* row = new Box(Axis::ROW);
     row->setFlexWrap(true);
@@ -542,7 +548,7 @@ static Box* buildInlineRow(MiniNode* node, float fontSize, NVGcolor color,
     row->setColumnGap(0);
     row->setAlignItems(AlignItems::FLEX_START);
     applyTextAlign(row, align);
-    renderInlineChildren(node->children, row, fontSize, color);
+    renderInlineChildren(renderer, node->children, row, fontSize, color);
     return row;
 }
 
@@ -590,7 +596,6 @@ static void buildTable(HtmlRenderer* renderer, MiniNode* tableNode, Box* parent,
         }
     };
     collect(tableNode, false);
-    for (auto* c : tableNode->children) if (c->tag == "tr") rows.push_back({false, c});
 
     CssStyle tableSt = renderer->parseInlineStyle(
         tableNode->attributes.count("style") ? tableNode->attributes.at("style") : "");
@@ -638,16 +643,16 @@ static void buildTable(HtmlRenderer* renderer, MiniNode* tableNode, Box* parent,
             }
 
             if (cellSt.paddingTop) cellBox->setPaddingTop(*cellSt.paddingTop);
-            else cellBox->setPaddingTop(hasBorder ? defPadding : defPadding * 0.5f);
+            else cellBox->setPaddingTop(defPadding);
             
             if (cellSt.paddingBottom) cellBox->setPaddingBottom(*cellSt.paddingBottom);
-            else cellBox->setPaddingBottom(hasBorder ? defPadding : defPadding * 0.5f);
+            else cellBox->setPaddingBottom(defPadding);
             
             if (cellSt.paddingLeft) cellBox->setPaddingLeft(*cellSt.paddingLeft);
-            else cellBox->setPaddingLeft(hasBorder ? defPadding * 2 : defPadding);
+            else cellBox->setPaddingLeft(defPadding);
             
             if (cellSt.paddingRight) cellBox->setPaddingRight(*cellSt.paddingRight);
-            else cellBox->setPaddingRight(hasBorder ? defPadding * 2 : defPadding);
+            else cellBox->setPaddingRight(defPadding);
 
             if (hasBorder) {
                 cellBox->setBorderThickness(1);
@@ -689,7 +694,7 @@ static void buildTable(HtmlRenderer* renderer, MiniNode* tableNode, Box* parent,
                         else inlineRow->setJustifyContent(JustifyContent::FLEX_START);
                         cellBox->addView(inlineRow);
                     }
-                    renderInline(child, inlineRow, baseFontSize * 0.85f, cCol);
+                    renderInline(renderer, child, inlineRow, baseFontSize * 0.85f, cCol);
                 } else {
                     inlineRow = nullptr;
                     HtmlRenderer::buildHtmlViews(renderer, child, cellBox, baseFontSize, localTextColor, defaultTextColor, accentColor);
@@ -729,7 +734,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         node->attributes.count("style") ? node->attributes.at("style") : "");
 
     // Pull colour/size from inline style early for headings / p
-    NVGcolor hColor = ist.color ? *ist.color : HAN_BLACK;
+    NVGcolor hColor = ist.color ? *ist.color : textCol;
     std::string hAlign = ist.textAlign ? *ist.textAlign : "left";
 
     // ── Headings ──────────────────────────────────────────────────────
@@ -737,7 +742,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         Box* hb = new Box(Axis::COLUMN);
         hb->setMarginTop(ist.marginTop ? *ist.marginTop : (scale >= 2.0f ? 32 : 18));
         hb->setMarginBottom(ist.marginBottom ? *ist.marginBottom : 10);
-        Box* row = buildInlineRow(node, BASE * scale, hColor, hAlign);
+        Box* row = buildInlineRow(renderer, node, BASE * scale, hColor, hAlign);
         hb->addView(row);
         if (doubleBottom) attachH1Border(hb);
         parent->addView(hb);
@@ -753,7 +758,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
     // ── Paragraph ─────────────────────────────────────────────────────
     else if (tag == "p") {
         NVGcolor pCol = ist.color ? *ist.color : textCol;
-        Box* pb = buildInlineRow(node, ist.fontSize ? *ist.fontSize : BASE, pCol, hAlign);
+        Box* pb = buildInlineRow(renderer, node, ist.fontSize ? *ist.fontSize : BASE, pCol, hAlign);
         pb->setMarginBottom(ist.marginBottom ? *ist.marginBottom : 22);
         if (ist.marginTop) pb->setMarginTop(*ist.marginTop);
         parent->addView(pb);
@@ -811,7 +816,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
                         inlineRow->setAlignItems(AlignItems::FLEX_START);
                         rhs->addView(inlineRow);
                     }
-                    renderInline(liChild, inlineRow, BASE, textCol);
+                    renderInline(renderer, liChild, inlineRow, BASE, textCol);
                 } else {
                     inlineRow = nullptr;
                     buildHtmlViews(renderer, liChild, rhs, baseFontSize, currentTextColor, defaultTextColor, accentColor);
@@ -900,56 +905,24 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
         parent->addView(spacer); skip = true;
     }
 
-    // ── Anchor block-level — may be a styled button ───────────────────
+    // ── Anchor block-level ─────────────────────────────────────────────
+    // Note: Due to isInlineTag("a"), <a> tags are now handled by renderInline!
+    // This block is only a fallback for <a> parsing directly into buildHtmlViews.
     else if (tag == "a") {
         std::string href = node->attributes.count("href") ? node->attributes.at("href") : "";
-        bool isButton = ist.backgroundColor.has_value();
-
-        if (isButton) {
-            // Render as a styled clickable Box
-            Box* btnBox = new Box(Axis::ROW);
-            btnBox->setJustifyContent(JustifyContent::CENTER);
-            btnBox->setAlignItems(AlignItems::CENTER);
-            if (ist.backgroundColor) btnBox->setBackgroundColor(*ist.backgroundColor);
-            if (ist.borderRadius)     btnBox->setCornerRadius(*ist.borderRadius);
-            if (ist.paddingTop)    btnBox->setPaddingTop(*ist.paddingTop);
-            if (ist.paddingBottom) btnBox->setPaddingBottom(*ist.paddingBottom);
-            if (ist.paddingLeft)   btnBox->setPaddingLeft(*ist.paddingLeft);
-            if (ist.paddingRight)  btnBox->setPaddingRight(*ist.paddingRight);
-            if (ist.marginLeft)    btnBox->setMarginLeft(*ist.marginLeft);
-            if (ist.marginRight)   btnBox->setMarginRight(*ist.marginRight);
-            if (ist.borderWidth && ist.borderColor) {
-                btnBox->setBorderThickness(*ist.borderWidth);
-                btnBox->setBorderColor(*ist.borderColor);
-            }
-            NVGcolor lblColor = ist.color ? *ist.color : nvgRGB(255,255,255);
-            float lblSize = ist.fontSize ? *ist.fontSize : BASE;
-            Label* lbl = makeLabel(collectText(node), lblSize, lblColor);
-            btnBox->addView(lbl);
-            if (!href.empty()) {
-                btnBox->setFocusable(true);
-                btnBox->registerClickAction([href](View*) { Application::getPlatform()->openBrowser(href); return true; });
-                btnBox->addGestureRecognizer(new TapGestureRecognizer([href](TapGestureStatus s, Sound*) {
-                    if (s.state == GestureState::END) Application::getPlatform()->openBrowser(href);
-                }));
-            }
-            parent->addView(btnBox);
-        } else {
-            Label* lbl = makeLabel(collectText(node), baseFontSize, HAN_LINK_BLUE);
-            lbl->setLineBottom(1); lbl->setLineColor(HAN_LINK_BLUE);
-            if (ist.color) lbl->setTextColor(*ist.color);
-            if (!href.empty()) {
-                lbl->setFocusable(true);
-                lbl->registerClickAction([href](View*) { Application::getPlatform()->openBrowser(href); return true; });
-                lbl->addGestureRecognizer(new TapGestureRecognizer([href](TapGestureStatus s, Sound*) {
-                    if (s.state == GestureState::END) Application::getPlatform()->openBrowser(href);
-                }));
-            }
-            parent->addView(lbl);
+        NVGcolor linkColor = ist.color ? *ist.color : HAN_LINK_BLUE;
+        Label* lbl = makeLabel(collectText(node), baseFontSize, linkColor);
+        lbl->setLineBottom(1); lbl->setLineColor(linkColor);
+        if (!href.empty()) {
+            lbl->setFocusable(true);
+            lbl->registerClickAction([href](View*) { Application::getPlatform()->openBrowser(href); return true; });
+            lbl->addGestureRecognizer(new TapGestureRecognizer([href](TapGestureStatus s, Sound*) {
+                if (s.state == GestureState::END) Application::getPlatform()->openBrowser(href);
+            }));
         }
+        parent->addView(lbl);
         skip = true;
     }
-
     // ── Image ─────────────────────────────────────────────────────────
     else if (tag == "img") {
         std::string src = node->attributes.count("src") ? node->attributes.at("src") : "";
@@ -963,7 +936,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
             Box* imgContainer = new Box(Axis::ROW);
             imgContainer->setJustifyContent(JustifyContent::CENTER);
             imgContainer->setWidthPercentage(100);
-            img->setWidthPercentage(80);
+            img->setWidthPercentage(100);
             imgContainer->addView(img);
             parent->addView(imgContainer);
             if (src.rfind("http", 0) == 0) {
@@ -1057,7 +1030,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
                     if (ist.textAlign) applyTextAlign(iRow, *ist.textAlign);
                     cont->addView(iRow);
                 }
-                renderInline(child, iRow, baseFontSize,
+                renderInline(renderer, child, iRow, baseFontSize,
                     currentTextColor ? *currentTextColor : defaultTextColor);
             } else {
                 iRow = nullptr;
