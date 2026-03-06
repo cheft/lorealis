@@ -34,6 +34,13 @@ struct CssStyle {
     // Text decoration / alignment
     std::optional<std::string> textAlign;          // "left" | "center" | "right"
     std::optional<bool>        textDecorationLine; // true = strikethrough
+
+    // Dimension
+    std::optional<float>    width;
+    std::optional<float>    widthPercentage;
+    std::optional<float>    height;
+    std::optional<float>    heightPercentage;
+    std::optional<bool>     overflowHidden;
 };
 
 class HtmlStyle {

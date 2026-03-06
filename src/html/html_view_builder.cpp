@@ -47,11 +47,19 @@ void HtmlViewBuilder::applyStyle(View* view, const CssStyle& st) {
             box->setCornerRadius(*st.borderRadius);
             if (*st.borderRadius > 0) box->setClipsToBounds(true);
         }
+        if (st.overflowHidden && *st.overflowHidden) {
+            box->setClipsToBounds(true);
+        }
         if (st.opacity) box->setAlpha(*st.opacity);
         if (st.borderWidth && st.borderColor) {
             box->setBorderThickness(*st.borderWidth);
             box->setBorderColor(*st.borderColor);
         }
+
+        if (st.width)           box->setWidth(*st.width);
+        if (st.widthPercentage)  box->setWidthPercentage(*st.widthPercentage);
+        if (st.height)          box->setHeight(*st.height);
+        if (st.heightPercentage) box->setHeightPercentage(*st.heightPercentage);
     }
 
     // Label-level
@@ -311,10 +319,11 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
             if (cell->tag != "td" && cell->tag != "th") continue;
             bool isHdr = (cell->tag == "th") || hdr;
 
-            CssStyle cellSt = HtmlStyle::parseInlineStyle(
-                cell->attributes.count("style") ? cell->attributes.at("style") : "");
+            std::string stText = cell->attributes.count("style") ? cell->attributes.at("style") : "";
+            CssStyle cellSt = HtmlStyle::parseInlineStyle(stText);
 
             std::string cellWidth = cell->attributes.count("width") ? cell->attributes.at("width") : "";
+            std::string cellHeight = cell->attributes.count("height") ? cell->attributes.at("height") : "";
             std::string cellAlign = cell->attributes.count("align") ? HtmlParser::toLower(cell->attributes.at("align")) : "";
             std::string cellValign = cell->attributes.count("valign") ? HtmlParser::toLower(cell->attributes.at("valign")) : "";
 
@@ -329,6 +338,14 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
             } else {
                 cellBox->setGrow(1.0f);
                 cellBox->setWidthPercentage(100.0f / cols);
+            }
+
+            if (!cellHeight.empty()) {
+                if (cellHeight.back() == '%') {
+                    try { cellBox->setHeightPercentage(std::stof(cellHeight.substr(0, cellHeight.size() - 1))); } catch(...) {}
+                } else {
+                    try { cellBox->setHeight(std::stof(cellHeight)); } catch(...) {}
+                }
             }
 
             if (cellSt.paddingTop) cellBox->setPaddingTop(*cellSt.paddingTop);
@@ -399,6 +416,15 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
                     buildHtmlViews(child, cellBox, baseFontSize, localTextColor, defaultTextColor, accentColor);
                 }
             }
+
+            // Bottom border simulation for cells
+            if (stText.find("border-bottom") != std::string::npos && cellSt.borderColor && cellSt.borderWidth) {
+                 Box* cellDivider = new Box(Axis::ROW);
+                 cellDivider->setHeight(*cellSt.borderWidth);
+                 cellDivider->setBackgroundColor(*cellSt.borderColor);
+                 cellBox->addView(cellDivider);
+            }
+
             rowBox->addView(cellBox);
         }
         tBox->addView(rowBox);

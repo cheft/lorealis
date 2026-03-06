@@ -156,6 +156,23 @@ CssStyle HtmlStyle::parseInlineStyle(const std::string& css) {
         else if (k == "padding-bottom") { try { st.paddingBottom = std::stof(v); } catch (...) {} }
         else if (k == "padding-left")   { try { st.paddingLeft   = std::stof(v); } catch (...) {} }
         else if (k == "padding-right")  { try { st.paddingRight  = std::stof(v); } catch (...) {} }
+        else if (k == "width") {
+            if (!v.empty() && v.back() == '%') {
+                try { st.widthPercentage = std::stof(v.substr(0, v.size() - 1)); } catch (...) {}
+            } else {
+                try { st.width = std::stof(v); } catch (...) {}
+            }
+        }
+        else if (k == "height") {
+            if (!v.empty() && v.back() == '%') {
+                try { st.heightPercentage = std::stof(v.substr(0, v.size() - 1)); } catch (...) {}
+            } else {
+                try { st.height = std::stof(v); } catch (...) {}
+            }
+        }
+        else if (k == "overflow") {
+            st.overflowHidden = (toLower(v) == "hidden");
+        }
         else if (k == "border" || k == "border-bottom" || k == "border-top") {
             // e.g. "1px solid #dadce0"
             auto col = parseColor(v.substr(v.rfind(' ') + 1));
