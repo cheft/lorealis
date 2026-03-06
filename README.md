@@ -47,21 +47,48 @@ docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/d
 /opt/devkitpro/tools/bin/nxlink -a 192.168.31.91 /work/lorealis.nro
 ```
 
-## Screenshot
+## Screenshots
 <p align="center">
-  <img src="./demo_screens/2051030715381500-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" width="45%" />
-  <img src="./demo_screens/2051030715383600-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" width="45%" />
-  <img src="./demo_screens/2051030715385100-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" width="45%" />
-  <img src="./demo_screens/2051030715385700-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" width="45%" />
-  <img src="./demo_screens/2051030715404700-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" width="45%" />
-  <img src="./demo_screens/2051030715405400-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" width="45%" />
-  <img src="./demo_screens/ScreenShot_2026-03-06_160039_853.png" width="45%" />
-  <img src="./demo_screens/ScreenShot_2026-03-06_160145_795.png" width="45%" />
-  <img src="./demo_screens/ScreenShot_2026-03-06_160157_228.png" width="45%" />
-  <img src="./demo_screens/ScreenShot_2026-03-06_160414_653.png" width="45%" />
-</p>
+<style>
+    /* 核心两列瀑布流容器 */
+    .two-col-waterfall {
+      column-count: 2;          /* 固定2列（核心） */
+      column-gap: 10px;         /* 列之间的间距 */
+      max-width: 900px;         /* 限制总宽度，避免太宽 */
+      margin: 0 auto;           /* 居中显示 */
+    }
+    /* 图片样式：关键是不截断+自适应 */
+    .two-col-waterfall img {
+      width: 100%;              /* 图片宽度填满列 */
+      height: auto;             /* 保留原始高宽比（高低不同才会插进去） */
+      margin-bottom: 10px;      /* 图片之间的间距 */
+      break-inside: avoid;      /* 禁止图片被列截断（核心中的核心） */
+      border-radius: 4px;       /* 可选：圆角更美观 */
+    }
+    /* 适配手机：小屏幕自动变1列 */
+    @media (max-width: 600px) {
+      .two-col-waterfall {
+        column-count: 1;
+      }
+    }
+  </style>
 
+  
+  <div class="two-col-waterfall">
+    <img src="./demo_screens/2051030715381500-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图1">
+    <img src="./demo_screens/2051030715383600-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图2">
+    <img src="./demo_screens/2051030715385100-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图3">
+    <img src="./demo_screens/2051030715385700-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图4">
+    <img src="./demo_screens/2051030715404700-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图5">
+    <img src="./demo_screens/2051030715405400-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图6">
+    <img src="./demo_screens/ScreenShot_2026-03-06_160039_853.png" alt="游戏截图7">
+    <img src="./demo_screens/ScreenShot_2026-03-06_160157_228.png" alt="游戏截图9">
+    <img src="./demo_screens/ScreenShot_2026-03-06_160325_175.png" alt="游戏截图10">
+    <img src="./demo_screens/ScreenShot_2026-03-06_160145_795.png" alt="游戏截图8">
+    <img src="./demo_screens/ScreenShot_2026-03-06_160414_653.png" alt="游戏截图11">
+
+  </div>
+</p>
 
 ## Credits 
 - Thanks to [Natinusala](https://github.com/natinusala), [xfangfang](https://github.com/xfangfang) and [XITRIX](https://github.com/XITRIX) for [borealis](https://github.com/xfangfang/borealis)
-
