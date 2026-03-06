@@ -207,7 +207,7 @@ void HtmlViewBuilder::renderInline(MiniNode* node, Box* target, float fontSize, 
             
             // Image spans the container width based on max-width rule from HTML test page
             img->setWidthPercentage(100);
-            img->setGrow(1.0f);
+            // img->setGrow(1.0f); // Removed as it causes vertical expansion in flex parents
 
             imgContainer->addView(img);
             target->addView(imgContainer);
@@ -232,7 +232,8 @@ void HtmlViewBuilder::renderInlineChildren(const std::vector<MiniNode*>& childre
 Box* HtmlViewBuilder::buildInlineRow(MiniNode* node, float fontSize, NVGcolor color, const std::string& align) {
     Box* row = new Box(Axis::ROW);
     row->setFlexWrap(true);
-    row->setRowGap(8); // Tighter gap
+    row->setWidthPercentage(100);
+    row->setRowGap(10);
     row->setColumnGap(0);
     row->setAlignItems(AlignItems::FLEX_START);
     applyTextAlign(row, align);
@@ -247,6 +248,7 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
                        const NVGcolor& accentColor) {
     Box* tBox = new Box(Axis::COLUMN);
     tBox->setMarginBottom(22);
+    tBox->setAlignItems(AlignItems::STRETCH);
 
     // Parse attributes
     std::string tableWidth = tableNode->attributes.count("width") ? tableNode->attributes.at("width") : "";
@@ -255,7 +257,7 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
 
     bool hasBorder = (tableBorder != "" && tableBorder != "0");
     if (hasBorder) {
-        tBox->setBorderThickness(1);
+        tBox->setBorderThickness(1.0f);
         tBox->setBorderColor(HAN_BORDER_DDD);
     }
 
@@ -337,7 +339,6 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
                 }
             } else {
                 cellBox->setGrow(1.0f);
-                cellBox->setWidthPercentage(100.0f / cols);
             }
 
             if (!cellHeight.empty()) {
@@ -402,13 +403,13 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
             for (auto* child : cell->children) {
                 if (HtmlParser::isInlineNode(child)) {
                     if (!inlineRow) {
-                        inlineRow = new Box(Axis::ROW);
-                        inlineRow->setFlexWrap(true); inlineRow->setRowGap(10);
-                        inlineRow->setAlignItems(AlignItems::CENTER);
-                        if (textAlignment == "center") inlineRow->setJustifyContent(JustifyContent::CENTER);
-                        else if (textAlignment == "right") inlineRow->setJustifyContent(JustifyContent::FLEX_END);
-                        else inlineRow->setJustifyContent(JustifyContent::FLEX_START);
-                        cellBox->addView(inlineRow);
+                         inlineRow = new Box(Axis::ROW);
+                         inlineRow->setFlexWrap(true); inlineRow->setRowGap(10);
+                         inlineRow->setAlignItems(AlignItems::FLEX_START);
+                         if (textAlignment == "center") inlineRow->setJustifyContent(JustifyContent::CENTER);
+                         else if (textAlignment == "right") inlineRow->setJustifyContent(JustifyContent::FLEX_END);
+                         else inlineRow->setJustifyContent(JustifyContent::FLEX_START);
+                         cellBox->addView(inlineRow);
                     }
                     renderInline(child, inlineRow, baseFontSize * 0.85f, cCol);
                 } else {
@@ -451,9 +452,29 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
     bool        skip     = false;
 
     NVGcolor textCol = currentTextColor ? *currentTextColor : defaultTextColor;
-
+ 
     CssStyle ist = HtmlStyle::parseInlineStyle(
         node->attributes.count("style") ? node->attributes.at("style") : "");
+
+    // Merge direct width/height attributes ONLY for specific tags if not in style
+    if (tag == "img" || tag == "table" || tag == "td" || tag == "th") {
+        if (!ist.width && node->attributes.count("width")) {
+            std::string val = node->attributes.at("width");
+            if (!val.empty() && val.back() == '%') {
+                 try { ist.widthPercentage = std::stof(val.substr(0, val.size()-1)); } catch(...) {}
+            } else {
+                 try { ist.width = std::stof(val); } catch(...) {}
+            }
+        }
+        if (!ist.height && node->attributes.count("height")) {
+            std::string val = node->attributes.at("height");
+            if (!val.empty() && val.back() == '%') {
+                 try { ist.heightPercentage = std::stof(val.substr(0, val.size()-1)); } catch(...) {}
+            } else {
+                 try { ist.height = std::stof(val); } catch(...) {}
+            }
+        }
+    }
 
     // Pull colour/size from inline style early for headings / p
     NVGcolor hColor = ist.color ? *ist.color : textCol;
@@ -462,6 +483,7 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
     // ── Headings ──────────────────────────────────────────────────────
     auto makeHeading = [&](float scale) {
         Box* hb = new Box(Axis::COLUMN);
+        hb->setWidthPercentage(100);
         hb->setMarginTop(ist.marginTop ? *ist.marginTop : 14);
         hb->setMarginBottom(ist.marginBottom ? *ist.marginBottom : 8);
         
@@ -469,11 +491,12 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
         Box* row = buildInlineRow(node, calculatedSize, hColor, hAlign);
         hb->addView(row);
         
-        if (ist.borderColor && ist.borderWidth) {
+        std::string stTextHead = node->attributes.count("style") ? node->attributes.at("style") : "";
+        if ((ist.borderColor && ist.borderWidth) || stTextHead.find("border-bottom") != std::string::npos) {
              Box* dividerLine = new Box(Axis::ROW);
-             dividerLine->setHeight(*ist.borderWidth);
-             dividerLine->setBackgroundColor(*ist.borderColor);
-             dividerLine->setMarginTop(8); // spacing specifically for the bottom divider
+             dividerLine->setHeight(ist.borderWidth ? *ist.borderWidth : 1.0f);
+             dividerLine->setBackgroundColor(ist.borderColor ? *ist.borderColor : HAN_BORDER_DDD);
+             dividerLine->setMarginTop(8);
              hb->addView(dividerLine);
         }
 
@@ -489,10 +512,24 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
     // ── Paragraph ─────────────────────────────────────────────────────
     else if (tag == "p") {
         NVGcolor pCol = ist.color ? *ist.color : textCol;
+        Box* pOuter = new Box(Axis::COLUMN);
+        pOuter->setWidthPercentage(100);
+        pOuter->setMarginBottom(ist.marginBottom ? *ist.marginBottom : 14);
+        if (ist.marginTop) pOuter->setMarginTop(*ist.marginTop);
+        
         Box* pb = buildInlineRow(node, ist.fontSize ? *ist.fontSize : BASE, pCol, hAlign);
-        pb->setMarginBottom(ist.marginBottom ? *ist.marginBottom : 14);
-        if (ist.marginTop) pb->setMarginTop(*ist.marginTop);
-        parent->addView(pb);
+        pOuter->addView(pb);
+
+        std::string stTextP = node->attributes.count("style") ? node->attributes.at("style") : "";
+        if (stTextP.find("border-bottom") != std::string::npos && ist.borderColor) {
+             Box* div = new Box(Axis::ROW);
+             div->setHeight(ist.borderWidth ? *ist.borderWidth : 1.0f);
+             div->setBackgroundColor(*ist.borderColor);
+             div->setMarginTop(8);
+             pOuter->addView(div);
+        }
+
+        parent->addView(pOuter);
         skip = true;
     }
 
@@ -513,6 +550,7 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
     // ── Lists ─────────────────────────────────────────────────────────
     else if (tag == "ul" || tag == "ol") {
         Box* lb = new Box(Axis::COLUMN);
+        lb->setWidthPercentage(100);
         lb->setPaddingLeft(ist.paddingLeft ? *ist.paddingLeft : 24);
         lb->setMarginBottom(ist.marginBottom ? *ist.marginBottom : 22);
         if (ist.marginTop) lb->setMarginTop(*ist.marginTop);
@@ -674,7 +712,6 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
             imgContainer->setJustifyContent(JustifyContent::FLEX_START);
             imgContainer->setAlignItems(AlignItems::CENTER);
             
-            // Map the parsed style properties if they exist
             applyStyle(imgContainer, ist);
             
             if (!ist.marginTop) imgContainer->setMarginTop(10);
@@ -682,6 +719,7 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
             
             imgContainer->setWidthPercentage(100);
             img->setWidthPercentage(100);
+            // img->setGrow(1.0f); // Keep this removed! Vertical grow in COLUMN is bad.
             
             imgContainer->addView(img);
             parent->addView(imgContainer);
@@ -746,21 +784,9 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
             skip = true;
         } else {
             Box* db = new Box(Axis::COLUMN);
+            db->setWidthPercentage(100); 
+            db->setAlignItems(AlignItems::STRETCH);
             applyStyle(db, ist);
-
-            // Add divider if there's a bottom border
-            if (ist.borderColor && ist.borderWidth) {
-                 // For div, simulating bottom border since Box does all 4 uniformly
-                 // If the user meant bottom border (we overloaded border in parsing somewhat)
-                 db->setBorderThickness(0); 
-            }
-
-            // check explicitly if it was border-bottom
-            std::string stText = node->attributes.count("style") ? node->attributes.at("style") : "";
-            if (stText.find("border-bottom") != std::string::npos && ist.borderColor) {
-                // Add a divider at the end of the children processing
-            }
-
             parent->addView(db);
             cont = db;
         }
@@ -778,7 +804,7 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
                 if (!iRow) {
                     iRow = new Box(Axis::ROW);
                     iRow->setFlexWrap(true); iRow->setRowGap(10);
-                    iRow->setAlignItems(AlignItems::CENTER);
+                    iRow->setAlignItems(AlignItems::FLEX_START);
                     if (ist.textAlign) applyTextAlign(iRow, *ist.textAlign);
                     cont->addView(iRow);
                 }
@@ -791,8 +817,8 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
             }
         }
 
-        std::string stText = node->attributes.count("style") ? node->attributes.at("style") : "";
-        if (stText.find("border-bottom") != std::string::npos && ist.borderColor && ist.borderWidth) {
+        std::string stTextFinal = node->attributes.count("style") ? node->attributes.at("style") : "";
+        if (stTextFinal.find("border-bottom") != std::string::npos && ist.borderColor && ist.borderWidth) {
              Box* divider = new Box(Axis::ROW);
              divider->setHeight(*ist.borderWidth);
              divider->setBackgroundColor(*ist.borderColor);

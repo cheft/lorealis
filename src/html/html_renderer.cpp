@@ -21,7 +21,7 @@ namespace brls {
 HtmlRenderer::HtmlRenderer()  { 
     setAxis(Axis::COLUMN); 
     setPadding(0); 
-    setAlignItems(AlignItems::CENTER);
+    setAlignItems(AlignItems::STRETCH);
 }
 HtmlRenderer::~HtmlRenderer() {}
 HtmlRenderer* HtmlRenderer::create() { return new HtmlRenderer(); }
