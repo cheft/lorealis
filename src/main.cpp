@@ -1,39 +1,35 @@
 #include <borealis.hpp>
 #include "lua_manager.hpp"
 #include "xml_loader.hpp"
-#include <cstdio>
-#include <stdarg.h>
+#include "ns_log.hpp"
 
 #ifdef __SWITCH__
+#include <switch.h>
 #include <dirent.h>
 #include <unistd.h>
 #include <curl/curl.h>
 #endif
 
-void NS_LOG(const char* format, ...)
-{
-    char buffer[512];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    // 1. Console
-    printf("%s\n", buffer);
-    fflush(stdout);
-    
-    // 2. SD Card
-    FILE* f = fopen("sdmc:/brls.log", "a");
-    if (f) {
-        fprintf(f, "%s\n", buffer);
-        fclose(f);
-    }
-}
-
 int main(int argc, char* argv[]) {
     NS_LOG("BRLS: Application main() entered");
 
 #ifdef __SWITCH__
+    // CRITICAL: Mount romfs FIRST — all romfs:/ paths require this
+    Result romfs_rc = romfsInit();
+    if (R_FAILED(romfs_rc)) {
+        NS_LOG("BRLS: FATAL: romfsInit() failed with rc=%u", romfs_rc);
+    } else {
+        NS_LOG("BRLS: romfsInit() succeeded");
+    }
+
+    // Initialize PL service so we can grab the system-provided fonts
+    Result pl_rc = plInitialize(PlServiceType_User);
+    if (R_FAILED(pl_rc)) {
+        NS_LOG("BRLS: WARNING: plInitialize failed with rc=%u. Fonts might not load!", pl_rc);
+    } else {
+        NS_LOG("BRLS: plInitialize() succeeded");
+    }
+
     curl_global_init(CURL_GLOBAL_ALL);
 #endif
 
@@ -80,20 +76,23 @@ int main(int argc, char* argv[]) {
         NS_LOG("BRLS: LuaManager::init success");
 
         // Configure package.path so 'require' can find our modules
+        NS_LOG("BRLS: Setting up package.path...");
         std::string pkgPathSetup = 
             std::string("package.path = package.path .. ';") + 
             BRLS_RESOURCES + "lua/?.lua;" + 
             BRLS_RESOURCES + "lua/?/init.lua'";
         LuaManager::getInstance().doString(pkgPathSetup);
+        NS_LOG("BRLS: package.path configured OK");
 
         // Load main.lua
+        NS_LOG("BRLS: Loading main.lua...");
         LuaManager::getInstance().doFile(std::string(BRLS_RESOURCES) + "lua/main.lua");
+        NS_LOG("BRLS: main.lua loaded OK");
 
         // Let Lua handle everything (XML loading and UI orchestration)
         NS_LOG("BRLS: Calling Lua onInit()...");
         LuaManager::getInstance().call("onInit");
-
-        // NS_LOG("BRLS: Activity pushed, entering main loop");
+        NS_LOG("BRLS: Lua onInit() returned OK, entering main loop...");
 
         // Main Loop
         while (brls::Application::mainLoop()) {
@@ -108,6 +107,8 @@ int main(int argc, char* argv[]) {
     NS_LOG("BRLS: Application main() exiting normally");
 #ifdef __SWITCH__
     curl_global_cleanup();
+    plExit();
+    romfsExit();
 #endif
     return 0;
 }

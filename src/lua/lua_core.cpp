@@ -1,11 +1,36 @@
 #include "lua_manager.hpp"
 #include "xml_loader.hpp"
 #include "zip_loader.hpp"
+#include "ns_log.hpp"
 #include <borealis/core/i18n.hpp>
 #include <borealis/core/activity.hpp>
 #include <borealis/core/view.hpp>
 #include <fstream>
-#include <filesystem>
+#include <sys/stat.h>
+#include <string>
+#include <sstream>
+
+// Cross-platform recursive mkdir (replaces std::filesystem::create_directories)
+static bool portable_mkdirs(const std::string& path) {
+    if (path.empty()) return false;
+    std::string accum;
+    std::istringstream ss(path);
+    std::string token;
+    // Handle leading '/' for absolute paths
+    if (path[0] == '/') accum = "/";
+    while (std::getline(ss, token, '/')) {
+        if (token.empty()) continue;
+        if (!accum.empty() && accum.back() != '/' && accum.back() != '\\') accum += '/';
+        accum += token;
+#ifdef _WIN32
+        _mkdir(accum.c_str());
+#else
+        mkdir(accum.c_str(), 0755);
+#endif
+    }
+    struct stat st;
+    return (stat(path.c_str(), &st) == 0);
+}
 
 void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     // Enums
@@ -275,7 +300,7 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     };
     platform_ut["mkdir"] = [](brls::Platform& self, const std::string& path) -> bool {
         try {
-            return std::filesystem::create_directories(path);
+            return portable_mkdirs(path);
         } catch (...) {
             return false;
         }

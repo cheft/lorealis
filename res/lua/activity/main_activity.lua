@@ -35,6 +35,7 @@ function main_activity.show()
     -- Helper to wrap tab creation and track global session
     local function registerTab(name, xmlPath, initFunc)
         brls.Application.registerXMLView(name, function()
+            print("MainActivity: Tab factory called for: " .. name)
             local tabView = brls.Application.loadXMLRes(xmlPath)
             if tabView then
                 _G.activeTabName = name
@@ -44,12 +45,15 @@ function main_activity.show()
                         initFunc(tabView) 
                     end
                 end
+            else
+                print("MainActivity: FAILED to load XML for tab: " .. name)
             end
             return tabView
         end)
     end
 
     -- (1) Register CaptionedImage (Implemented in Lua)
+    print("MainActivity: Registering CaptionedImage...")
     brls.Application.registerXMLView("CaptionedImage", function()
         local view = brls.Application.loadXMLRes("xml/views/captioned_image.xml")
         if not view then return nil end
@@ -83,6 +87,7 @@ function main_activity.show()
     end)
 
     -- (2) Register TransformBox (Implemented in Lua with LuaImage)
+    print("MainActivity: Registering TransformBox...")
     brls.Application.registerXMLView("TransformBox", function()
         local view = brls.LuaImage.new()
         
@@ -127,27 +132,42 @@ function main_activity.show()
     end)
 
     -- (3) Register other demo views with local initialization
+    print("MainActivity: Registering PokemonView...")
     brls.Application.registerXMLView("PokemonView",      "views/pokemon.xml")
     
     -- Register tabs with the tracking factory
+    print("MainActivity: Registering tabs...")
     registerTab("ComponentsTab", "xml/tabs/components.xml", components_tab.init)
+    print("MainActivity: Registered ComponentsTab")
     registerTab("TransformTab", "xml/tabs/transform.xml", transform_tab.init)
+    print("MainActivity: Registered TransformTab")
     registerTab("TextTestTab", "xml/tabs/text_test.xml", text_test_tab.init)
+    print("MainActivity: Registered TextTestTab")
     registerTab("RecyclingListTab", "xml/tabs/recycling_list.xml", recycling_list_tab.init)
+    print("MainActivity: Registered RecyclingListTab")
     registerTab("GameListTab", "xml/tabs/game_list.xml", game_list_tab.init)
+    print("MainActivity: Registered GameListTab")
     registerTab("CnBetaListTab", "xml/tabs/cnbeta_list.xml", cnbeta_list_tab.init)
+    print("MainActivity: Registered CnBetaListTab")
     registerTab("SettingsTab", "xml/tabs/settings.xml", settings_tab.init)
+    print("MainActivity: Registered SettingsTab")
     registerTab("LayoutThemeSettingsTab", "xml/tabs/layout_theme_settings.xml", layout_theme_settings_tab.init)
+    print("MainActivity: Registered LayoutThemeSettingsTab")
 
     registerTab("HelloTab", "xml/tabs/hello.xml", hello_tab.init)
+    print("MainActivity: Registered HelloTab")
 
     -- Now load main.xml
+    print("MainActivity: Loading xml/activity/main.xml...")
     local mainView = brls.Application.loadXMLRes("xml/activity/main.xml")
     if mainView then
+        print("MainActivity: main.xml loaded, initializing...")
         main_activity.init(mainView)
+        print("MainActivity: Pushing activity...")
         brls.Application.pushActivity(mainView)
+        print("MainActivity: Activity pushed OK")
     else
-        print("MainActivity: Failed to load xml/activity/main.xml!")
+        print("MainActivity: FAILED to load xml/activity/main.xml!")
     end
 end
 
