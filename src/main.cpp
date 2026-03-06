@@ -30,6 +30,21 @@ int main(int argc, char* argv[]) {
         NS_LOG("BRLS: plInitialize() succeeded");
     }
 
+    // Initialize Network services
+    Result socket_rc = socketInitializeDefault();
+    if (R_FAILED(socket_rc)) {
+        NS_LOG("BRLS: WARNING: socketInitializeDefault failed with rc=%u", socket_rc);
+    } else {
+        NS_LOG("BRLS: socketInitializeDefault() succeeded");
+    }
+
+    Result nifm_rc = nifmInitialize(NifmServiceType_User);
+    if (R_FAILED(nifm_rc)) {
+        NS_LOG("BRLS: WARNING: nifmInitialize failed with rc=%u", nifm_rc);
+    } else {
+        NS_LOG("BRLS: nifmInitialize() succeeded");
+    }
+
     curl_global_init(CURL_GLOBAL_ALL);
 #endif
 
@@ -107,6 +122,8 @@ int main(int argc, char* argv[]) {
     NS_LOG("BRLS: Application main() exiting normally");
 #ifdef __SWITCH__
     curl_global_cleanup();
+    nifmExit();
+    socketExit();
     plExit();
     romfsExit();
 #endif

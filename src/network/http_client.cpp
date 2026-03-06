@@ -161,14 +161,20 @@ uint32_t SimpleHTTPClient::get(const std::string& url, std::function<void(bool s
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
             
             CURLcode res = curl_easy_perform(curl);
-            if (res == CURLE_OK && !NetworkRegistry::isCancelled(id)) {
-                long code = 0;
-                curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
-                statusCode = (int)code;
-                success = !response.empty();
+            if (res == CURLE_OK) {
+                if (!NetworkRegistry::isCancelled(id)) {
+                    long code = 0;
+                    curl_easy_getinfo(curl, CURLINFO_RESPONSE_CODE, &code);
+                    statusCode = (int)code;
+                    success = !response.empty();
+                }
+            } else {
+                brls::Logger::error("CURL get request failed: {}", curl_easy_strerror(res));
             }
             curl_slist_free_all(headers);
             curl_easy_cleanup(curl);
+        } else {
+            brls::Logger::error("CURL easy init failed!");
         }
 #endif
         bool wasCancelled = NetworkRegistry::isCancelled(id);
@@ -229,14 +235,20 @@ uint32_t SimpleHTTPClient::downloadImage(const std::string& url, std::function<v
             curl_easy_setopt(curl, CURLOPT_SSL_VERIFYPEER, 0L);
             
             CURLcode res = curl_easy_perform(curl);
-            if (res == CURLE_OK && !NetworkRegistry::isCancelled(id) && data.size() > 12) {
-                bool isJpeg = ((unsigned char)data[0] == 0xFF && (unsigned char)data[1] == 0xD8);
-                bool isPng = ((unsigned char)data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G');
-                bool isWebp = (data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
-                             data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P');
-                success = isJpeg || isPng || isWebp || (data.size() > 100);
+            if (res == CURLE_OK) {
+                if (!NetworkRegistry::isCancelled(id) && data.size() > 12) {
+                    bool isJpeg = ((unsigned char)data[0] == 0xFF && (unsigned char)data[1] == 0xD8);
+                    bool isPng = ((unsigned char)data[0] == 0x89 && data[1] == 'P' && data[2] == 'N' && data[3] == 'G');
+                    bool isWebp = (data[0] == 'R' && data[1] == 'I' && data[2] == 'F' && data[3] == 'F' &&
+                                 data[8] == 'W' && data[9] == 'E' && data[10] == 'B' && data[11] == 'P');
+                    success = isJpeg || isPng || isWebp || (data.size() > 100);
+                }
+            } else {
+                brls::Logger::error("CURL downloadImage request failed: {}", curl_easy_strerror(res));
             }
             curl_easy_cleanup(curl);
+        } else {
+            brls::Logger::error("CURL downloadImage easy init failed!");
         }
 #endif
         bool wasCancelled = NetworkRegistry::isCancelled(id);
