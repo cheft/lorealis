@@ -179,6 +179,9 @@ set(APP_SOURCES
     src/xml_loader.cpp
     src/zip_loader.cpp
     src/html/html_renderer.cpp
+    src/html/html_parser.cpp
+    src/html/html_style.cpp
+    src/html/html_view_builder.cpp
     src/html/markdown_renderer.cpp
     src/html/format_converters.cpp
     src/lua/lua_html.cpp
