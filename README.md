@@ -47,6 +47,13 @@ docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/d
 /opt/devkitpro/tools/bin/nxlink -a 192.168.31.91 /work/lorealis.nro
 ```
 
+
+## TODO
+- [ ] Theme Compatibility
+- [ ] I18n Bundle Lazy Loading
+- [ ] Luajit Tests
+- [ ] Component Enhancement 
+
 ## Screenshots
 <p align="center">
 <style>

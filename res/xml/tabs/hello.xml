@@ -24,7 +24,7 @@
                 height="auto"
                 fontSize="24px"
                 horizontalAlign="center"
-                text="功能测试页(整个Demo程序都已失现 Lua+XML 全动态编写)"
+                text="功能测试页(整个App程序都已使用 Lua+XML 全动态编写)"
                 marginBottom="10px" />
 
             <brls:Button

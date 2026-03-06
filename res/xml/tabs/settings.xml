@@ -20,6 +20,9 @@
             paddingBottom="@style/brls/sidebar/padding_bottom"
             paddingLeft="@style/brls/sidebar/padding_left">
             
+            <brls:BooleanCell
+                id="themeSwitcher"/>
+                
             <brls:RadioCell
                 id="radio"/>
                 

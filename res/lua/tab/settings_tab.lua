@@ -32,6 +32,18 @@ function settings_tab.init(mainView)
     local swapInterval = mainView:getView("swapInterval")
     local brightnessSlider = mainView:getView("brightnessSlider")
     local notify = mainView:getView("notify")
+    local themeSwitcher = mainView:getView("themeSwitcher")
+    local platform = brls.Application.getPlatform()
+
+    -- 0. Theme Switcher
+    if themeSwitcher and platform then
+        local currentTheme = platform:getThemeVariant()
+        themeSwitcher:init("Theme", currentTheme == brls.ThemeVariant.DARK, function(value)
+            local newTheme = value and brls.ThemeVariant.DARK or brls.ThemeVariant.LIGHT
+            platform:setThemeVariant(newTheme)
+            brls.Application.notify("Switched to " .. (value and "dark" or "light") .. " theme")
+        end)
+    end
 
     -- 1. Radio cell
     if radio then
@@ -68,8 +80,8 @@ function settings_tab.init(mainView)
     -- 5. Bottom Bar
     if bottomBar then
         local isHidden = brls.getHideBottomBar()
-        bottomBar:init("Bottom Bar", not isHidden, function(value)
-            brls.setHideBottomBar(not value)
+        bottomBar:init("Bottom Bar", isHidden, function(value)
+            brls.setHideBottomBar(value)
             local stack = brls.Application.getActivitiesStack()
             for i = 1, #stack do
                 local activity = stack[i]

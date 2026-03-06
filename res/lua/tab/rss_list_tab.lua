@@ -3,6 +3,7 @@ local rss_detail_view = require("view/rss_detail_view")
 local network = require("utils/network")
 local image_cache = require("utils/image_cache")
 local rss_storage = require("utils/rss_storage")
+local rss_list_tab = {}
 
 -- State tracking
 local all_news = {}
