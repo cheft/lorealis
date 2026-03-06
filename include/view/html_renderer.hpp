@@ -20,10 +20,33 @@ struct MiniNode {
 };
 
 struct CssStyle {
+    // Typography
     std::optional<NVGcolor> color;
-    std::optional<float> fontSize;
-    std::optional<float> marginTop;
-    std::optional<float> marginBottom;
+    std::optional<float>    fontSize;
+    std::optional<bool>     fontBold;
+    std::optional<float>    opacity;
+
+    // Spacing — margin
+    std::optional<float>    marginTop;
+    std::optional<float>    marginRight;
+    std::optional<float>    marginBottom;
+    std::optional<float>    marginLeft;
+
+    // Spacing — padding
+    std::optional<float>    paddingTop;
+    std::optional<float>    paddingRight;
+    std::optional<float>    paddingBottom;
+    std::optional<float>    paddingLeft;
+
+    // Box appearance
+    std::optional<NVGcolor> backgroundColor;
+    std::optional<float>    borderRadius;
+    std::optional<float>    borderWidth;
+    std::optional<NVGcolor> borderColor;
+
+    // Text decoration / alignment
+    std::optional<std::string> textAlign;          // "left" | "center" | "right"
+    std::optional<bool>        textDecorationLine; // true = strikethrough
 };
 
 class HtmlRenderer : public Box {
@@ -43,13 +66,17 @@ public:
 private:
     float baseFontSize = 24.0f;
     std::optional<NVGcolor> customTextColor;
-    
+
     NVGcolor getThemeColor(const std::string& key);
-    CssStyle parseInlineStyle(const std::string& styleStr);
 
 public:
+    CssStyle parseInlineStyle(const std::string& styleStr);
     void applyStyle(View* view, const CssStyle& style);
-    static void buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* parent, float& baseFontSize, std::optional<NVGcolor>& currentTextColor, const NVGcolor& defaultTextColor, const NVGcolor& accentColor);
+    static void buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* parent,
+                               float& baseFontSize,
+                               std::optional<NVGcolor>& currentTextColor,
+                               const NVGcolor& defaultTextColor,
+                               const NVGcolor& accentColor);
 };
 
 } // namespace brls

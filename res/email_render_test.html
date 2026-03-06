@@ -1,0 +1,651 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Email 渲染测试模板 | Test Template</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+    <style>
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --blue-primary: #4285f4;
+            --blue-dark: #1a73e8;
+            --blue-light: #e8f0fe;
+            --text-primary: #202124;
+            --text-secondary: #5f6368;
+            --text-muted: #9aa0a6;
+            --border-color: #dadce0;
+            --bg-page: #f0f4f8;
+            --bg-card: #ffffff;
+            --bg-section: #f8f9fa;
+            --shadow-card: 0 1px 3px rgba(60,64,67,0.10), 0 4px 24px rgba(60,64,67,0.07);
+            --radius-card: 12px;
+            --radius-btn: 6px;
+            --radius-img: 8px;
+            --font-body: 'Inter', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            --font-mono: 'JetBrains Mono', 'Courier New', monospace;
+            --transition: 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: var(--font-body);
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text-primary);
+            background-color: var(--bg-page);
+            min-height: 100vh;
+            padding: 32px 16px 48px;
+        }
+
+        /* ─── Page wrapper ─── */
+        .page-wrapper {
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+        }
+
+        /* ─── Card ─── */
+        .email-card {
+            width: 100%;
+            max-width: 640px;
+            background: var(--bg-card);
+            border-radius: var(--radius-card);
+            box-shadow: var(--shadow-card);
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+
+        /* ─── Header ─── */
+        .email-header {
+            background: linear-gradient(135deg, #4285f4 0%, #1a73e8 60%, #185abc 100%);
+            padding: 36px 32px 32px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .email-header::before {
+            content: '';
+            position: absolute;
+            top: -40px; right: -40px;
+            width: 200px; height: 200px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.07);
+            pointer-events: none;
+        }
+
+        .email-header::after {
+            content: '';
+            position: absolute;
+            bottom: -60px; left: -30px;
+            width: 240px; height: 240px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.05);
+            pointer-events: none;
+        }
+
+        .email-header h1 {
+            font-size: 22px;
+            font-weight: 700;
+            color: #ffffff;
+            line-height: 1.3;
+            letter-spacing: -0.3px;
+            position: relative;
+            z-index: 1;
+        }
+
+        .email-header p {
+            margin-top: 10px;
+            font-size: 14px;
+            color: rgba(255,255,255,0.82);
+            font-weight: 400;
+            position: relative;
+            z-index: 1;
+        }
+
+        /* ─── Body ─── */
+        .email-body {
+            padding: 32px 32px 28px;
+        }
+
+        /* ─── Section ─── */
+        .section {
+            margin-bottom: 32px;
+        }
+
+        .section:last-child {
+            margin-bottom: 0;
+        }
+
+        .section-divider {
+            height: 1px;
+            background: linear-gradient(to right, var(--border-color), transparent);
+            margin-bottom: 28px;
+        }
+
+        /* ─── Section heading ─── */
+        .section-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+
+        .section-title .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            background: var(--blue-light);
+            color: var(--blue-primary);
+            font-size: 12px;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .section-title h2 {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--text-primary);
+            letter-spacing: -0.1px;
+        }
+
+        /* ─── Text section ─── */
+        .text-block p {
+            color: #3c4043;
+            font-size: 14px;
+            line-height: 1.75;
+            margin-bottom: 10px;
+        }
+
+        .text-block p:last-child {
+            margin-bottom: 0;
+        }
+
+        .text-block strong {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+
+        .text-block em {
+            color: #5f6368;
+            font-style: italic;
+        }
+
+        .text-strikethrough {
+            text-decoration: line-through;
+            color: var(--text-muted);
+        }
+
+        .text-link-sample {
+            color: var(--blue-dark);
+            font-weight: 500;
+        }
+
+        .text-link-sample a {
+            color: var(--blue-dark);
+            text-decoration: none;
+            border-bottom: 1px solid var(--blue-dark);
+            padding-bottom: 1px;
+            transition: opacity var(--transition);
+        }
+
+        .text-link-sample a:hover {
+            opacity: 0.75;
+        }
+
+        /* ─── Lists ─── */
+        .list-block ul,
+        .list-block ol {
+            padding-left: 22px;
+            margin-bottom: 14px;
+        }
+
+        .list-block ul:last-child,
+        .list-block ol:last-child {
+            margin-bottom: 0;
+        }
+
+        .list-block li {
+            margin-bottom: 8px;
+            color: #3c4043;
+            line-height: 1.7;
+        }
+
+        .list-block li:last-child {
+            margin-bottom: 0;
+        }
+
+        .list-block ul {
+            list-style: disc;
+        }
+
+        .list-block ul ul {
+            list-style: circle;
+            margin-top: 6px;
+            margin-bottom: 0;
+            padding-left: 20px;
+        }
+
+        .list-block ol {
+            list-style: decimal;
+        }
+
+        /* ─── Buttons ─── */
+        .btn-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 11px 26px;
+            border-radius: var(--radius-btn);
+            font-family: var(--font-body);
+            font-size: 14px;
+            font-weight: 600;
+            text-decoration: none;
+            cursor: pointer;
+            transition: transform var(--transition), box-shadow var(--transition), background-color var(--transition);
+            user-select: none;
+            letter-spacing: 0.1px;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #4285f4, #1a73e8);
+            color: #ffffff;
+            box-shadow: 0 2px 8px rgba(66,133,244,0.35);
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(66,133,244,0.45);
+        }
+
+        .btn-primary:active {
+            transform: translateY(0);
+        }
+
+        .btn-secondary {
+            background: #ffffff;
+            color: var(--blue-primary);
+            border: 1.5px solid var(--blue-primary);
+            box-shadow: 0 1px 4px rgba(66,133,244,0.12);
+        }
+
+        .btn-secondary:hover {
+            background: var(--blue-light);
+            transform: translateY(-1px);
+            box-shadow: 0 3px 10px rgba(66,133,244,0.18);
+        }
+
+        /* ─── Image ─── */
+        .image-block {
+            text-align: center;
+        }
+
+        .email-image {
+            width: 100%;
+            max-width: 100%;
+            height: auto;
+            border-radius: var(--radius-img);
+            display: block;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.10);
+            transition: box-shadow var(--transition);
+        }
+
+        .email-image:hover {
+            box-shadow: 0 4px 20px rgba(0,0,0,0.16);
+        }
+
+        .image-caption {
+            margin-top: 10px;
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.5;
+        }
+
+        /* ─── Table ─── */
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+        }
+
+        .data-table th {
+            text-align: left;
+            font-weight: 600;
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            padding: 10px 12px;
+            background: var(--bg-section);
+            border-bottom: 2px solid var(--border-color);
+        }
+
+        .data-table th:last-child { text-align: right; }
+        .data-table th:nth-child(2) { text-align: center; }
+
+        .data-table td {
+            padding: 11px 12px;
+            border-bottom: 1px solid var(--border-color);
+            color: #3c4043;
+            font-size: 14px;
+            vertical-align: middle;
+        }
+
+        .data-table td:last-child { text-align: right; }
+        .data-table td:nth-child(2) { text-align: center; }
+
+        .data-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .data-table tbody tr {
+            transition: background-color var(--transition);
+        }
+
+        .data-table tbody tr:hover {
+            background-color: #f8f9ff;
+        }
+
+        /* Status badges */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            padding: 3px 10px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+        }
+
+        .status-done {
+            background: #e6f4ea;
+            color: #1e8e3e;
+        }
+
+        .status-ongoing {
+            background: #fef7e0;
+            color: #f29900;
+        }
+
+        .status-done::before { content: '✓'; }
+        .status-ongoing::before { content: '●'; font-size: 8px; position: relative; top: -1px; }
+
+        /* Progress bar */
+        .progress-wrap {
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            gap: 8px;
+        }
+
+        .progress-bar {
+            width: 72px;
+            height: 6px;
+            background: var(--border-color);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            border-radius: 3px;
+            background: linear-gradient(90deg, var(--blue-primary), var(--blue-dark));
+        }
+
+        .progress-fill-ongoing {
+            background: linear-gradient(90deg, #fbbc04, #f29900);
+        }
+
+        .progress-text {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            min-width: 34px;
+            text-align: right;
+        }
+
+        /* ─── Code block ─── */
+        .code-block {
+            background: #1e1e2e;
+            border-radius: var(--radius-img);
+            padding: 20px 22px;
+            overflow-x: auto;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.16);
+        }
+
+        .code-block code {
+            font-family: var(--font-mono);
+            font-size: 13px;
+            line-height: 1.8;
+            display: block;
+        }
+
+        .code-keyword { color: #cba6f7; }
+        .code-string  { color: #a6e3a1; }
+        .code-fn      { color: #89b4fa; }
+        .code-var     { color: #f38ba8; }
+        .code-op      { color: #94e2d5; }
+        .code-num     { color: #fab387; }
+        .code-comment { color: #6c7086; font-style: italic; }
+        .code-plain   { color: #cdd6f4; }
+
+        /* ─── Footer ─── */
+        .email-footer {
+            padding: 20px 32px 24px;
+            background: var(--bg-section);
+            border-top: 1px solid var(--border-color);
+            text-align: center;
+        }
+
+        .email-footer p {
+            color: var(--text-secondary);
+            font-size: 12px;
+            line-height: 1.6;
+            margin-bottom: 4px;
+        }
+
+        .email-footer p:last-child {
+            color: var(--text-muted);
+            margin-bottom: 0;
+        }
+
+        /* ─── Responsive ─── */
+        @media (max-width: 680px) {
+            body { padding: 16px 10px 32px; }
+            .email-header { padding: 28px 20px 24px; }
+            .email-header h1 { font-size: 18px; }
+            .email-body { padding: 24px 18px 20px; }
+            .email-footer { padding: 18px 18px 20px; }
+            .btn-row { flex-direction: column; align-items: center; }
+            .btn { width: 100%; max-width: 280px; }
+            .data-table { font-size: 12px; }
+        }
+    </style>
+</head>
+<body>
+<div class="page-wrapper">
+    <div class="email-card">
+
+        <!-- ══ HEADER ══ -->
+        <div class="email-header">
+            <h1>Email 渲染测试模板 | Test Template</h1>
+            <p>行内样式全场景验证 | Inline Style Full Test</p>
+        </div>
+
+        <!-- ══ BODY ══ -->
+        <div class="email-body">
+
+            <!-- 1. 文本格式 -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="badge">1</span>
+                    <h2>文本格式测试 | Text Formatting</h2>
+                </div>
+                <div class="text-block">
+                    <p>普通文本：这是一封测试邮件，包含中英文混合内容，用于验证邮件客户端对行内样式的渲染效果。</p>
+                    <p><strong>粗体文本 | Bold Text</strong>：LÖVE2D 框架适配测试，Sol2 绑定性能验证。</p>
+                    <p><em>斜体文本 | Italic Text</em>：水浒卡牌游戏开发进度更新，108好汉牌型设计完成。</p>
+                    <p><span class="text-strikethrough">删除线 | Strikethrough：已废弃的渲染方案，改用行内样式实现。</span></p>
+                    <p class="text-link-sample">链接色文本 | Link Color：<a href="https://love2d.org" target="_blank" rel="noopener">LÖVE2D 官网</a></p>
+                </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- 2. 列表 -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="badge">2</span>
+                    <h2>列表测试 | List Test</h2>
+                </div>
+                <div class="list-block">
+                    <ul>
+                        <li>无序列表项 1：修复图片拉伸问题（Image Stretch Fix）</li>
+                        <li>无序列表项 2：实现剪贴板复制功能（Clipboard Copy）</li>
+                        <li>嵌套列表：
+                            <ul>
+                                <li>子项 1：Emoji 单色渲染验证</li>
+                                <li>子项 2：Markdown 链接空格恢复</li>
+                            </ul>
+                        </li>
+                    </ul>
+                    <ol>
+                        <li>有序列表项 1：测试行内样式优先级</li>
+                        <li>有序列表项 2：验证跨客户端兼容性（Outlook / Gmail / QQ邮箱）</li>
+                    </ol>
+                </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- 3. 按钮 -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="badge">3</span>
+                    <h2>按钮测试 | Button Test</h2>
+                </div>
+                <div class="btn-row">
+                    <a href="https://example.com/test" class="btn btn-primary" target="_blank" rel="noopener">
+                        测试按钮 | Test Button
+                    </a>
+                    <a href="https://example.com/secondary" class="btn btn-secondary" target="_blank" rel="noopener">
+                        次要按钮 | Secondary Button
+                    </a>
+                </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- 4. 图片 -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="badge">4</span>
+                    <h2>图片测试 | Image Test</h2>
+                </div>
+                <div class="image-block">
+                    <img
+                        src="https://picsum.photos/600/240?random=42"
+                        alt="Test Image"
+                        class="email-image"
+                        loading="lazy"
+                    />
+                    <p class="image-caption">图片说明：测试自适应宽度与圆角样式 | Image Caption: Responsive &amp; Border Radius</p>
+                </div>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- 5. 表格 -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="badge">5</span>
+                    <h2>表格测试 | Table Test</h2>
+                </div>
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>功能模块 | Module</th>
+                            <th>状态 | Status</th>
+                            <th>进度 | Progress</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>文本渲染 | Text Render</td>
+                            <td><span class="status-badge status-done">完成 | Done</span></td>
+                            <td>
+                                <div class="progress-wrap">
+                                    <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+                                    <span class="progress-text">100%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>图片适配 | Image Adapt</td>
+                            <td><span class="status-badge status-done">完成 | Done</span></td>
+                            <td>
+                                <div class="progress-wrap">
+                                    <div class="progress-bar"><div class="progress-fill" style="width:100%"></div></div>
+                                    <span class="progress-text">100%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        <tr>
+                            <td>Emoji 渲染 | Emoji Render</td>
+                            <td><span class="status-badge status-ongoing">进行中 | Ongoing</span></td>
+                            <td>
+                                <div class="progress-wrap">
+                                    <div class="progress-bar"><div class="progress-fill progress-fill-ongoing" style="width:80%"></div></div>
+                                    <span class="progress-text">80%</span>
+                                </div>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="section-divider"></div>
+
+            <!-- 6. 代码 -->
+            <div class="section">
+                <div class="section-title">
+                    <span class="badge">6</span>
+                    <h2>代码行测试 | Code Line Test</h2>
+                </div>
+                <div class="code-block">
+<code><span class="code-keyword">local</span> <span class="code-var">emojiFont</span> <span class="code-op">=</span> <span class="code-fn">love.graphics.newFont</span>(<span class="code-string">"C:\\Windows\\Fonts\\seguiemj.ttf"</span>, <span class="code-num">24</span>)</code>
+<code><span class="code-keyword">function</span> <span class="code-fn">love.draw</span>()</code>
+<code>  <span class="code-fn">love.graphics.print</span>(<span class="code-string">"🎴 水浒卡牌 🃏"</span>, <span class="code-num">100</span>, <span class="code-num">100</span>)</code>
+<code><span class="code-keyword">end</span></code>
+                </div>
+            </div>
+
+        </div><!-- /email-body -->
+
+        <!-- ══ FOOTER ══ -->
+        <div class="email-footer">
+            <p>© 2026 测试团队 | Test Team &nbsp;·&nbsp; 行内样式仅用于邮件渲染测试</p>
+            <p>如果无法正常查看，请切换至网页版 | View in browser if display is abnormal</p>
+        </div>
+
+    </div><!-- /email-card -->
+</div>
+</body>
+</html>

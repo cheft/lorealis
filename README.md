@@ -43,8 +43,8 @@ docker run --rm -v "${PWD}:/data" devkitpro/devkita64:20260219 bash -c "/data/bu
 docker run --rm -v "%cd%:/data" devkitpro/devkita64:20251117 bash -c "/data/build_switch.sh"
 
 # copy to ns
-docker run --rm -it -v E:\Works\Projects\ns-chat\build_switch:/work devkitpro/devkita64:20260219 bash
-/opt/devkitpro/tools/bin/nxlink -a 192.168.31.91 /work/NS_Finder.nro
+docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/devkita64:20260219 bash
+/opt/devkitpro/tools/bin/nxlink -a 192.168.31.91 /work/lorealis.nro
 ```
 
 
