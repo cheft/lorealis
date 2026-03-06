@@ -19,6 +19,7 @@ dkp-pacman -S --noconfirm \
     switch-libmpv \
     switch-libtheora \
     switch-libvorbis \
+    switch-libwebp \
     switch-pkg-config
 
 # 2. 清理旧的编译目录

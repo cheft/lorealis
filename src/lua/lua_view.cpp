@@ -1,7 +1,6 @@
 #include "lua_manager.hpp"
 #include <borealis.hpp>
 #include "lua_bindings.hpp"
-#include "utils/image_utils.hpp"
 #include <nanovg.h>
 #include <borealis/views/label.hpp>
 #include <borealis/views/scrolling_frame.hpp>
@@ -190,22 +189,6 @@ void LuaManager::registerViewBindings(sol::table& brls_ns) {
     image_ut["setImageFromRes"] = &brls::Image::setImageFromRes;
     image_ut["setImageFromMem"] = [](brls::Image& self, const std::string& data) {
         if (data.empty()) return;
-        
-        // Check if data is WebP and decode it
-        if (brls::ImageUtils::isWebP(data)) {
-            std::string rgba;
-            int width, height;
-            if (brls::ImageUtils::decodeWebP(data, rgba, width, height)) {
-                NVGcontext* vg = brls::Application::getNVGContext();
-                int texture = nvgCreateImageRGBA(vg, width, height, 0, (const unsigned char*)rgba.data());
-                self.innerSetImage(texture);
-                return;
-            }
-            brls::Logger::error("Lua: Failed to decode WebP image");
-            return;
-        }
-        
-        // For non-WebP images, use the standard loader
         self.setImageFromMem((const unsigned char*)data.data(), (int)data.size());
     };
 

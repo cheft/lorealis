@@ -1,6 +1,5 @@
 #include "view/html_view_builder.hpp"
 #include "network/http_client.hpp"
-#include "utils/image_utils.hpp"
 #include <borealis/core/touch/tap_gesture.hpp>
 #include <sstream>
 

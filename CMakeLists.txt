@@ -185,7 +185,6 @@ set(APP_SOURCES
     src/html/markdown_renderer.cpp
     src/html/format_converters.cpp
     src/lua/lua_html.cpp
-    src/utils/image_utils.cpp
 )
 add_executable(lorealis ${APP_SOURCES})
 
@@ -199,7 +198,7 @@ endif()
 
 # Link against borealis and Lua
 target_include_directories(lorealis BEFORE PRIVATE ${LUA_INC})
-target_link_libraries(lorealis PRIVATE borealis sol2::sol2 ${LUA_LIBS} pugixml webp webpdemux)
+target_link_libraries(lorealis PRIVATE borealis sol2::sol2 ${LUA_LIBS} pugixml webp)
 
 # zlib for ZipLoader (DEFLATE decompression)
 if(NOT PLATFORM_SWITCH)
@@ -283,7 +282,7 @@ if(PLATFORM_SWITCH)
 
     set_target_properties(lorealis PROPERTIES SUFFIX ".elf")
     target_compile_definitions(lorealis PRIVATE SOL_LUA_VERSION=501)
-    target_compile_definitions(lorealis PRIVATE SOL_ALL_SAFETIES_ON=0)
+    target_compile_definitions(lorealis PRIVATE SOL_ALL_SAFETIES_ON=1)
     target_compile_definitions(lorealis PRIVATE SOL_NO_CHECK_NUMBER_PRECISION=1)
     
     target_compile_options(lorealis PRIVATE -Wno-error=template-body)
