@@ -256,7 +256,7 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
     std::string tableBorder = tableNode->attributes.count("border") ? tableNode->attributes.at("border") : "";
     std::string tableCellPad = tableNode->attributes.count("cellpadding") ? tableNode->attributes.at("cellpadding") : "";
 
-    bool hasBorder = (tableBorder != "" && tableBorder != "0");
+    bool hasBorder = (tableBorder != "0"); // Default to true if not "0"
     if (hasBorder) {
         tBox->setBorderThickness(1.0f);
         tBox->setBorderColor(HAN_BORDER_DDD);
@@ -510,6 +510,20 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
     else if (tag == "h3") makeHeading(1.2f);
     else if (tag == "h4" || tag == "h5" || tag == "h6") makeHeading(1.0f);
 
+    // ── Title ─────────────────────────────────────────────────────────
+    else if (tag == "title") {
+        Box* tb = new Box(Axis::COLUMN);
+        tb->setWidthPercentage(100);
+        tb->setAlignItems(AlignItems::CENTER);
+        tb->setMarginTop(10); tb->setMarginBottom(20);
+        
+        Label* tl = makeLabel(HtmlParser::collectText(node), BASE * 1.6f, HAN_BLACK);
+        tl->setLineHeight(1.2f);
+        tb->addView(tl);
+        parent->addView(tb);
+        skip = true;
+    }
+
     // ── Paragraph ─────────────────────────────────────────────────────
     else if (tag == "p") {
         NVGcolor pCol = ist.color ? *ist.color : textCol;
@@ -589,6 +603,7 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
                 } else if (HtmlParser::isInlineNode(liChild)) {
                     if (!inlineRow) {
                         inlineRow = new Box(Axis::ROW);
+                        inlineRow->setWidthPercentage(100);
                         inlineRow->setFlexWrap(true); inlineRow->setRowGap(10);
                         inlineRow->setAlignItems(AlignItems::FLEX_START);
                         rhs->addView(inlineRow);
