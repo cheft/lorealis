@@ -138,6 +138,9 @@ CssStyle HtmlStyle::parseInlineStyle(const std::string& css) {
         else if (k == "text-decoration") {
             st.textDecorationLine = (toLower(v).find("line-through") != std::string::npos);
         }
+        else if (k == "line-height") {
+            try { st.lineHeight = std::stof(v); } catch (...) {}
+        }
         else if (k == "margin") {
             float t=0,r=0,b=0,l=0;
             parseSpacing(v,t,r,b,l);

@@ -67,8 +67,9 @@ void HtmlViewBuilder::applyStyle(View* view, const CssStyle& st) {
         if (st.color)    lbl->setTextColor(*st.color);
         if (st.fontSize) {
              lbl->setFontSize(*st.fontSize);
-             // Also scale line height if available
-             lbl->setLineHeight(*st.fontSize * 1.5f);
+             lbl->setLineHeight(st.lineHeight.value_or(1.1f));
+        } else if (st.lineHeight) {
+             lbl->setLineHeight(*st.lineHeight);
         }
     }
 }
@@ -87,7 +88,7 @@ void HtmlViewBuilder::renderInline(MiniNode* node, Box* target, float fontSize, 
         }
         std::string trimmed = txt.substr(start, end - start + 1);
         Label* l = makeLabel(trimmed, fontSize, strikethrough ? HAN_DEL_TEXT : color);
-        l->setLineHeight(fontSize * 1.5f);
+        l->setLineHeight(1.1f);
         if (strikethrough) l->setLineBottom(1); // visual approximation
         if (hasLeadingSpace)  l->setMarginLeft(fontSize * 0.3f);
         if (hasTrailingSpace) l->setMarginRight(fontSize * 0.3f);
@@ -518,6 +519,11 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
         if (ist.marginTop) pOuter->setMarginTop(*ist.marginTop);
         
         Box* pb = buildInlineRow(node, ist.fontSize ? *ist.fontSize : BASE, pCol, hAlign);
+        // Ensure consistency with multiplier
+        for (auto* child : pb->getChildren()) {
+            if (auto* lbl = dynamic_cast<Label*>(child))
+                lbl->setLineHeight(ist.lineHeight.value_or(1.1f));
+        }
         pOuter->addView(pb);
 
         std::string stTextP = node->attributes.count("style") ? node->attributes.at("style") : "";
@@ -714,8 +720,8 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
             
             applyStyle(imgContainer, ist);
             
-            if (!ist.marginTop) imgContainer->setMarginTop(10);
-            if (!ist.marginBottom) imgContainer->setMarginBottom(10);
+            if (!ist.marginTop) imgContainer->setMarginTop(4);
+            if (!ist.marginBottom) imgContainer->setMarginBottom(4);
             
             imgContainer->setWidthPercentage(100);
             img->setWidthPercentage(100);

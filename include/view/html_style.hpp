@@ -10,6 +10,7 @@ struct CssStyle {
     // Typography
     std::optional<NVGcolor> color;
     std::optional<float>    fontSize;
+    std::optional<float>    lineHeight;
     std::optional<bool>     fontBold;
     std::optional<float>    opacity;
 

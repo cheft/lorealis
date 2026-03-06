@@ -289,7 +289,7 @@ function html_test_view.markdown(main_view)
     local content = brls.ScrollingFrame.new()
     local renderer = brls.MarkdownRenderer.new()
     renderer:renderMarkdown(md_content)
-    renderer:setPadding(0)
+    renderer:setPadding(64)
     content:setContentView(renderer)
     return content
 end
@@ -298,7 +298,7 @@ function html_test_view.html(main_view)
     local content = brls.ScrollingFrame.new()
     local renderer = brls.HtmlRenderer.new()
     renderer:renderString(html_content)
-    renderer:setPadding(0)
+    renderer:setPadding(4)
 
     content:setContentView(renderer)
     return content
