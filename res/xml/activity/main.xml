@@ -11,7 +11,7 @@
         </brls:Tab>
 
         <brls:Tab label="RSS Reader">
-            <CnBetaListTab />
+            <RSSListTab />
         </brls:Tab>
 
         <brls:Tab label="Free Games Test">

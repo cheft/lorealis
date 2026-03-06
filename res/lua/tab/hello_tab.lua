@@ -1,5 +1,4 @@
 -- hello_tab.lua
-local hello_view = require("view/hello_view")
 local zip_loader = require("utils/zip_view_loader")
 
 local hello_tab = {}
@@ -119,33 +118,12 @@ function hello_tab.init(mainView)
     if button then
         button:onClick(function(v)
             print("HelloTab: button clicked")
-
-             -- 每次重新创建 view，避免 popActivity() 后旧指针悬空导致闪退
+            -- 每次重新创建 view，避免 popActivity() 后旧指针悬空导致闪退
             local view, mod = zip_loader.load("hello.blpkg", "main.xml", "main.lua")
             if view and mod then
                 mod.init(view)          -- 初始化事件绑定
                 v:present(view)
             end
-           
-            -- local view = brls.Application.loadXMLRes("xml/views/hello.xml")
-            -- hello_view.init(view)          -- 初始化事件绑定
-            -- v:present(view)  -- 使用 present 替代 pushActivity 以获得更顺滑的动画
-
-            -- local dropdown = brls.Dropdown.new(
-            --     "Test",
-            --     {
-            --         "Test 1", "Test 2", "Test 3", "Test 4", "Test 5",
-            --         "Test 6", "Test 7", "Test 8", "Test 9", "Test 10",
-            --         "Test 11", "Test 12", "Test 13"
-            --     },
-            --     function(_selected)
-            --         selected = _selected
-            --         print("HelloTab: Dropdown selected: " .. tostring(_selected))
-            --         label:setText("Selected: " .. tostring(_selected))
-            --     end,
-            --     selected
-            -- )
-            -- brls.Application.pushActivity(dropdown)
             return true
         end)
     end

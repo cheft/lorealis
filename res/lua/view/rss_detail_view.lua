@@ -1,5 +1,5 @@
--- cnbeta_detail_view.lua - CnBeta News Detail View
-local cnbeta_detail_view = {}
+-- rss_detail_view.lua - RSS News Detail View
+local rss_detail_view = {}
 local image_cache = require("utils/image_cache")
 
 -- Strip HTML tags for display
@@ -68,10 +68,10 @@ local function format_date(pub_date)
     return pub_date
 end
 
-function cnbeta_detail_view.init(view, news_data)
-    print("CnBeta: Initializing detail view for " .. (news_data.title or "Unknown"))
-    print("CnBeta: image_url = " .. tostring(news_data.image_url))
-    print("CnBeta: has thumbnail view = " .. tostring(view:getView("thumbnail") ~= nil))
+function rss_detail_view.init(view, news_data)
+    print("RSS: Initializing detail view for " .. (news_data.title or "Unknown"))
+    print("RSS: image_url = " .. tostring(news_data.image_url))
+    print("RSS: has thumbnail view = " .. tostring(view:getView("thumbnail") ~= nil))
     
     -- Get all views
     local thumbnail = view:getView("thumbnail")
@@ -87,17 +87,17 @@ function cnbeta_detail_view.init(view, news_data)
     
     -- Then load actual image if available (true = no debounce for immediate loading)
     if news_data.image_url and news_data.image_url ~= "" then
-        print("CnBeta: Loading image from URL: " .. news_data.image_url)
+        print("RSS: Loading image from URL: " .. news_data.image_url)
         if thumbnail then
-            print("CnBeta: Calling image_cache.load_image for thumbnail")
+            print("RSS: Calling image_cache.load_image for thumbnail")
             image_cache.load_image(news_data.image_url, thumbnail, "img/game_bg.jpg", true)
         end
         -- if background_image then
-        --     print("CnBeta: Calling image_cache.load_image for background")
+        --     print("RSS: Calling image_cache.load_image for background")
         --     image_cache.load_image(news_data.image_url, background_image, "img/game_bg.jpg", true)
         -- end
     else
-        print("CnBeta: No image_url available, using placeholder")
+        print("RSS: No image_url available, using placeholder")
         if thumbnail then thumbnail:setImageFromRes("img/game_bg.jpg") end
         -- if background_image then background_image:setImageFromRes("img/game_bg.jpg") end
     end
@@ -153,7 +153,7 @@ function cnbeta_detail_view.init(view, news_data)
         local detail_box = view:getView("detail_box")
 
         if is_html then
-            print("CnBeta: HTML detected for [" .. (news_data.title or "Unknown") .. "], using HtmlRenderer")
+            print("RSS: HTML detected for [" .. (news_data.title or "Unknown") .. "], using HtmlRenderer")
             -- Hide the original label
             description:setVisibility(brls.Visibility.GONE)
             
@@ -170,7 +170,7 @@ function cnbeta_detail_view.init(view, news_data)
                 detail_box:addView(renderer, 1)
             end
         else
-            print("CnBeta: Plain text detected, using standard Label")
+            print("RSS: Plain text detected, using standard Label")
             local content = strip_html(raw_content)
             if content == "" then
                 content = "暂无内容摘要"
@@ -188,7 +188,7 @@ function cnbeta_detail_view.init(view, news_data)
     
     -- Set author
     if author then
-        author:setText(news_data.author or "CnBeta")
+        author:setText(news_data.author or "RSS")
         author:setTextColor(color_author)
     end
     
@@ -201,16 +201,16 @@ function cnbeta_detail_view.init(view, news_data)
     -- Read button - open article URL
     if read_button then
         read_button:onClick(function(v)
-            print("CnBeta: Read button clicked for " .. (news_data.title or "Unknown"))
+            print("RSS: Read button clicked for " .. (news_data.title or "Unknown"))
             
             if news_data.link and news_data.link ~= "" then
-                print("CnBeta: Opening URL " .. news_data.link)
+                print("RSS: Opening URL " .. news_data.link)
                 -- Use Switch built-in browser
                 local platform = brls.Application.getPlatform()
                 if platform and platform.openBrowser then
                     platform:openBrowser(news_data.link)
                 else
-                    print("CnBeta: Browser not available on this platform")
+                    print("RSS: Browser not available on this platform")
                 end
             end
             
@@ -221,7 +221,7 @@ function cnbeta_detail_view.init(view, news_data)
     -- Close button - dismiss the view
     if close_button then
         close_button:onClick(function(v)
-            print("CnBeta: Closing detail view")
+            print("RSS: Closing detail view")
             view:dismiss()
             return true
         end)
@@ -236,4 +236,4 @@ function cnbeta_detail_view.init(view, news_data)
     end)
 end
 
-return cnbeta_detail_view
+return rss_detail_view

@@ -1,6 +1,5 @@
--- cnbeta_list_tab.lua - Multi-RSS News List Tab (CnBeta + Gcores + Extensible)
-local cnbeta_list_tab = {}
-local cnbeta_detail_view = require("view/cnbeta_detail_view")
+-- rss_list_tab.lua - Multi-RSS News List Tab
+local rss_detail_view = require("view/rss_detail_view")
 local network = require("utils/network")
 local image_cache = require("utils/image_cache")
 local rss_storage = require("utils/rss_storage")
@@ -421,7 +420,7 @@ local function switch_source(new_index, recycler, source_selector)
 end
 
 -- Initialize the tab view
-function cnbeta_list_tab.init(view)
+function rss_list_tab.init(view)
     if not view then return end
     
     local recycler = view:getView("recycler")
@@ -667,9 +666,9 @@ function cnbeta_list_tab.init(view)
             return brls.RecyclerCell.createFromXML("xml/cells/message_cell.xml")
         end)
         
-        -- Register CnBetaCell for news items
-        recycler:registerCell("CnBetaCell", function()
-            local cell = brls.RecyclerCell.createFromXML("xml/cells/cnbeta_cell.xml")
+        -- Register RSSCell for news items
+        recycler:registerCell("RSSCell", function()
+            local cell = brls.RecyclerCell.createFromXML("xml/cells/rss_cell.xml")
             if cell.setPrepareForReuseCallback then
                 cell:setPrepareForReuseCallback(function()
                     -- Check if cell is still valid before accessing
@@ -723,7 +722,7 @@ function cnbeta_list_tab.init(view)
                 end
                 
                 -- News item
-                local cell = rc:dequeueReusableCell("CnBetaCell")
+                local cell = rc:dequeueReusableCell("RSSCell")
                 if not cell then return nil end
                 
                 local news = all_news[row + 1]
@@ -767,9 +766,9 @@ function cnbeta_list_tab.init(view)
                 if is_loading or #all_news == 0 then return end
                 local news = all_news[row + 1]
                 if news then
-                    local detail = brls.Application.loadXMLRes("xml/views/cnbeta_detail.xml")
+                    local detail = brls.Application.loadXMLRes("xml/views/rss_detail.xml")
                     if detail then
-                        cnbeta_detail_view.init(detail, news)
+                        rss_detail_view.init(detail, news)
                         rc:present(detail)
                     end
                 end
@@ -796,4 +795,4 @@ function cnbeta_list_tab.init(view)
     end
 end
 
-return cnbeta_list_tab
+return rss_list_tab
