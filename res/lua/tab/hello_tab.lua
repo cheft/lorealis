@@ -58,7 +58,7 @@ function hello_tab.init(mainView)
         function(v)
             local dialog = brls.Dialog.new("Fetch Website HTML")
             local input = brls.InputCell.new()
-            input:init("URL", "https://thebookofshaders.com/?lan=ch", function(text) end, "https://thebookofshaders.com/?lan=ch", "Enter full URL", 256)
+            input:init("URL", "https://openai.com/index/introducing-gpt-5-4/", function(text) end, "https://thebookofshaders.com/?lan=ch", "Enter full URL", 256)
             dialog:addView(input)
             
             dialog:addButton("Fetch", function()
@@ -67,7 +67,17 @@ function hello_tab.init(mainView)
                 
                 brls.Application.notify("Fetching " .. url .. "...")
                 brls.Network.get(url, function(success, statusCode, response)
-                    if success then
+                    -- Detect Cloudflare challenge from response content
+                    local is_challenge = false
+                    if success and response then
+                        if response:find("<title>Just a moment...</title>") or 
+                           response:find("cf-browser-verification") or
+                           response:find("cf-challenge") then
+                            is_challenge = true
+                        end
+                    end
+
+                    if success and not is_challenge then
                         local content = brls.ScrollingFrame.new()
                         local renderer = brls.HtmlRenderer.new()
                         renderer:renderString(response)
@@ -75,14 +85,19 @@ function hello_tab.init(mainView)
                         content:setContentView(renderer)
                         v:present(content)
                     else
-                        local errorMsg = "Status: " .. tostring(statusCode)
-                        if statusCode < 0 then
-                            local winErr = -statusCode
-                            if winErr == 12007 then errorMsg = "DNS Error (12007)"
-                            elseif winErr == 12029 then errorMsg = "Connection Refused (12029)"
-                            elseif winErr == 12002 then errorMsg = "Timeout (12002)"
-                            elseif winErr == 12157 then errorMsg = "SSL/TLS Error (12157)"
-                            else errorMsg = "WinInet Error " .. tostring(winErr)
+                        local errorMsg = ""
+                        if is_challenge then
+                            errorMsg = "Blocked by Cloudflare protection"
+                        else
+                            errorMsg = "Status: " .. tostring(statusCode)
+                            if statusCode < 0 then
+                                local winErr = -statusCode
+                                if winErr == 12007 then errorMsg = "DNS Error (12007)"
+                                elseif winErr == 12029 then errorMsg = "Connection Refused (12029)"
+                                elseif winErr == 12002 then errorMsg = "Timeout (12002)"
+                                elseif winErr == 12157 then errorMsg = "SSL/TLS Error (12157)"
+                                else errorMsg = "WinInet Error " .. tostring(winErr)
+                                end
                             end
                         end
                         brls.Application.notify("Failed to fetch: " .. errorMsg)

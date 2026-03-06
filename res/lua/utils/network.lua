@@ -37,14 +37,29 @@ function network.get(url, callback)
     print("Network: GET " .. url)
     
     return brls.Network.get(url, function(success, statusCode, response)
+        local is_challenge = false
+        if success and response then
+            -- Simple heuristic for Cloudflare/WAF challenges
+            if response:find("<title>Just a moment...</title>") or 
+               response:find("cf-browser-verification") or
+               response:find("cf-challenge") then
+                is_challenge = true
+            end
+        end
+
         if success then
-            print("Network: Success, received " .. #response .. " bytes")
+            if is_challenge then
+                print("Network: Warning, received Cloudflare challenge from " .. url)
+            else
+                print("Network: Success, received " .. #response .. " bytes")
+            end
         else
             print("Network: Request failed with status " .. tostring(statusCode))
         end
         
         if callback then
-            callback(success, response)
+            -- We pass is_challenge as a third parameter to the callback
+            callback(success, response, is_challenge)
         end
     end)
 end

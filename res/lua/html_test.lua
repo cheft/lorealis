@@ -121,100 +121,127 @@ local html_content = [[
 
 
 local md_content = [[
----
-# frontmatter: https://jekyllrb.com/docs/front-matter/
-layout: post
-title: Blogging Like a Hacker
----
+# Electrobun
+<p align="center">
+  <a href="https://electrobun.dev"><img src="https://github.com/blackboardsh/electrobun/assets/75102186/8799b522-0507-45e9-86e3-c3cfded1aa7c" alt="Logo" height=170></a>
+</p>
 
-## Markdown Basic Syntax
+<h1 align="center">Electrobun</h1>
 
-I just love **bold text**. Italicized text is the _cat's meow_. At the command prompt, type `nano`.
+<div align="center">
+  Get started with a template <br />
+  <code><strong>npx electrobun init</strong></code>   
+</div>
 
-My favorite markdown editor is [ByteMD](https://github.com/bytedance/bytemd).
 
-1. First item
-2. Second item
-3. Third item
 
-> Dorothy followed her through many of the beautiful rooms in her castle.
+## What is Electrobun?
 
-```js
-import gfm from '@bytemd/plugin-gfm'
-import { Editor, Viewer } from 'bytemd'
+Electrobun aims to be a complete **solution-in-a-box** for building, updating, and shipping ultra fast, tiny, and cross-platform desktop applications written in Typescript.
+Under the hood it uses <a href="https://bun.sh">bun</a> to execute the main process and to bundle webview typescript, and has native bindings written in <a href="https://ziglang.org/">zig</a>.
 
-const plugins = [
-  gfm(),
-  // Add more plugins here
-]
+Visit <a href="https://blackboard.sh/electrobun/">https://blackboard.sh/electrobun/</a> to see api documentation, guides, and more.
 
-const editor = new Editor({
-  target: document.body, // DOM to render
-  props: {
-    value: '',
-    plugins,
-  },
-})
+**Project Goals**
 
-editor.on('change', (e) => {
-  editor.$set({ value: e.detail.value })
-})
+- Write typescript for the main process and webviews without having to think about it.
+- Isolation between main and webview processes with fast, typed, easy to implement RPC between them.
+- Small self-extracting app bundles ~12MB (when using system webview, most of this is the bun runtime)
+- Even smaller app updates as small as 14KB (using bsdiff it only downloads tiny patches between versions)
+- Provide everything you need in one tightly integrated workflow to start writing code in 5 minutes and distribute in 10.
+
+## Apps Built with Electrobun
+- [Audio TTS](https://github.com/blackboardsh/audio-tts) - desktop text-to-speech app using Qwen3-TTS for voice design, cloning, and generation
+- [Co(lab)](https://blackboard.sh/colab/) - a hybrid web browser + code editor for deep work
+- [DOOM](https://github.com/blackboardsh/electrobun-doom) - DOOM implemented in 2 ways: bun -> (c doom -> bundled wgpu) and (full ts port bun -> bundled wgpu)
+
+# Video Demos
+
+[![Audio TTS Demo](https://img.youtube.com/vi/Z4dNK1d6l6E/maxresdefault.jpg)](https://www.youtube.com/watch?v=Z4dNK1d6l6E)
+
+[![Co(lab) Demo](https://img.youtube.com/vi/WWTCqGmE86w/maxresdefault.jpg)](https://www.youtube.com/watch?v=WWTCqGmE86w)
+
+[![DOOM Demo](https://github.com/user-attachments/assets/6cc5f04a-6d97-4010-b65f-3f282d32590c)](https://x.com/YoavCodes/status/2028499038148903239?s=20)
+
+## Star History
+
+[![Star History Chart](https://api.star-history.com/svg?repos=blackboardsh/electrobun&type=date&legend=top-left&cache=2)](https://www.star-history.com/#blackboardsh/electrobun&type=date&legend=top-left)
+
+## Contributing
+Ways to get involved:
+
+- Follow us on X for updates <a href="https://twitter.com/BlackboardTech">@BlackboardTech</a> or <a href="https://bsky.app/profile/yoav.codes">@yoav.codes</a>
+- Join the conversation on <a href="https://discord.gg/ueKE4tjaCE">Discord</a>
+- Create and participate in Github issues and discussions
+- Let me know what you're building with Electrobun
+
+## Development Setup
+Building apps with Electrobun is as easy as updating your package.json dependencies with `npm add electrobun` or try one of our templates via `npx electrobun init`.
+
+**This section is for building Electrobun from source locally in order to contribute fixes to it.**
+
+### Prerequisites
+
+**macOS:**
+- Xcode command line tools
+- cmake (install via homebrew: `brew install cmake`)
+
+**Windows:**
+- Visual Studio Build Tools or Visual Studio with C++ development tools
+- cmake
+
+**Linux:**
+- build-essential package
+- cmake
+- webkit2gtk and GTK development packages
+
+On Ubuntu/Debian based distros: `sudo apt install build-essential cmake pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libayatana-appindicator3-dev librsvg2-dev`
+
+### First-time Setup
+
+```bash
+git clone --recurse-submodules https://github.com/blackboardsh/electrobun.git
+cd electrobun/package
+bun install
+bun dev:clean
 ```
 
-## GFM Extended Syntax
+### Development Workflow
 
-Automatic URL Linking: https://github.com/bytedance/bytemd
+```bash
+# All commands are run from the /package directory
+cd electrobun/package
 
-~~The world is flat.~~ We now know that the world is round.
+# After making changes to source code
+bun dev
 
-- [x] Write the press release
-- [ ] Update the website
-- [ ] Contact the media
+# If you only changed kitchen sink code (not electrobun source)
+bun dev:rerun
 
-| Syntax    | Description |
-| --------- | ----------- |
-| Header    | Title       |
-| Paragraph | Text        |
-
-## Footnotes
-
-Here's a simple footnote,[^1] and here's a longer one. bignote
-
-[^1]: This is the first footnote.
-[^bignote]: Here's one with multiple paragraphs and code.
-
-    Indent paragraphs to include them in the footnote.
-
-    `{ my code }`
-
-    Add as many paragraphs as you like.
-
-## Gemoji
-
-Thumbs up: :+1:, thumbs down: :-1:.
-
-Families: :family_man_man_boy_boy:
-
-Long flags: :wales:, :scotland:, :england:.
-
-## Math Equation
-
-Inline math equation: $a+b$
-
-$$
-\displaystyle \left( \sum_{k=1}^n a_k b_k \right)^2 \leq \left( \sum_{k=1}^n a_k^2 \right) \left( \sum_{k=1}^n b_k^2 \right)
-$$
-
-## Mermaid Diagrams
-
-```mermaid
-graph TD;
-  A-->B;
-  A-->C;
-  B-->D;
-  C-->D;
+# If you need a completely fresh start
+bun dev:clean
 ```
 
+### Additional Commands
+
+All commands are run from the `/package` directory:
+
+- `bun dev:canary` - Build and run kitchen sink in canary mode
+- `bun build:dev` - Build electrobun in development mode
+- `bun build:release` - Build electrobun in release mode
+
+### Debugging
+
+**macOS:** Use `lldb <path-to-bundle>/Contents/MacOS/launcher` and then `run` to debug release builds
+
+## Platform Support
+
+| OS | Status |
+|---|---|
+| macOS 14+ | Official |
+| Windows 11+ | Official |
+| Ubuntu 22.04+ | Official |
+| Other Linux distros (gtk3, webkit2gtk-4.1) | Community |
 
 ]]
 

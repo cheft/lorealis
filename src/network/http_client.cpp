@@ -100,10 +100,14 @@ uint32_t SimpleHTTPClient::get(const std::string& url, std::function<void(bool s
         int statusCode = 0;
 
 #ifdef _WIN32
-        HINTERNET hInternet = InternetOpen("Mozilla/5.0", INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
+        const char* ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36";
+        HINTERNET hInternet = InternetOpen(ua, INTERNET_OPEN_TYPE_PRECONFIG, NULL, NULL, 0);
         if (hInternet) {
             NetworkRegistry::addHandle(id, hInternet);
-            HINTERNET hConnect = InternetOpenUrlA(hInternet, url.c_str(), NULL, 0, INTERNET_FLAG_RELOAD, 0);
+            const char* headers = "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8\r\n"
+                                 "Accept-Language: en-US,en;q=0.9\r\n"
+                                 "Cache-Control: max-age=0\r\n";
+            HINTERNET hConnect = InternetOpenUrlA(hInternet, url.c_str(), headers, -1L, INTERNET_FLAG_RELOAD | INTERNET_FLAG_NO_CACHE_WRITE, 0);
             if (hConnect) {
                 NetworkRegistry::addHandle(id, hConnect);
                 char buffer[8192];
@@ -119,8 +123,13 @@ uint32_t SimpleHTTPClient::get(const std::string& url, std::function<void(bool s
                     statusCode = (int)code;
                 }
                 
+                // If it's a 403 or 503 but has content, it's likely a Cloudflare/WAF challenge page
+                // We mark it as success to allow the UI to handle/display the error message or challenge
                 success = (statusCode >= 200 && statusCode < 300) && !response.empty() && !NetworkRegistry::isCancelled(id);
-                if (!success && !response.empty() && statusCode > 0) success = true; // Still allow rendering if we got content
+                if (!success && !response.empty() && statusCode > 0) {
+                    success = true; 
+                    brls::Logger::debug("Network: Request to {} returned status {} but has content (possible challenge)", url, statusCode);
+                }
                 InternetCloseHandle(hConnect);
             } else {
                 statusCode = -(int)GetLastError();
@@ -134,7 +143,14 @@ uint32_t SimpleHTTPClient::get(const std::string& url, std::function<void(bool s
         CURL* curl = curl_easy_init();
         if (curl) {
             CurlData cd = { &response, nullptr, id };
+            struct curl_slist *headers = NULL;
+            headers = curl_slist_append(headers, "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8");
+            headers = curl_slist_append(headers, "Accept-Language: en-US,en;q=0.9");
+            headers = curl_slist_append(headers, "Cache-Control: max-age=0");
+            
             curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+            curl_easy_setopt(curl, CURLOPT_HTTPHEADER, headers);
+            curl_easy_setopt(curl, CURLOPT_USERAGENT, "Mozilla/5.0 (Nintendo Switch; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36");
             curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, writeCallback);
             curl_easy_setopt(curl, CURLOPT_WRITEDATA, &cd);
             curl_easy_setopt(curl, CURLOPT_XFERINFOFUNCTION, progressCallback);
@@ -151,6 +167,7 @@ uint32_t SimpleHTTPClient::get(const std::string& url, std::function<void(bool s
                 statusCode = (int)code;
                 success = !response.empty();
             }
+            curl_slist_free_all(headers);
             curl_easy_cleanup(curl);
         }
 #endif
