@@ -24,7 +24,7 @@ static const NVGcolor HAN_COPY_BTN    = nvgRGB(0x88, 0x88, 0x88);
 static const NVGcolor HAN_LINK_BLUE   = nvgRGB(0x1a, 0x73, 0xe8);
 static const NVGcolor HAN_DARK_BG     = nvgRGB(0x1e, 0x1e, 0x2e);
 
-static constexpr float BASE = 24.0f;
+static constexpr float BASE = 16.0f;
 
 class HtmlViewBuilder {
 public:

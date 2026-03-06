@@ -256,7 +256,7 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
     std::string tableBorder = tableNode->attributes.count("border") ? tableNode->attributes.at("border") : "";
     std::string tableCellPad = tableNode->attributes.count("cellpadding") ? tableNode->attributes.at("cellpadding") : "";
 
-    bool hasBorder = (tableBorder != "0"); // Default to true if not "0"
+    bool hasBorder = (tableBorder != "0");
     if (hasBorder) {
         tBox->setBorderThickness(1.0f);
         tBox->setBorderColor(HAN_BORDER_DDD);
@@ -266,9 +266,8 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
         if (tableWidth.back() == '%') {
             try { tBox->setWidthPercentage(std::stof(tableWidth.substr(0, tableWidth.size() - 1))); } catch(...) {}
         } else {
-            // It's a precise dp value
             try { tBox->setWidth(std::stof(tableWidth)); } catch(...) {}
-            tBox->setAlignSelf(AlignSelf::CENTER); // Usually layout tables are centered if they don't cover full width
+            tBox->setAlignSelf(AlignSelf::CENTER);
         }
     } else {
         tBox->setWidthPercentage(100);
@@ -289,6 +288,15 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
     };
     collect(tableNode, false);
 
+    // Find max columns for alignment
+    int maxCols = 0;
+    for (auto& [h, r] : rows) {
+        int rCols = 0;
+        for (auto* c : r->children) if (c->tag == "td" || c->tag == "th") rCols++;
+        if (rCols > maxCols) maxCols = rCols;
+    }
+    if (maxCols == 0) maxCols = 1;
+
     CssStyle tableSt = HtmlStyle::parseInlineStyle(
         tableNode->attributes.count("style") ? tableNode->attributes.at("style") : "");
     if (tableSt.backgroundColor) tBox->setBackgroundColor(*tableSt.backgroundColor);
@@ -304,7 +312,6 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
     }
 
     if (tableWidth == "600" || (!tableWidth.empty() && tableWidth.back() != '%')) {
-         // Auto margin equivalent, push it to center if parent has AlignItems stretch
          tBox->setAlignSelf(AlignSelf::CENTER);
     }
 
@@ -313,20 +320,18 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
             row->attributes.count("style") ? row->attributes.at("style") : "");
 
         Box* rowBox = new Box(Axis::ROW);
+        rowBox->setAlignItems(AlignItems::STRETCH); // Ensure cells fill row height
 
-        int cols = 0;
-        for (auto* c : row->children) if (c->tag == "td" || c->tag == "th") cols++;
-        if (cols == 0) cols = 1;
-
+        int currentCellIdx = 0;
         for (auto* cell : row->children) {
             if (cell->tag != "td" && cell->tag != "th") continue;
             bool isHdr = (cell->tag == "th") || hdr;
+            currentCellIdx++;
 
             std::string stText = cell->attributes.count("style") ? cell->attributes.at("style") : "";
             CssStyle cellSt = HtmlStyle::parseInlineStyle(stText);
 
             std::string cellWidth = cell->attributes.count("width") ? cell->attributes.at("width") : "";
-            std::string cellHeight = cell->attributes.count("height") ? cell->attributes.at("height") : "";
             std::string cellAlign = cell->attributes.count("align") ? HtmlParser::toLower(cell->attributes.at("align")) : "";
             std::string cellValign = cell->attributes.count("valign") ? HtmlParser::toLower(cell->attributes.at("valign")) : "";
 
@@ -339,31 +344,20 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
                     try { cellBox->setWidth(std::stof(cellWidth)); cellBox->setGrow(0.0f); } catch(...) {}
                 }
             } else {
-                cellBox->setGrow(1.0f);
-            }
-
-            if (!cellHeight.empty()) {
-                if (cellHeight.back() == '%') {
-                    try { cellBox->setHeightPercentage(std::stof(cellHeight.substr(0, cellHeight.size() - 1))); } catch(...) {}
-                } else {
-                    try { cellBox->setHeight(std::stof(cellHeight)); } catch(...) {}
-                }
+                // Synchronize column width by percentage if not specified
+                cellBox->setWidthPercentage(100.0f / maxCols);
             }
 
             if (cellSt.paddingTop) cellBox->setPaddingTop(*cellSt.paddingTop);
             else cellBox->setPaddingTop(defPadding);
-            
             if (cellSt.paddingBottom) cellBox->setPaddingBottom(*cellSt.paddingBottom);
             else cellBox->setPaddingBottom(defPadding);
-            
             if (cellSt.paddingLeft) cellBox->setPaddingLeft(*cellSt.paddingLeft);
             else cellBox->setPaddingLeft(defPadding);
-            
             if (cellSt.paddingRight) cellBox->setPaddingRight(*cellSt.paddingRight);
             else cellBox->setPaddingRight(defPadding);
 
             if (hasBorder) {
-                // If the table wants borders, but cell didn't specify one, use generic color
                 if (!cellSt.borderWidth) cellBox->setBorderThickness(1);
                 if (!cellSt.borderColor) cellBox->setBorderColor(HAN_BORDER_DDD);
             }
@@ -374,17 +368,9 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
             else if (rowSt.backgroundColor) cellBox->setBackgroundColor(*rowSt.backgroundColor);
             else if (isHdr && hasBorder) cellBox->setBackgroundColor(HAN_TH_BG);
 
-            // Per cell border override
             if (cellSt.borderWidth && cellSt.borderColor) {
                 cellBox->setBorderThickness(*cellSt.borderWidth);
                 cellBox->setBorderColor(*cellSt.borderColor);
-            } else if (cellSt.borderColor) {
-                // User forced bottom border via bottom-border
-                cellBox->setBorderThickness(1);
-                cellBox->setBorderColor(*cellSt.borderColor);
-            } else if (cellSt.borderWidth) {
-                cellBox->setBorderThickness(*cellSt.borderWidth);
-                cellBox->setBorderColor(HAN_BORDER_DDD);
             }
 
             std::string textAlignment = cellSt.textAlign ? *cellSt.textAlign : (cellAlign.empty() ? "left" : cellAlign);
@@ -405,6 +391,7 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
                 if (HtmlParser::isInlineNode(child)) {
                     if (!inlineRow) {
                          inlineRow = new Box(Axis::ROW);
+                         inlineRow->setWidthPercentage(100);
                          inlineRow->setFlexWrap(true); inlineRow->setRowGap(10);
                          inlineRow->setAlignItems(AlignItems::FLEX_START);
                          if (textAlignment == "center") inlineRow->setJustifyContent(JustifyContent::CENTER);
@@ -412,14 +399,13 @@ void HtmlViewBuilder::buildTable(MiniNode* tableNode, Box* parent,
                          else inlineRow->setJustifyContent(JustifyContent::FLEX_START);
                          cellBox->addView(inlineRow);
                     }
-                    renderInline(child, inlineRow, baseFontSize * 0.85f, cCol);
+                    renderInline(child, inlineRow, baseFontSize, cCol);
                 } else {
                     inlineRow = nullptr;
                     buildHtmlViews(child, cellBox, baseFontSize, localTextColor, defaultTextColor, accentColor);
                 }
             }
 
-            // Bottom border simulation for cells
             if (stText.find("border-bottom") != std::string::npos && cellSt.borderColor && cellSt.borderWidth) {
                  Box* cellDivider = new Box(Axis::ROW);
                  cellDivider->setHeight(*cellSt.borderWidth);
@@ -488,7 +474,7 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
         hb->setMarginTop(ist.marginTop ? *ist.marginTop : 14);
         hb->setMarginBottom(ist.marginBottom ? *ist.marginBottom : 8);
         
-        float calculatedSize = ist.fontSize ? *ist.fontSize : (BASE * scale);
+        float calculatedSize = ist.fontSize ? *ist.fontSize : (baseFontSize * scale);
         Box* row = buildInlineRow(node, calculatedSize, hColor, hAlign);
         hb->addView(row);
         
@@ -532,7 +518,7 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
         pOuter->setMarginBottom(ist.marginBottom ? *ist.marginBottom : 14);
         if (ist.marginTop) pOuter->setMarginTop(*ist.marginTop);
         
-        Box* pb = buildInlineRow(node, ist.fontSize ? *ist.fontSize : BASE, pCol, hAlign);
+        Box* pb = buildInlineRow(node, ist.fontSize ? *ist.fontSize : baseFontSize, pCol, hAlign);
         // Ensure consistency with multiplier
         for (auto* child : pb->getChildren()) {
             if (auto* lbl = dynamic_cast<Label*>(child))
@@ -587,14 +573,15 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
             row->setAlignItems(AlignItems::FLEX_START);
             row->setMarginBottom(6);
 
-            float fSize = ist.fontSize ? *ist.fontSize : BASE;
+            float fSize = ist.fontSize ? *ist.fontSize : baseFontSize;
 
             if (hasContent) {
                 Label* marker = makeLabel(ordered ? (std::to_string(counter++) + ". ") : "• ", fSize, textCol);
+                marker->setLineHeight(1.1f);
                 row->addView(marker);
             }
 
-            Box* rhs = new Box(Axis::COLUMN); rhs->setGrow(1.0f);
+            Box* rhs = new Box(Axis::COLUMN); rhs->setGrow(1.0f); rhs->setWidthPercentage(100);
             Box* inlineRow = nullptr;
             for (auto* liChild : liNode->children) {
                 if (liChild->tag == "ul" || liChild->tag == "ol") {
@@ -735,8 +722,8 @@ void HtmlViewBuilder::buildHtmlViews(MiniNode* node, Box* parent,
             
             applyStyle(imgContainer, ist);
             
-            if (!ist.marginTop) imgContainer->setMarginTop(4);
-            if (!ist.marginBottom) imgContainer->setMarginBottom(4);
+            if (!ist.marginTop) imgContainer->setMarginTop(baseFontSize);
+            if (!ist.marginBottom) imgContainer->setMarginBottom(baseFontSize);
             
             imgContainer->setWidthPercentage(100);
             img->setWidthPercentage(100);
