@@ -47,11 +47,6 @@ docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/d
 /opt/devkitpro/tools/bin/nxlink -a 192.168.31.91 /work/lorealis.nro
 ```
 
-
-## Credits 
-- Thanks to [Natinusala](https://github.com/natinusala), [xfangfang](https://github.com/xfangfang) and [XITRIX](https://github.com/XITRIX) for [borealis](https://github.com/xfangfang/borealis)
-
-
 ## Screenshot
 <p align="center">
   <img src="./demo_screens/2051030715381500-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" width="45%" />
@@ -63,6 +58,10 @@ docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/d
   <img src="./demo_screens/ScreenShot_2026-03-06_160039_853.png" width="45%" />
   <img src="./demo_screens/ScreenShot_2026-03-06_160145_795.png" width="45%" />
   <img src="./demo_screens/ScreenShot_2026-03-06_160157_228.png" width="45%" />
-  <img src="./demo_screens/ScreenShot_2026-03-06_160325_175.png" width="45%" />
   <img src="./demo_screens/ScreenShot_2026-03-06_160414_653.png" width="45%" />
 </p>
+
+
+## Credits 
+- Thanks to [Natinusala](https://github.com/natinusala), [xfangfang](https://github.com/xfangfang) and [XITRIX](https://github.com/XITRIX) for [borealis](https://github.com/xfangfang/borealis)
+
