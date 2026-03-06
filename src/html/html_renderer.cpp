@@ -547,13 +547,39 @@ static Box* buildInlineRow(MiniNode* node, float fontSize, NVGcolor color,
 }
 
 // ============================================================
-// Table builder — now with per-row bg and per-cell text-align
+// Table builder — now with layout & recursion support
 // ============================================================
-static void buildTable(HtmlRenderer* renderer, MiniNode* tableNode, Box* parent) {
+static void buildTable(HtmlRenderer* renderer, MiniNode* tableNode, Box* parent,
+                       float& baseFontSize,
+                       std::optional<NVGcolor>& currentTextColor,
+                       const NVGcolor& defaultTextColor,
+                       const NVGcolor& accentColor) {
     Box* tBox = new Box(Axis::COLUMN);
     tBox->setMarginBottom(22);
-    tBox->setBorderThickness(1);
-    tBox->setBorderColor(HAN_BORDER_DDD);
+
+    // Parse attributes
+    std::string tableWidth = tableNode->attributes.count("width") ? tableNode->attributes.at("width") : "";
+    std::string tableBorder = tableNode->attributes.count("border") ? tableNode->attributes.at("border") : "";
+    std::string tableCellPad = tableNode->attributes.count("cellpadding") ? tableNode->attributes.at("cellpadding") : "";
+
+    bool hasBorder = (tableBorder != "" && tableBorder != "0");
+    if (hasBorder) {
+        tBox->setBorderThickness(1);
+        tBox->setBorderColor(HAN_BORDER_DDD);
+    }
+
+    if (!tableWidth.empty()) {
+        if (tableWidth.back() == '%') {
+            try { tBox->setWidthPercentage(std::stof(tableWidth.substr(0, tableWidth.size() - 1))); } catch(...) {}
+        } else {
+            try { tBox->setWidth(std::stof(tableWidth)); } catch(...) {}
+        }
+    }
+
+    float defPadding = 8.0f;
+    if (!tableCellPad.empty()) {
+        try { defPadding = std::stof(tableCellPad); } catch(...) {}
+    }
 
     std::vector<std::pair<bool, MiniNode*>> rows;
     std::function<void(MiniNode*, bool)> collect = [&](MiniNode* n, bool hdr) {
@@ -566,8 +592,18 @@ static void buildTable(HtmlRenderer* renderer, MiniNode* tableNode, Box* parent)
     collect(tableNode, false);
     for (auto* c : tableNode->children) if (c->tag == "tr") rows.push_back({false, c});
 
+    CssStyle tableSt = renderer->parseInlineStyle(
+        tableNode->attributes.count("style") ? tableNode->attributes.at("style") : "");
+    if (tableSt.backgroundColor) tBox->setBackgroundColor(*tableSt.backgroundColor);
+    if (tableSt.borderRadius)    tBox->setCornerRadius(*tableSt.borderRadius);
+    if (tableSt.marginTop)       tBox->setMarginTop(*tableSt.marginTop);
+    if (tableSt.marginBottom)    tBox->setMarginBottom(*tableSt.marginBottom);
+    if (tableSt.borderWidth && tableSt.borderColor) {
+        tBox->setBorderThickness(*tableSt.borderWidth);
+        tBox->setBorderColor(*tableSt.borderColor);
+    }
+
     for (auto& [hdr, row] : rows) {
-        // Row background from inline style
         CssStyle rowSt = renderer->parseInlineStyle(
             row->attributes.count("style") ? row->attributes.at("style") : "");
 
@@ -584,31 +620,81 @@ static void buildTable(HtmlRenderer* renderer, MiniNode* tableNode, Box* parent)
             CssStyle cellSt = renderer->parseInlineStyle(
                 cell->attributes.count("style") ? cell->attributes.at("style") : "");
 
-            Box* cellBox = new Box(Axis::COLUMN);
-            cellBox->setGrow(1.0f);
-            cellBox->setWidthPercentage(100.0f / cols);
-            cellBox->setPadding(8, 16, 8, 16);
-            cellBox->setBorderThickness(1);
-            cellBox->setBorderColor(HAN_BORDER_DDD);
-            cellBox->setMarginTop(0); cellBox->setMarginBottom(0);
-            cellBox->setMarginLeft(0); cellBox->setMarginRight(0);
+            std::string cellWidth = cell->attributes.count("width") ? cell->attributes.at("width") : "";
+            std::string cellAlign = cell->attributes.count("align") ? toLower(cell->attributes.at("align")) : "";
+            std::string cellValign = cell->attributes.count("valign") ? toLower(cell->attributes.at("valign")) : "";
 
-            // Background: cell style > row style > header default
+            Box* cellBox = new Box(Axis::COLUMN);
+
+            if (!cellWidth.empty()) {
+                if (cellWidth.back() == '%') {
+                    try { cellBox->setWidthPercentage(std::stof(cellWidth.substr(0, cellWidth.size() - 1))); } catch(...) {}
+                } else {
+                    try { cellBox->setWidth(std::stof(cellWidth)); cellBox->setGrow(0.0f); } catch(...) {}
+                }
+            } else {
+                cellBox->setGrow(1.0f);
+                cellBox->setWidthPercentage(100.0f / cols);
+            }
+
+            if (cellSt.paddingTop) cellBox->setPaddingTop(*cellSt.paddingTop);
+            else cellBox->setPaddingTop(hasBorder ? defPadding : defPadding * 0.5f);
+            
+            if (cellSt.paddingBottom) cellBox->setPaddingBottom(*cellSt.paddingBottom);
+            else cellBox->setPaddingBottom(hasBorder ? defPadding : defPadding * 0.5f);
+            
+            if (cellSt.paddingLeft) cellBox->setPaddingLeft(*cellSt.paddingLeft);
+            else cellBox->setPaddingLeft(hasBorder ? defPadding * 2 : defPadding);
+            
+            if (cellSt.paddingRight) cellBox->setPaddingRight(*cellSt.paddingRight);
+            else cellBox->setPaddingRight(hasBorder ? defPadding * 2 : defPadding);
+
+            if (hasBorder) {
+                cellBox->setBorderThickness(1);
+                cellBox->setBorderColor(HAN_BORDER_DDD);
+            }
+            cellBox->setMarginTop(0); cellBox->setMarginBottom(0);
+
             if (cellSt.backgroundColor) cellBox->setBackgroundColor(*cellSt.backgroundColor);
             else if (rowSt.backgroundColor) cellBox->setBackgroundColor(*rowSt.backgroundColor);
-            else if (isHdr) cellBox->setBackgroundColor(HAN_TH_BG);
+            else if (isHdr && hasBorder) cellBox->setBackgroundColor(HAN_TH_BG);
 
-            // Border override from cell style
             if (cellSt.borderWidth && cellSt.borderColor) {
                 cellBox->setBorderThickness(*cellSt.borderWidth);
                 cellBox->setBorderColor(*cellSt.borderColor);
             }
 
-            NVGcolor cellTextColor = cellSt.color ? *cellSt.color : (isHdr ? HAN_BLACK : HAN_TD_TEXT);
-            std::string align = cellSt.textAlign ? *cellSt.textAlign : "left";
+            std::string textAlignment = cellSt.textAlign ? *cellSt.textAlign : (cellAlign.empty() ? "left" : cellAlign);
+            if (textAlignment == "center") cellBox->setAlignItems(AlignItems::CENTER);
+            else if (textAlignment == "right") cellBox->setAlignItems(AlignItems::FLEX_END);
+            else cellBox->setAlignItems(AlignItems::FLEX_START);
 
-            Box* content = buildInlineRow(cell, BASE * 0.85f, cellTextColor, align);
-            cellBox->addView(content);
+            if (cellValign == "middle") cellBox->setJustifyContent(JustifyContent::CENTER);
+            else if (cellValign == "bottom") cellBox->setJustifyContent(JustifyContent::FLEX_END);
+            else cellBox->setJustifyContent(JustifyContent::FLEX_START);
+
+            NVGcolor cCol = cellSt.color ? *cellSt.color : (isHdr ? HAN_BLACK : HAN_TD_TEXT);
+            std::optional<NVGcolor> localTextColor = cCol;
+
+            // Recursively build elements
+            Box* inlineRow = nullptr;
+            for (auto* child : cell->children) {
+                if (isInlineNode(child)) {
+                    if (!inlineRow) {
+                        inlineRow = new Box(Axis::ROW);
+                        inlineRow->setFlexWrap(true); inlineRow->setRowGap(10);
+                        inlineRow->setAlignItems(AlignItems::CENTER);
+                        if (textAlignment == "center") inlineRow->setJustifyContent(JustifyContent::CENTER);
+                        else if (textAlignment == "right") inlineRow->setJustifyContent(JustifyContent::FLEX_END);
+                        else inlineRow->setJustifyContent(JustifyContent::FLEX_START);
+                        cellBox->addView(inlineRow);
+                    }
+                    renderInline(child, inlineRow, baseFontSize * 0.85f, cCol);
+                } else {
+                    inlineRow = nullptr;
+                    HtmlRenderer::buildHtmlViews(renderer, child, cellBox, baseFontSize, localTextColor, defaultTextColor, accentColor);
+                }
+            }
             rowBox->addView(cellBox);
         }
         tBox->addView(rowBox);
@@ -740,7 +826,7 @@ void HtmlRenderer::buildHtmlViews(HtmlRenderer* renderer, MiniNode* node, Box* p
 
     // ── Table ─────────────────────────────────────────────────────────
     else if (tag == "table") {
-        buildTable(renderer, node, parent);
+        buildTable(renderer, node, parent, baseFontSize, currentTextColor, defaultTextColor, accentColor);
         skip = true;
     }
 
