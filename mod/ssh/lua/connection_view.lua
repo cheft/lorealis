@@ -30,9 +30,8 @@ function ConnectionView.new()
     end
     self._ssh.onDisconnect = function()
         self._terminal:setStatus("已断开连接", 220, 80, 80)
-        brls.Application.runAsync(2000, function()
-            self:_showConnectionList()
-        end)
+        -- runAsync API 不存在，直接返回列表
+        self:_showConnectionList()
     end
     self._ssh.onError = function(msg)
         local dialog = brls.Dialog.new("SSH 错误: " .. msg)
@@ -98,16 +97,20 @@ function ConnectionView:_showConnectForm()
     end)
 
     if ok and inputHost then
-        inputHost:init("主机", "192.168.1.1", function(text) end, "192.168.1.1", "IP 或域名", 64)
+        inputHost:init("主机", "192.168.31.43", function(text) end, "192.168.31.43", "IP 或域名", 64)
         dialog:addView(inputHost)
 
         local inputUser = brls.InputCell.new()
-        inputUser:init("用户名", "root", function(text) end, "root", "用户名", 32)
+        inputUser:init("用户名", "jax", function(text) end, "jax", "用户名", 32)
         dialog:addView(inputUser)
 
         local inputPort = brls.InputCell.new()
         inputPort:init("端口", "22", function(text) end, "22", "SSH 端口", 5)
         dialog:addView(inputPort)
+
+        local inputPass = brls.InputCell.new()
+        inputPass:init("密码", "", function(text) end, "", "密码（留空使用密钥）", 64)
+        dialog:addView(inputPass)
 
         dialog:addButton("连接", function()
             local conn = {
@@ -115,7 +118,7 @@ function ConnectionView:_showConnectForm()
                 host = inputHost:getValue(),
                 port = tonumber(inputPort:getValue()) or 22,
                 user = inputUser:getValue(),
-                password = "",
+                password = inputPass:getValue(),
             }
             if conn.host and conn.host ~= "" and conn.user and conn.user ~= "" then
                 self._connections = SavedConnections.upsert(conn)
@@ -165,17 +168,15 @@ function ConnectionView:_doConnect(conn)
     end)
     connectingDlg:open()
 
-    -- 异步连接
-    brls.Application.runAsync(100, function()
-        local ok, err = self._ssh:connect(params)
-        connectingDlg:close()
-        if not ok then
-            print("[SSH] Connection failed: " .. tostring(err))
-            local errDlg = brls.Dialog.new("连接失败: " .. tostring(err))
-            errDlg:addButton("确定", function() end)
-            errDlg:open()
-        end
-    end)
+    -- 直接连接（不在异步中，因为 runAsync API 可能不存在）
+    local ok, err = self._ssh:connect(params)
+    pcall(function() connectingDlg:close() end)
+    if not ok then
+        print("[SSH] Connection failed: " .. tostring(err))
+        local errDlg = brls.Dialog.new("连接失败: " .. tostring(err))
+        errDlg:addButton("确定", function() return true end)
+        errDlg:open()
+    end
 end
 
 -- ── 内部：切换到终端视图 ─────────────────────────────────────

@@ -214,11 +214,10 @@ function SSHManager:_pollOnce()
         end
     end
 
-    -- 调度下次轮询（通过 brls 的异步 tick 机制）
-    -- 使用 brls.Application.runLoop 或相当的帧回调
-    brls.Application.runAsync(self._pollInterval, function()
-        self:_pollOnce()
-    end)
+    -- runAsync API 不存在，轮询机制禁用
+    -- 如需数据接收，需要手动调用 poll() 或实现其他机制
+    -- 暂时禁用自动轮询
+    self._polling = false
 end
 
 -- ── 内部：处理断开事件 ───────────────────────────────────────

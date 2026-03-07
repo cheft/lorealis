@@ -61,6 +61,19 @@ public:
         }
         doDisconnect();
 
+#ifdef _WIN32
+        // Windows 需要初始化 Winsock
+        static bool wsaInitialized = false;
+        if (!wsaInitialized) {
+            WSADATA wsaData;
+            int wsaResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+            if (wsaResult != 0) {
+                return "WSAStartup failed: " + std::to_string(wsaResult);
+            }
+            wsaInitialized = true;
+        }
+#endif
+
         // ① 解析主机名
         struct addrinfo hints{}, *res = nullptr;
         hints.ai_family   = AF_UNSPEC;

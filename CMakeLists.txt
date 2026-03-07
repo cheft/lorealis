@@ -287,11 +287,12 @@ else()
         target_link_libraries(lorealis PRIVATE ${LIBSSH2_LIBRARIES})
         message(STATUS "--- SSH: Using system libssh2 (${LIBSSH2_VERSION}) ---")
     else()
-        # Fallback: fetch and build libssh2 from source
+        # Fallback: fetch and build libssh2 from source (使用最新 master 分支)
         FetchContent_Declare(
             libssh2_src
-            URL "https://github.com/libssh2/libssh2/releases/download/libssh2-1.11.0/libssh2-1.11.0.tar.gz"
-            DOWNLOAD_EXTRACT_TIMESTAMP true
+            GIT_REPOSITORY "https://github.com/libssh2/libssh2.git"
+            GIT_TAG "master"
+            GIT_SHALLOW TRUE
         )
         # 设置兼容策略以支持旧版 CMakeLists.txt
         set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
