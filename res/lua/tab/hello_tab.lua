@@ -115,6 +115,23 @@ function hello_tab.init(mainView)
     )
     hello_box:addView(fetch_website_btn)
 
+    -- Add SSH Client Button
+    local ssh_btn = brls.Button.new(
+        "SSH Client",
+        function(v)
+            print("HelloTab: SSH Client clicked")
+            -- Load SSH module main.lua
+            local ssh_main = dofile("mod/ssh/lua/main.lua")
+            if ssh_main and ssh_main.show then
+                ssh_main.show()
+            else
+                brls.Application.notify("Failed to load SSH module")
+            end
+            return true
+        end
+    )
+    hello_box:addView(ssh_btn)
+
     if button then
         button:onClick(function(v)
             print("HelloTab: button clicked")

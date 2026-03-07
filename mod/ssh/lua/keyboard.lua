@@ -139,7 +139,7 @@ function Keyboard:openSwkbd(opts)
 
     if not ok2 then
         self._swkbdOpen = false
-        brls.Logger.warning("[SSH Keyboard] openSwkbd failed: " .. tostring(err))
+        print("[SSH Keyboard] openSwkbd failed: " .. tostring(err))
         -- 降级：使用 brls 内置输入框
         self:_openFallbackInput(opts)
     end
@@ -175,8 +175,9 @@ function Keyboard:handleKey(keyCode, mods)
     local MOD_SHIFT = 0x01
     local MOD_ALT   = 0x04
 
-    local ctrl  = (mods & MOD_CTRL)  ~= 0
-    local shift = (mods & MOD_SHIFT) ~= 0
+    -- Lua 5.1 不支持 &，用取模判断位是否设置
+    local ctrl  = (mods % 4) >= 2   -- 检查 MOD_CTRL (0x02) 位
+    local shift = (mods % 2) >= 1   -- 检查 MOD_SHIFT (0x01) 位
 
     -- 方向键
     local ARROW_UP=265; local ARROW_DOWN=264; local ARROW_LEFT=263; local ARROW_RIGHT=262
@@ -220,21 +221,21 @@ function Keyboard:handleChar(codepoint)
         ch = string.char(codepoint)
     elseif codepoint < 0x800 then
         ch = string.char(
-            0xC0 | (codepoint >> 6),
-            0x80 | (codepoint & 0x3F)
+            0xC0 + math.floor(codepoint / 64),
+            0x80 + (codepoint % 0x40)
         )
     elseif codepoint < 0x10000 then
         ch = string.char(
-            0xE0 | (codepoint >> 12),
-            0x80 | ((codepoint >> 6) & 0x3F),
-            0x80 | (codepoint & 0x3F)
+            0xE0 + math.floor(codepoint / 4096),
+            0x80 + (math.floor(codepoint / 64) % 0x40),
+            0x80 + (codepoint % 0x40)
         )
     else
         ch = string.char(
-            0xF0 | (codepoint >> 18),
-            0x80 | ((codepoint >> 12) & 0x3F),
-            0x80 | ((codepoint >> 6)  & 0x3F),
-            0x80 | (codepoint & 0x3F)
+            0xF0 + math.floor(codepoint / 262144),
+            0x80 + (math.floor(codepoint / 4096) % 0x40),
+            0x80 + (math.floor(codepoint / 64)  % 0x40),
+            0x80 + (codepoint % 0x40)
         )
     end
     self:_emit(ch)

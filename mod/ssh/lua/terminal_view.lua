@@ -126,7 +126,7 @@ function TerminalView:resize(width, height)
         self._rows = newRows
         self._buf:resize(newCols, newRows)
         self._ssh:resize(newCols, newRows)
-        brls.Logger.info("[SSH Terminal] Resized to {}x{}", newCols, newRows)
+        print("[SSH Terminal] Resized to {}x{}", newCols, newRows)
     end
 end
 
@@ -151,7 +151,7 @@ function TerminalView:_draw(vg, x, y, w, h)
     -- 字体设置（使用等宽字体）
     nvgFontSize(vg, FONT_SIZE)
     nvgFontFace(vg, "monospace")
-    nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_TOP)
+    nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_TOP)
 
     -- 可见行数
     local visRows = math.min(self._rows, math.floor((h - PADDING_Y * 2 - 20) / LINE_HEIGHT))
@@ -265,13 +265,13 @@ function TerminalView:_drawStatusBar(vg, x, y, w, h)
     -- 状态文字
     nvgFontSize(vg, 11)
     nvgFontFace(vg, "regular")
-    nvgTextAlign(vg, NVG_ALIGN_LEFT | NVG_ALIGN_MIDDLE)
+    nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     local c = self._statusColor
     nvgFillColor(vg, nvgRGBA(c.r, c.g, c.b, 255))
     nvgText(vg, x + 4, y + h / 2, self._statusText, nil)
 
     -- 右侧终端尺寸
-    nvgTextAlign(vg, NVG_ALIGN_RIGHT | NVG_ALIGN_MIDDLE)
+    nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, nvgRGBA(100, 100, 100, 255))
     nvgText(vg, x + w - 4, y + h / 2,
         string.format("%dx%d", self._cols, self._rows), nil)

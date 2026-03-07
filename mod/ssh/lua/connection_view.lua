@@ -1,7 +1,6 @@
 -- =============================================================
--- connection_view.lua — SSH 连接管理 UI
--- 显示已保存的连接列表 + 新建/编辑连接表单
--- 连接成功后切换到 TerminalView
+-- connection_view.lua — SSH 连接管理 UI（简化版本）
+-- 仅使用已知可用的 Borealis Lua API
 -- =============================================================
 
 local Platform        = require("platform")
@@ -19,43 +18,32 @@ function ConnectionView.new()
     self._ssh          = SSHManager.new()
     self._terminal     = TerminalView.new(self._ssh)
     self._connections  = SavedConnections.load()
-    self._activity     = nil   -- 由 main.lua 注入
+    self._activity     = nil
 
     -- 配置 SSH 回调
     self._ssh.onData = function(data)
         self._terminal:feedData(data)
     end
     self._ssh.onConnect = function()
-        self._terminal:setStatus(
-            "已连接: " .. self._ssh:getInfo() ..
-            "  FP: " .. self._ssh:getFingerprint():sub(1, 20) .. "…",
-            80, 220, 80
-        )
-        -- 切换到终端界面
+        self._terminal:setStatus("已连接: " .. self._ssh:getInfo(), 80, 220, 80)
         self:_showTerminal()
     end
     self._ssh.onDisconnect = function()
         self._terminal:setStatus("已断开连接", 220, 80, 80)
-        -- 延迟 2 秒后返回连接列表
         brls.Application.runAsync(2000, function()
             self:_showConnectionList()
         end)
     end
     self._ssh.onError = function(msg)
-        -- 显示错误对话框
-        brls.Application.blockInputs()
-        local dialog = brls.Dialog.new("SSH 错误")
-        dialog:addButton("确定", function()
-            brls.Application.unblockInputs()
-        end)
+        local dialog = brls.Dialog.new("SSH 错误: " .. msg)
+        dialog:addButton("确定", function() end)
         dialog:open()
-        brls.Logger.error("[SSH] " .. msg)
+        print("[SSH] " .. msg)
     end
 
     return self
 end
 
--- ── 注入 Activity 引用 ───────────────────────────────────────
 function ConnectionView:setActivity(activity)
     self._activity = activity
 end
@@ -66,227 +54,154 @@ function ConnectionView:show()
     self:_showConnectionList()
 end
 
--- ── 内部：显示连接列表 ───────────────────────────────────────
+-- ── 内部：显示连接列表（极简版本）────────────────────────
 function ConnectionView:_showConnectionList()
-    -- inflate 连接列表 XML
-    local ok, view = pcall(function()
-        return brls.View.inflate("@mod_ssh/xml/connect.xml")
-    end)
-    if not ok then
-        brls.Logger.error("[SSH] Failed to inflate connect.xml: " .. tostring(view))
-        return
+    -- 使用 Dialog 作为主界面（简化实现）
+    local title = "SSH 客户端"
+    if #self._connections == 0 then
+        title = "SSH 客户端 - 无连接"
+    else
+        title = "SSH 客户端 - " .. #self._connections .. " 个连接"
     end
+    local dialog = brls.Dialog.new(title)
 
-    -- 填充保存的连接（通过 RecyclerView 或 ScrollingFrame）
-    local listContainer = view:getViewById("connection_list")
-    if listContainer and #self._connections > 0 then
-        for i, conn in ipairs(self._connections) do
-            local item = self:_buildConnectionItem(conn, i)
-            if item then listContainer:addView(item) end
-        end
-    end
-
-    -- "新建连接"按钮
-    local btnNew = view:getViewById("btn_new_connection")
-    if btnNew then
-        btnNew:registerClickAction(function()
-            self:_showConnectForm(nil)
+    -- 为每个连接添加按钮
+    for i, conn in ipairs(self._connections) do
+        local btnText = (conn.name or conn.host) .. " (" .. conn.user .. "@" .. conn.host .. ")"
+        dialog:addButton(btnText, function()
+            dialog:close()
+            self:_doConnect(conn)
         end)
     end
 
-    -- 在 Activity 中推入视图
-    if self._activity then
-        self._activity:setContentView(view)
-    end
-end
-
--- ── 内部：构建单个连接列表项 ─────────────────────────────────
-function ConnectionView:_buildConnectionItem(conn, idx)
-    -- 简单用 Label 展示，实际可换为 CellBase
-    local ok, cell = pcall(function()
-        return brls.View.inflate("@mod_ssh/xml/connect_item.xml")
-    end)
-    if not ok then return nil end
-
-    -- 填充文字
-    local lblName = cell:getViewById("lbl_conn_name")
-    local lblHost = cell:getViewById("lbl_conn_host")
-    if lblName then lblName:setFullText(conn.name or conn.host) end
-    if lblHost then lblHost:setFullText(string.format("%s@%s:%d",
-        conn.user or "?", conn.host or "?", conn.port or 22)) end
-
-    -- 点击 → 连接
-    cell:registerClickAction(function()
-        self:_doConnect(conn)
-    end)
-
-    -- 长按 / Y键 → 编辑
-    cell:registerAction("编辑", brls.ControllerButton.BUTTON_Y, function()
-        self:_showConnectForm(conn, idx)
-        return true
-    end, false)
-
-    -- X键 → 删除
-    cell:registerAction("删除", brls.ControllerButton.BUTTON_X, function()
-        local dialog = brls.Dialog.new("确认删除连接「" .. (conn.name or conn.host) .. "」？")
-        dialog:addButton("删除", function()
-            self._connections = SavedConnections.remove(idx)
-            self:_showConnectionList()  -- 刷新列表
+    -- 新建连接按钮
+    dialog:addButton("+ 新建连接", function(v)
+        local ok, err = pcall(function()
+            self:_showConnectForm()
         end)
-        dialog:addButton("取消", function() end)
-        dialog:open()
+        if not ok then
+            print("[SSH] Error showing connect form: " .. tostring(err))
+        end
         return true
-    end, false)
-
-    return cell
-end
-
--- ── 内部：显示连接表单（新建/编辑）─────────────────────────
-function ConnectionView:_showConnectForm(conn, editIdx)
-    conn = conn or {}
-
-    -- 弹出编辑 Dialog（也可以 inflate 独立页面）
-    local dialog = brls.Dialog.new(editIdx and "编辑连接" or "新建 SSH 连接")
-
-    -- 简化：使用多个 InputCell 构建表单
-    -- 实际项目中可 inflate 完整 XML 表单
-    local fields = {
-        {id="name",       label="连接名称", value=conn.name      or ""},
-        {id="host",       label="主机地址", value=conn.host      or ""},
-        {id="port",       label="端口",     value=tostring(conn.port or 22)},
-        {id="user",       label="用户名",   value=conn.user      or ""},
-        {id="password",   label="密码",     value="" },  -- 密码不回显
-        {id="privkey",    label="私钥路径", value=conn.privkey   or ""},
-    }
-
-    -- 临时存储输入值
-    local values = {}
-    for _, f in ipairs(fields) do
-        values[f.id] = f.value
-    end
-
-    -- 添加确认按钮
-    dialog:addButton("连接", function()
-        local newConn = {
-            name     = values.name ~= "" and values.name or values.host,
-            host     = values.host,
-            port     = tonumber(values.port) or 22,
-            user     = values.user,
-            password = values.password,
-            privkey  = values.privkey,
-        }
-        local valid, errMsg = SavedConnections.validate(newConn)
-        if not valid then
-            brls.Logger.warning("[SSH] Invalid connection: " .. errMsg)
-            -- 显示验证错误
-            local errDlg = brls.Dialog.new("输入错误: " .. errMsg)
-            errDlg:addButton("确定", function() end)
-            errDlg:open()
-            return
-        end
-        -- 保存并连接
-        self._connections = SavedConnections.upsert(newConn)
-        self:_doConnect(newConn)
     end)
 
-    dialog:addButton("仅保存", function()
-        local newConn = {
-            name     = values.name ~= "" and values.name or values.host,
-            host     = values.host,
-            port     = tonumber(values.port) or 22,
-            user     = values.user,
-            password = values.password,
-            privkey  = values.privkey,
-        }
-        local valid, errMsg = SavedConnections.validate(newConn)
-        if valid then
-            self._connections = SavedConnections.upsert(newConn)
-            self:_showConnectionList()
-        end
-    end)
-
-    dialog:addButton("取消", function() end)
     dialog:open()
+end
 
-    -- 注意：在真实实现中，需要为每个 fields 注册 Swkbd 输入
-    -- 这里通过手柄 A 键触发系统键盘
-    if Platform.isSwitch then
-        -- Switch 上依次弹出各字段的软键盘
-        -- 实际应该用 tabbing 机制，这里简化
+-- ── 内部：显示连接表单 ──────────────────────────────────────
+function ConnectionView:_showConnectForm()
+    local dialog = brls.Dialog.new("新建 SSH 连接")
+
+    -- 使用 InputCell 输入（如果可用）
+    local ok, inputHost = pcall(function()
+        return brls.InputCell.new()
+    end)
+
+    if ok and inputHost then
+        inputHost:init("主机", "192.168.1.1", function(text) end, "192.168.1.1", "IP 或域名", 64)
+        dialog:addView(inputHost)
+
+        local inputUser = brls.InputCell.new()
+        inputUser:init("用户名", "root", function(text) end, "root", "用户名", 32)
+        dialog:addView(inputUser)
+
+        local inputPort = brls.InputCell.new()
+        inputPort:init("端口", "22", function(text) end, "22", "SSH 端口", 5)
+        dialog:addView(inputPort)
+
+        dialog:addButton("连接", function()
+            local conn = {
+                name = inputHost:getValue(),
+                host = inputHost:getValue(),
+                port = tonumber(inputPort:getValue()) or 22,
+                user = inputUser:getValue(),
+                password = "",
+            }
+            if conn.host and conn.host ~= "" and conn.user and conn.user ~= "" then
+                self._connections = SavedConnections.upsert(conn)
+                dialog:close()
+                self:_doConnect(conn)
+            end
+        end)
+    else
+        -- InputCell 不可用，使用简单按钮
+        dialog:addButton("示例: root@192.168.1.1", function()
+            local conn = {
+                name = "测试连接",
+                host = "192.168.1.1",
+                port = 22,
+                user = "root",
+                password = "",
+            }
+            dialog:close()
+            self:_doConnect(conn)
+        end)
     end
+
+    dialog:addButton("取消", function() dialog:close() end)
+    dialog:open()
 end
 
 -- ── 内部：执行连接 ────────────────────────────────────────────
 function ConnectionView:_doConnect(conn)
-    -- 显示连接进度
-    self._terminal:setStatus(
-        string.format("正在连接 %s@%s:%d …", conn.user, conn.host, conn.port or 22),
-        220, 220, 80
-    )
+    print("[SSH] Connecting to " .. conn.user .. "@" .. conn.host .. ":" .. (conn.port or 22))
 
-    -- 在后台线程建立 SSH 连接（通过 brls 异步机制）
-    -- 传递窗口尺寸
     local params = {
         host        = conn.host,
         port        = conn.port or 22,
         user        = conn.user,
-        password    = conn.password,
-        privkey     = conn.privkey,
-        pubkey      = conn.pubkey,
-        passphrase  = conn.passphrase,
+        password    = conn.password or "",
+        privkey     = conn.privkey or "",
         timeout     = 10000,
         cols        = Platform.defaultCols,
         rows        = Platform.defaultRows,
     }
 
-    brls.Logger.info("[SSH] Connecting to {}@{}:{}", params.user, params.host, params.port)
+    -- 显示连接中对话框
+    local connectingDlg = brls.Dialog.new("正在连接 " .. conn.host .. " ...")
+    connectingDlg:addButton("取消", function()
+        self._ssh:disconnect()
+        connectingDlg:close()
+    end)
+    connectingDlg:open()
 
-    -- 在主线程调用（libssh2 在 Switch 上是同步阻塞，需在 async 中执行）
-    brls.Application.runAsync(0, function()
+    -- 异步连接
+    brls.Application.runAsync(100, function()
         local ok, err = self._ssh:connect(params)
+        connectingDlg:close()
         if not ok then
-            brls.Logger.error("[SSH] Connection failed: " .. tostring(err))
-            self._terminal:setStatus("连接失败: " .. tostring(err), 220, 80, 80)
+            print("[SSH] Connection failed: " .. tostring(err))
+            local errDlg = brls.Dialog.new("连接失败: " .. tostring(err))
+            errDlg:addButton("确定", function() end)
+            errDlg:open()
         end
     end)
 end
 
 -- ── 内部：切换到终端视图 ─────────────────────────────────────
 function ConnectionView:_showTerminal()
-    local ok, view = pcall(function()
-        return brls.View.inflate("@mod_ssh/xml/terminal.xml")
+    -- 使用 Dialog 显示终端（简化实现）
+    local dialog = brls.Dialog.new("SSH 终端 (简化)\n" .. self._ssh:getInfo())
+
+    -- 添加一些基本操作按钮
+    dialog:addButton("发送命令 (示例: ls)", function()
+        if self._ssh:isConnected() then
+            self._ssh:send("ls\r")
+        end
     end)
-    if not ok then
-        brls.Logger.error("[SSH] Failed to inflate terminal.xml: " .. tostring(view))
-        return
-    end
 
-    -- 找到终端绘制容器
-    local termContainer = view:getViewById("terminal_canvas")
-    if termContainer then
-        self._terminal:bindView(termContainer)
-    end
+    dialog:addButton("发送 Ctrl+C", function()
+        if self._ssh:isConnected() then
+            self._ssh:send("\3")
+        end
+    end)
 
-    -- 注册 LT/RT 翻页
-    view:registerAction("向上翻页", brls.ControllerButton.BUTTON_LT, function()
-        self._terminal:scrollUp(self._terminal._rows - 2)
-        return true
-    end, false)
-    view:registerAction("向下翻页", brls.ControllerButton.BUTTON_RT, function()
-        self._terminal:scrollDown(self._terminal._rows - 2)
-        return true
-    end, false)
-
-    -- 返回连接列表
-    view:registerAction("返回", brls.ControllerButton.BUTTON_START, function()
+    dialog:addButton("断开连接", function()
         self._ssh:disconnect()
-        self:_showConnectionList()
-        return true
-    end, false)
+        dialog:close()
+    end)
 
-    if self._activity then
-        self._activity:setContentView(view)
-    end
+    dialog:open()
 end
 
 return ConnectionView

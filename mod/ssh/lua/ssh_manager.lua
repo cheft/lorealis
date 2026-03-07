@@ -48,7 +48,7 @@ function SSHManager:connect(params)
         params.timeout or 10000
     )
     if err ~= "" then
-        brls.Logger.error("[SSH] Connect failed: " .. err)
+        print("[SSH] Connect failed: " .. err)
         self:_fireError("连接失败: " .. err)
         return false, err
     end
@@ -68,7 +68,7 @@ function SSHManager:connect(params)
     end
 
     if err ~= "" then
-        brls.Logger.error("[SSH] Auth failed: " .. err)
+        print("[SSH] Auth failed: " .. err)
         self:_fireError("认证失败: " .. err)
         self._session:disconnect()
         return false, err
@@ -80,14 +80,14 @@ function SSHManager:connect(params)
         params.rows or Platform.defaultRows
     )
     if err ~= "" then
-        brls.Logger.error("[SSH] Shell open failed: " .. err)
+        print("[SSH] Shell open failed: " .. err)
         self:_fireError("Shell 启动失败: " .. err)
         self._session:disconnect()
         return false, err
     end
 
     self._connected = true
-    brls.Logger.info("[SSH] Connected to {}:{} as {}", params.host, params.port or 22, params.user)
+    print("[SSH] Connected to {}:{} as {}", params.host, params.port or 22, params.user)
 
     -- ④ 启动轮询定时器
     self:_startPolling()
@@ -109,7 +109,7 @@ function SSHManager:send(data)
     end
     local err = self._session:send(data)
     if err ~= "" then
-        brls.Logger.warning("[SSH] Send error: " .. err)
+        print("[SSH] Send error: " .. err)
         self:_handleDisconnect()
         return false
     end
@@ -137,7 +137,7 @@ end
 function SSHManager:reconnect()
     if self._reconnecting or not self._params then return end
     self._reconnecting = true
-    brls.Logger.info("[SSH] Reconnecting...")
+    print("[SSH] Reconnecting...")
     self:disconnect()
 
     -- 延迟 1 秒后重连
@@ -145,7 +145,7 @@ function SSHManager:reconnect()
         self._reconnecting = false
         local ok, err = self:connect(self._params)
         if not ok then
-            brls.Logger.error("[SSH] Reconnect failed: " .. err)
+            print("[SSH] Reconnect failed: " .. err)
         end
     end)
 end
@@ -200,7 +200,7 @@ function SSHManager:_pollOnce()
             return
         elseif err ~= "" and err ~= nil then
             -- 读取错误（非暂无数据）
-            brls.Logger.warning("[SSH] Recv error: " .. tostring(err))
+            print("[SSH] Recv error: " .. tostring(err))
             self:_handleDisconnect()
             return
         elseif data and #data > 0 then
@@ -208,7 +208,7 @@ function SSHManager:_pollOnce()
             if self.onData then
                 local ok, e = pcall(self.onData, data)
                 if not ok then
-                    brls.Logger.error("[SSH] onData callback error: " .. tostring(e))
+                    print("[SSH] onData callback error: " .. tostring(e))
                 end
             end
         end
@@ -224,7 +224,7 @@ end
 -- ── 内部：处理断开事件 ───────────────────────────────────────
 function SSHManager:_handleDisconnect()
     if not self._connected then return end
-    brls.Logger.info("[SSH] Disconnected from remote.")
+    print("[SSH] Disconnected from remote.")
     self._connected = false
     self:_stopPolling()
     if self.onDisconnect then

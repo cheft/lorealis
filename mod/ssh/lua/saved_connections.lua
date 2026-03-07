@@ -47,9 +47,17 @@ end
 -- ── 公共 API ─────────────────────────────────────────────────
 local SavedConnections = {}
 
+-- 内存存储（Borealis Lua 沙箱中 io 库不可用）
+local _inMemoryConnections = {}
+
 -- ── 加载连接列表 ─────────────────────────────────────────────
 ---@return table  连接列表（array of connection）
 function SavedConnections.load()
+    -- Borealis Lua 沙箱中 io 库不可用，使用内存存储
+    if not io then
+        return _inMemoryConnections
+    end
+    
     local path = getConfigPath()
     local f = io.open(path, "r")
     if not f then
@@ -69,6 +77,12 @@ end
 ---@param list table  连接列表
 ---@return boolean  是否保存成功
 function SavedConnections.save(list)
+    -- Borealis Lua 沙箱中 io 库不可用，使用内存存储
+    if not io then
+        _inMemoryConnections = list
+        return true
+    end
+    
     -- 确保目录存在（跨平台 mkdir）
     local dir = getConfigDir()
     -- 使用 os.execute 创建目录（跨平台）
@@ -81,7 +95,7 @@ function SavedConnections.save(list)
     local path = getConfigPath()
     local f = io.open(path, "w")
     if not f then
-        brls.Logger.error("[SSH] Cannot write config: " .. path)
+        print("[SSH] Cannot write config: " .. path)
         return false
     end
     local data = {connections = list, version = 1}

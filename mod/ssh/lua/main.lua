@@ -19,18 +19,18 @@ local _activity = nil
 
 -- ── SSH 模块初始化 ─────────────────────────────────────────
 local function init()
-    brls.Logger.info("[SSH Module] Initializing... ({})", Platform.info())
+    print("[SSH Module] Initializing... ({})", Platform.info())
 
     -- 验证 SSH 绑定是否可用
     if not brls.SSH then
-        brls.Logger.error("[SSH Module] brls.SSH bindings not found! Check lua_ssh.cpp registration.")
+        print("[SSH Module] brls.SSH bindings not found! Check lua_ssh.cpp registration.")
         local dlg = brls.Dialog.new("SSH 模块初始化失败\n\n缺少 brls.SSH 绑定层\n请检查编译配置")
         dlg:addButton("确定", function() end)
         dlg:open()
         return false
     end
 
-    brls.Logger.info("[SSH Module] libssh2 version: {}", brls.SSH.version())
+    print("[SSH Module] libssh2 version: {}", brls.SSH.version())
 
     -- 创建连接管理视图
     _connView = ConnectionView.new()
@@ -73,17 +73,15 @@ local function show()
 
     else
         -- 方式 2：在当前 Activity 内嵌显示（降级方案）
-        brls.Logger.warning("[SSH Module] Could not push new activity, using inline mode.")
-        local currentActivity = brls.Application.getCurrentActivity()
-        if currentActivity then
-            _connView:setActivity(currentActivity)
-        end
+        print("[SSH Module] Could not push new activity, using inline mode.")
+        -- getCurrentActivity API 不存在，直接尝试使用当前上下文
+        -- 实际运行中 pushActivity 通常能成功，此分支很少进入
     end
 
     -- 显示连接列表
     _connView:show()
 
-    brls.Logger.info("[SSH Module] Ready.")
+    print("[SSH Module] Ready.")
 end
 
 -- ── 模块清理（退出时调用）────────────────────────────────
@@ -92,7 +90,7 @@ local function cleanup()
         _connView._ssh:disconnect()
     end
     _connView = nil
-    brls.Logger.info("[SSH Module] Cleaned up.")
+    print("[SSH Module] Cleaned up.")
 end
 
 -- ── 模块对外接口 ───────────────────────────────────────────
@@ -108,7 +106,7 @@ local M = {
 if not _SSH_MODULE_LOADED then
     _SSH_MODULE_LOADED = true
     -- 如果在主 Activity 初始化后调用，直接 show
-    brls.Logger.info("[SSH Module] Auto-starting...")
+    print("[SSH Module] Auto-starting...")
     show()
 end
 
