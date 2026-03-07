@@ -287,12 +287,39 @@ else()
         target_link_libraries(lorealis PRIVATE ${LIBSSH2_LIBRARIES})
         message(STATUS "--- SSH: Using system libssh2 (${LIBSSH2_VERSION}) ---")
     else()
-        # Fallback: fetch and build libssh2 from source (使用最新 master 分支)
+        # 获取并构建 mbedTLS（CMake 原生支持，比 OpenSSL 更易构建）
+        message(STATUS "--- SSH: Fetching and building mbedTLS ---")
+        FetchContent_Declare(
+            mbedtls_src
+            GIT_REPOSITORY "https://github.com/Mbed-TLS/mbedtls.git"
+            GIT_TAG "v2.28.4"  # LTS 版本，稳定兼容
+            GIT_SHALLOW TRUE
+        )
+        # 为 mbedTLS 设置兼容性策略（它使用旧版 CMake 语法）
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+        # mbedTLS 选项
+        set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+        set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
+        set(USE_SHARED_MBEDTLS_LIBRARY OFF CACHE BOOL "" FORCE)
+        FetchContent_MakeAvailable(mbedtls_src)
+        # 恢复策略设置
+        unset(CMAKE_POLICY_VERSION_MINIMUM)
+        
+        # 设置 mbedTLS 路径供 libssh2 使用
+        # FetchContent 使用 <name>_BINARY_DIR 和 <name>_SOURCE_DIR 格式
+        set(MBEDCRYPTO_LIBRARY ${mbedtls_src_BINARY_DIR}/library/${CMAKE_STATIC_LIBRARY_PREFIX}mbedcrypto${CMAKE_STATIC_LIBRARY_SUFFIX})
+        set(MBEDX509_LIBRARY ${mbedtls_src_BINARY_DIR}/library/${CMAKE_STATIC_LIBRARY_PREFIX}mbedx509${CMAKE_STATIC_LIBRARY_SUFFIX})
+        set(MBEDTLS_LIBRARY ${mbedtls_src_BINARY_DIR}/library/${CMAKE_STATIC_LIBRARY_PREFIX}mbedtls${CMAKE_STATIC_LIBRARY_SUFFIX})
+        set(MBEDTLS_INCLUDE_DIR ${mbedtls_src_SOURCE_DIR}/include)
+        message(STATUS "--- mbedTLS source: ${mbedtls_src_SOURCE_DIR} ---")
+        message(STATUS "--- mbedTLS binary: ${mbedtls_src_BINARY_DIR} ---")
+        message(STATUS "--- mbedTLS library: ${MBEDTLS_LIBRARY} ---")
+
+        # Fallback: fetch and build libssh2 from source
         FetchContent_Declare(
             libssh2_src
-            GIT_REPOSITORY "https://github.com/libssh2/libssh2.git"
-            GIT_TAG "master"
-            GIT_SHALLOW TRUE
+            URL "https://github.com/libssh2/libssh2/releases/download/libssh2-1.11.0/libssh2-1.11.0.tar.gz"
+            DOWNLOAD_EXTRACT_TIMESTAMP true
         )
         # 设置兼容策略以支持旧版 CMakeLists.txt
         set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
@@ -302,27 +329,8 @@ else()
         set(BUILD_TESTING  OFF CACHE BOOL "" FORCE)
         # 禁用 pkgconfig 生成
         set(LIBSSH2_ENABLE_PKGCONFIG OFF CACHE BOOL "" FORCE)
-        # 选择加密后端：Windows 使用 WinCNG，其他使用 OpenSSL
-        if(WIN32)
-            set(CRYPTO_BACKEND "WinCNG" CACHE STRING "Crypto backend for libssh2" FORCE)
-        else()
-            # 尝试找 OpenSSL，如果没有则使用 mbedTLS
-            find_package(OpenSSL QUIET)
-            if(OPENSSL_FOUND)
-                set(CRYPTO_BACKEND "OpenSSL" CACHE STRING "Crypto backend for libssh2" FORCE)
-            else()
-                set(CRYPTO_BACKEND "mbedTLS" CACHE STRING "Crypto backend for libssh2" FORCE)
-                # 确保 mbedtls 存在
-                FetchContent_Declare(
-                    mbedtls_src
-                    URL "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v3.5.0.tar.gz"
-                    DOWNLOAD_EXTRACT_TIMESTAMP true
-                )
-                set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
-                set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
-                FetchContent_MakeAvailable(mbedtls_src)
-            endif()
-        endif()
+        # 强制使用 mbedTLS 后端（比 WinCNG 兼容性好）
+        set(CRYPTO_BACKEND "mbedTLS" CACHE STRING "Crypto backend for libssh2" FORCE)
         # 在 FetchContent_MakeAvailable 之前创建缺失的 libssh2.pc.in 文件
         # 这样可以避免 configure_file 错误
         FetchContent_GetProperties(libssh2_src)
@@ -377,12 +385,19 @@ Cflags: -I${includedir}
         add_subdirectory(${libssh2_src_SOURCE_DIR} ${libssh2_src_BINARY_DIR})
         unset(CMAKE_POLICY_VERSION_MINIMUM)
         target_include_directories(lorealis PRIVATE ${libssh2_src_SOURCE_DIR}/include)
+        
+        # 链接 mbedTLS 库到主项目（libssh2 在内部应该已链接，但主项目也需要）
+        if(NOT TARGET mbedtls)
+            message(FATAL_ERROR "mbedTLS target not found!")
+        endif()
+        
         if(WIN32)
-            target_link_libraries(lorealis PRIVATE libssh2_static ws2_32 crypt32)
+            target_link_libraries(lorealis PRIVATE libssh2_static mbedtls mbedx509 mbedcrypto ws2_32 crypt32)
         else()
-            target_link_libraries(lorealis PRIVATE libssh2_static)
+            target_link_libraries(lorealis PRIVATE libssh2_static mbedtls mbedx509 mbedcrypto)
         endif()
         message(STATUS "--- SSH: Using fetched libssh2 (${CRYPTO_BACKEND}) ---")
+        message(STATUS "--- mbedTLS libs: mbedtls mbedx509 mbedcrypto ---")
     endif()
     # On Windows also need winsock2
     if(WIN32)
