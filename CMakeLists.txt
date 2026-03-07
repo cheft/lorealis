@@ -185,6 +185,7 @@ set(APP_SOURCES
     src/html/markdown_renderer.cpp
     src/html/format_converters.cpp
     src/lua/lua_html.cpp
+    src/lua/lua_ssh.cpp
 )
 add_executable(lorealis ${APP_SOURCES})
 
@@ -265,6 +266,127 @@ if(MSVC)
 
     add_compile_options(/MP)
     message(STATUS "--- Build Optimization: Multi-process compilation (/MP) ENABLED ---")
+endif()
+
+# ── libssh2 Integration ──────────────────────────────────────
+# On Switch (devkitPro): pkg_check_modules(LIBSSH2 REQUIRED libssh2)
+# On Desktop: FetchContent or system install
+if(PLATFORM_SWITCH)
+    pkg_check_modules(LIBSSH2 REQUIRED libssh2)
+    target_include_directories(lorealis PRIVATE ${LIBSSH2_INCLUDE_DIRS})
+    target_link_libraries(lorealis PRIVATE ${LIBSSH2_LIBRARIES})
+    message(STATUS "--- SSH: Using devkitPro libssh2 ---")
+else()
+    # Try system libssh2 first
+    find_package(PkgConfig QUIET)
+    if(PkgConfig_FOUND)
+        pkg_check_modules(LIBSSH2 QUIET libssh2)
+    endif()
+    if(LIBSSH2_FOUND)
+        target_include_directories(lorealis PRIVATE ${LIBSSH2_INCLUDE_DIRS})
+        target_link_libraries(lorealis PRIVATE ${LIBSSH2_LIBRARIES})
+        message(STATUS "--- SSH: Using system libssh2 (${LIBSSH2_VERSION}) ---")
+    else()
+        # Fallback: fetch and build libssh2 from source
+        FetchContent_Declare(
+            libssh2_src
+            URL "https://github.com/libssh2/libssh2/releases/download/libssh2-1.11.0/libssh2-1.11.0.tar.gz"
+            DOWNLOAD_EXTRACT_TIMESTAMP true
+        )
+        # 设置兼容策略以支持旧版 CMakeLists.txt
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.10)
+        # libssh2 选项
+        set(BUILD_SHARED_LIBS OFF CACHE BOOL "" FORCE)
+        set(BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(BUILD_TESTING  OFF CACHE BOOL "" FORCE)
+        # 禁用 pkgconfig 生成
+        set(LIBSSH2_ENABLE_PKGCONFIG OFF CACHE BOOL "" FORCE)
+        # 选择加密后端：Windows 使用 WinCNG，其他使用 OpenSSL
+        if(WIN32)
+            set(CRYPTO_BACKEND "WinCNG" CACHE STRING "Crypto backend for libssh2" FORCE)
+        else()
+            # 尝试找 OpenSSL，如果没有则使用 mbedTLS
+            find_package(OpenSSL QUIET)
+            if(OPENSSL_FOUND)
+                set(CRYPTO_BACKEND "OpenSSL" CACHE STRING "Crypto backend for libssh2" FORCE)
+            else()
+                set(CRYPTO_BACKEND "mbedTLS" CACHE STRING "Crypto backend for libssh2" FORCE)
+                # 确保 mbedtls 存在
+                FetchContent_Declare(
+                    mbedtls_src
+                    URL "https://github.com/Mbed-TLS/mbedtls/archive/refs/tags/v3.5.0.tar.gz"
+                    DOWNLOAD_EXTRACT_TIMESTAMP true
+                )
+                set(ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+                set(ENABLE_PROGRAMS OFF CACHE BOOL "" FORCE)
+                FetchContent_MakeAvailable(mbedtls_src)
+            endif()
+        endif()
+        # 在 FetchContent_MakeAvailable 之前创建缺失的 libssh2.pc.in 文件
+        # 这样可以避免 configure_file 错误
+        FetchContent_GetProperties(libssh2_src)
+        if(NOT libssh2_src_POPULATED)
+            FetchContent_Populate(libssh2_src)
+        endif()
+        # libssh2 的 src/CMakeLists.txt:188 错误地使用 ${CMAKE_SOURCE_DIR} 查找 libssh2.pc.in
+        # 需要在主项目根目录创建 workaround 文件
+        if(NOT EXISTS "${CMAKE_SOURCE_DIR}/libssh2.pc.in")
+            file(WRITE "${CMAKE_SOURCE_DIR}/libssh2.pc.in" "prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+
+Name: libssh2
+Description: The SSH library
+Version: @LIBSSH2_VERSION@
+Libs: -L${libdir} -lssh2
+Libs.private: @LIBSSH2_PC_LIBS_PRIVATE@
+Cflags: -I${includedir}
+")
+        endif()
+        # 同时也在 libssh2 源码目录创建
+        if(NOT EXISTS "${libssh2_src_SOURCE_DIR}/libssh2.pc.in")
+            file(WRITE "${libssh2_src_SOURCE_DIR}/libssh2.pc.in" "prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+
+Name: libssh2
+Description: The SSH library
+Version: @LIBSSH2_VERSION@
+Libs: -L${libdir} -lssh2
+Libs.private: @LIBSSH2_PC_LIBS_PRIVATE@
+Cflags: -I${includedir}
+")
+        endif()
+        if(NOT EXISTS "${libssh2_src_SOURCE_DIR}/src/libssh2.pc.in")
+            file(WRITE "${libssh2_src_SOURCE_DIR}/src/libssh2.pc.in" "prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+
+Name: libssh2
+Description: The SSH library
+Version: @LIBSSH2_VERSION@
+Libs: -L${libdir} -lssh2
+Libs.private: @LIBSSH2_PC_LIBS_PRIVATE@
+Cflags: -I${includedir}
+")
+        endif()
+        add_subdirectory(${libssh2_src_SOURCE_DIR} ${libssh2_src_BINARY_DIR})
+        unset(CMAKE_POLICY_VERSION_MINIMUM)
+        target_include_directories(lorealis PRIVATE ${libssh2_src_SOURCE_DIR}/include)
+        if(WIN32)
+            target_link_libraries(lorealis PRIVATE libssh2_static ws2_32 crypt32)
+        else()
+            target_link_libraries(lorealis PRIVATE libssh2_static)
+        endif()
+        message(STATUS "--- SSH: Using fetched libssh2 (${CRYPTO_BACKEND}) ---")
+    endif()
+    # On Windows also need winsock2
+    if(WIN32)
+        target_link_libraries(lorealis PRIVATE ws2_32)
+    endif()
 endif()
 
 # Switch Specific Configuration

@@ -50,6 +50,7 @@ public:
     void registerRecyclerBindings(sol::table& brls_ns);
     void registerNetworkBindings(sol::table& brls_ns);
     void registerHtmlBindings(sol::table& brls_ns);
+    void registerSSHBindings(sol::table& brls_ns);
 
 private:
     LuaManager() = default;

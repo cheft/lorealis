@@ -87,6 +87,7 @@ void LuaManager::registerBorealisBindings() {
     REGISTER_STAGE("CellBindings",      registerCellBindings)
     REGISTER_STAGE("NetworkBindings",   registerNetworkBindings)
     REGISTER_STAGE("HtmlBindings",      registerHtmlBindings)
+    REGISTER_STAGE("SSHBindings",       registerSSHBindings)
 }
 
 #undef REGISTER_STAGE

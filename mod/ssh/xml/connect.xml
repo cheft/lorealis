@@ -1,0 +1,122 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  connect.xml — SSH 连接列表页面布局
+  包含：保存的连接列表 + 新建连接按钮 + 标题栏
+-->
+<brls:Box
+    width="fill"
+    height="fill"
+    axis="column"
+    paddingTop="20"
+    paddingLeft="40"
+    paddingRight="40"
+    paddingBottom="20"
+    backgroundColor="#0C0C0C">
+
+    <!-- 标题区域 -->
+    <brls:Box
+        width="fill"
+        height="56"
+        axis="row"
+        alignItems="center"
+        marginBottom="16">
+
+        <!-- 图标 + 标题 -->
+        <brls:Label
+            id="lbl_title"
+            width="fill"
+            height="fill"
+            text="SSH 客户端"
+            fontSize="28"
+            fontStyle="bold"
+            textColor="#E0E0E0"
+            verticalAlign="center"/>
+
+        <!-- SSH 版本标签 -->
+        <brls:Label
+            id="lbl_version"
+            width="auto"
+            height="fill"
+            text="libssh2"
+            fontSize="12"
+            textColor="#606060"
+            verticalAlign="center"/>
+    </brls:Box>
+
+    <!-- 分隔线 -->
+    <brls:Rectangle
+        width="fill"
+        height="1"
+        color="#2A2A2A"
+        marginBottom="16"/>
+
+    <!-- 操作提示（Switch 手柄） -->
+    <brls:Box
+        width="fill"
+        height="32"
+        axis="row"
+        alignItems="center"
+        marginBottom="12">
+        <brls:Label
+            width="fill"
+            height="fill"
+            id="lbl_hint"
+            text="A 连接  Y 编辑  X 删除  + 新建"
+            fontSize="11"
+            textColor="#505050"
+            verticalAlign="center"/>
+    </brls:Box>
+
+    <!-- 连接列表（可滚动） -->
+    <brls:ScrollingFrame
+        id="connection_list"
+        width="fill"
+        height="fill"
+        axis="column"
+        spacing="8"
+        paddingBottom="8">
+
+        <!-- 空列表提示（若无连接时显示） -->
+        <brls:Label
+            id="lbl_empty"
+            width="fill"
+            height="120"
+            text="暂无保存的连接\n点击下方「+」新建第一个 SSH 连接"
+            fontSize="14"
+            textColor="#404040"
+            horizontalAlign="center"
+            verticalAlign="center"
+            multiLine="true"/>
+
+    </brls:ScrollingFrame>
+
+    <!-- 底部按钮区域 -->
+    <brls:Box
+        width="fill"
+        height="56"
+        axis="row"
+        alignItems="center"
+        justifyContent="space-between"
+        marginTop="12">
+
+        <!-- 平台信息 -->
+        <brls:Label
+            id="lbl_platform"
+            width="fill"
+            height="fill"
+            text=""
+            fontSize="11"
+            textColor="#404040"
+            verticalAlign="center"/>
+
+        <!-- 新建连接按钮 -->
+        <brls:Button
+            id="btn_new_connection"
+            width="160"
+            height="44"
+            text="+ 新建连接"
+            fontSize="14"
+            focusable="true"/>
+    </brls:Box>
+
+</brls:Box>

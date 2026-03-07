@@ -1,0 +1,101 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  terminal.xml — SSH 终端主界面布局
+  包含：终端画布区域 + 顶部状态栏 + 底部操作提示
+
+  终端画布 (terminal_canvas) 由 TerminalView 通过自定义 draw 回调渲染，
+  不需要内置文字子控件。
+-->
+<brls:Box
+    width="fill"
+    height="fill"
+    axis="column"
+    backgroundColor="#0C0C0C">
+
+    <!-- 顶部极简信息条 -->
+    <brls:Box
+        width="fill"
+        height="26"
+        axis="row"
+        alignItems="center"
+        paddingLeft="8"
+        paddingRight="8"
+        backgroundColor="#181818">
+
+        <!-- 连接标识图标 -->
+        <brls:Label
+            width="auto"
+            height="fill"
+            text="⬡ SSH"
+            fontSize="11"
+            textColor="#60C060"
+            verticalAlign="center"
+            marginRight="8"/>
+
+        <!-- 动态连接信息（由 TerminalView 更新） -->
+        <brls:Label
+            id="lbl_conn_info"
+            width="fill"
+            height="fill"
+            text="正在连接…"
+            fontSize="11"
+            textColor="#A0A0A0"
+            verticalAlign="center"/>
+
+        <!-- 右侧：终端尺寸 -->
+        <brls:Label
+            id="lbl_terminal_size"
+            width="auto"
+            height="fill"
+            text="80×24"
+            fontSize="10"
+            textColor="#404040"
+            verticalAlign="center"/>
+    </brls:Box>
+
+    <!-- ── 终端主画布区域 ───────────────────────────────────
+         brls:CustomView 作为 NanoVG 自定义绘制容器
+         TerminalView:bindView() 将向此控件注册绘制回调
+    ─────────────────────────────────────────────────────── -->
+    <brls:CustomView
+        id="terminal_canvas"
+        width="fill"
+        height="fill"
+        focusable="true"
+        backgroundColor="#0C0C0C"/>
+
+    <!-- 底部提示栏（Switch 手柄操作说明） -->
+    <brls:Box
+        id="hint_bar"
+        width="fill"
+        height="22"
+        axis="row"
+        alignItems="center"
+        paddingLeft="8"
+        paddingRight="8"
+        backgroundColor="#141414">
+
+        <!-- Switch 手柄提示 -->
+        <brls:Label
+            id="lbl_hints_switch"
+            width="fill"
+            height="fill"
+            text="A 键盘  B 退格  X Ctrl+C  Y EOF  L Tab  R 回车  LT↑  RT↓  + 返回"
+            fontSize="10"
+            textColor="#3A3A3A"
+            verticalAlign="center"/>
+
+        <!-- PC 键盘提示（切换显示） -->
+        <brls:Label
+            id="lbl_hints_desktop"
+            width="fill"
+            height="fill"
+            text="直接键盘输入 | Ctrl+C 中断 | PageUp/Down 滚动历史 | Alt+F4 断开"
+            fontSize="10"
+            textColor="#3A3A3A"
+            verticalAlign="center"
+            visibility="gone"/>
+
+    </brls:Box>
+
+</brls:Box>

@@ -1,0 +1,11 @@
+prefix=@CMAKE_INSTALL_PREFIX@
+exec_prefix=@CMAKE_INSTALL_PREFIX@
+libdir=@CMAKE_INSTALL_FULL_LIBDIR@
+includedir=@CMAKE_INSTALL_FULL_INCLUDEDIR@
+
+Name: libssh2
+Description: The SSH library
+Version: @LIBSSH2_VERSION@
+Libs: -L -lssh2
+Libs.private: @LIBSSH2_PC_LIBS_PRIVATE@
+Cflags: -I

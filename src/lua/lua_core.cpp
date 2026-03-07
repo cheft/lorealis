@@ -9,6 +9,9 @@
 #include <sys/stat.h>
 #include <string>
 #include <sstream>
+#ifdef _WIN32
+#include <direct.h>
+#endif
 
 // Cross-platform recursive mkdir (replaces std::filesystem::create_directories)
 static bool portable_mkdirs(const std::string& path) {

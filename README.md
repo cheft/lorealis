@@ -17,6 +17,59 @@ Controller and TV oriented UI library for Android, iOS, PC, PS4, PSV and Nintend
 - Integrated internationalization and storage systems
 - Integrated toolbox (logger, animations, timers, background tasks...)
 
+## SSH Client Module
+
+Lorealis includes a full-featured SSH client module (`mod/ssh`) for cross-platform remote terminal access on both Switch NRO and Desktop.
+
+### Features
+- **Full SSH Protocol**: Password and public key authentication, PTY shell, xterm-256color terminal
+- **ANSI Terminal**: Complete VT100/ANSI escape sequence parser (colors, cursor, scroll regions, 256 colors, true color)
+- **Cross-Platform Input**:
+  - **Switch**: Controller mapping to VT100 sequences (A=keyboard, B=backspace, X=Ctrl+C, Y=EOF, LT/RT=scroll history)
+  - **PC**: Direct physical keyboard input with Ctrl/Alt modifiers
+- **Session Management**: Save connections as JSON, auto-reconnect, fingerprint verification
+- **UTF-8 Support**: Full Unicode rendering with CJK wide character detection
+
+### File Structure
+```
+mod/ssh/
+├── module.ini              # Module metadata
+├── lua/
+│   ├── main.lua            # Entry point
+│   ├── platform.lua        # Platform detection & key mappings
+│   ├── ansi_parser.lua     # ANSI escape sequence parser
+│   ├── terminal_buffer.lua # Terminal screen buffer
+│   ├── ssh_manager.lua     # SSH session lifecycle
+│   ├── keyboard.lua        # Switch swkbd & controller input
+│   ├── terminal_view.lua   # NanoVG terminal rendering
+│   ├── connection_view.lua # Connection list UI
+│   └── saved_connections.lua # JSON persistence
+└── xml/
+    ├── connect.xml         # Connection list layout
+    └── terminal.xml        # Terminal layout
+```
+
+### Lua API
+```lua
+local ssh = require("ssh_manager")
+local session = ssh.new()
+session:connect({
+    host = "192.168.1.1",
+    port = 22,
+    user = "root",
+    password = "secret",
+    cols = 100,
+    rows = 36
+})
+session:send("ls -la\r")
+```
+
+### Build Requirements
+- **Switch**: devkitPro with `libssh2` (`dkp-pacman -S switch-libssh2`)
+- **Desktop**: CMake will auto-fetch libssh2 if not found via pkgconfig
+
+---
+
 ## Windows build
 ```PowerShell
 1. Clear cache
@@ -70,9 +123,6 @@ docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/d
     <img src="./demo_screens/ScreenShot_2026-03-06_160145_795.png" alt="游戏截图8" style="width: 100%; height: auto; margin-bottom: 10px; break-inside: avoid; border-radius: 4px;">
     <img src="./demo_screens/ScreenShot_2026-03-06_160414_653.png" alt="游戏截图11" style="width: 100%; height: auto; break-inside: avoid; border-radius: 4px;">
   </div>
-
-  <!-- 补充：GitHub不支持@media内联，移动端适配可加这段说明（可选） -->
-  <small style="display: block; margin-top: 10px; color: #666;">移动端请横屏查看，图片会自动适配单列显示</small>
 </p>
 
 ## Credits 
