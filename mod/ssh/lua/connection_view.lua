@@ -25,8 +25,10 @@ function ConnectionView.new()
         self._terminal:feedData(data)
     end
     self._ssh.onConnect = function()
+        print("[SSH] onConnect callback started")
         self._terminal:setStatus("已连接: " .. self._ssh:getInfo(), 80, 220, 80)
-        self:_showTerminal()
+        print("[SSH] setStatus done")
+        -- 这里不再调用 _showTerminal，由 _doConnect 在关闭连接对话框后调用
     end
     self._ssh.onDisconnect = function()
         self._terminal:setStatus("已断开连接", 220, 80, 80)
@@ -34,8 +36,11 @@ function ConnectionView.new()
         self:_showConnectionList()
     end
     self._ssh.onError = function(msg)
-        local dialog = brls.Dialog.new("SSH 错误: " .. msg)
-        dialog:addButton("确定", function() end)
+        self._errorDialog = brls.Dialog.new("SSH 错误: " .. msg)
+        local dialog = self._errorDialog
+        dialog:addButton("确定", function()
+            self._errorDialog = nil
+        end)
         dialog:open()
         print("[SSH] " .. msg)
     end
@@ -62,13 +67,16 @@ function ConnectionView:_showConnectionList()
     else
         title = "SSH 客户端 - " .. #self._connections .. " 个连接"
     end
-    local dialog = brls.Dialog.new(title)
+    -- 保存为成员变量防止被 Lua GC
+    self._listDialog = brls.Dialog.new(title)
+    local dialog = self._listDialog
 
     -- 为每个连接添加按钮
     for i, conn in ipairs(self._connections) do
         local btnText = (conn.name or conn.host) .. " (" .. conn.user .. "@" .. conn.host .. ")"
         dialog:addButton(btnText, function()
             dialog:close()
+            self._listDialog = nil
             self:_doConnect(conn)
         end)
     end
@@ -89,7 +97,9 @@ end
 
 -- ── 内部：显示连接表单 ──────────────────────────────────────
 function ConnectionView:_showConnectForm()
-    local dialog = brls.Dialog.new("新建 SSH 连接")
+    -- 保存为成员变量防止被 Lua GC
+    self._formDialog = brls.Dialog.new("新建 SSH 连接")
+    local dialog = self._formDialog
 
     -- 使用 InputCell 输入（如果可用）
     local ok, inputHost = pcall(function()
@@ -109,7 +119,7 @@ function ConnectionView:_showConnectForm()
         dialog:addView(inputPort)
 
         local inputPass = brls.InputCell.new()
-        inputPass:init("密码", "", function(text) end, "", "密码（留空使用密钥）", 64)
+        inputPass:init("密码", "jax2025", function(text) end, "", "密码（留空使用密钥）", 64)
         dialog:addView(inputPass)
 
         dialog:addButton("连接", function()
@@ -123,6 +133,7 @@ function ConnectionView:_showConnectForm()
             if conn.host and conn.host ~= "" and conn.user and conn.user ~= "" then
                 self._connections = SavedConnections.upsert(conn)
                 dialog:close()
+                self._formDialog = nil
                 self:_doConnect(conn)
             end
         end)
@@ -176,30 +187,42 @@ function ConnectionView:_doConnect(conn)
         local errDlg = brls.Dialog.new("连接失败: " .. tostring(err))
         errDlg:addButton("确定", function() return true end)
         errDlg:open()
+    else
+        -- 连接成功且对话框已关闭，显示终端
+        self:_showTerminal()
     end
 end
 
 -- ── 内部：切换到终端视图 ─────────────────────────────────────
 function ConnectionView:_showTerminal()
-    -- 使用 Dialog 显示终端（简化实现）
-    local dialog = brls.Dialog.new("SSH 终端 (简化)\n" .. self._ssh:getInfo())
+    print("[SSH] Showing Terminal")
 
-    -- 添加一些基本操作按钮
-    dialog:addButton("发送命令 (示例: ls)", function()
-        if self._ssh:isConnected() then
-            self._ssh:send("ls\r")
-        end
-    end)
+    -- 创建全屏终端对话框
+    self._terminalDialog = brls.Dialog.new("SSH 终端")
+    local dialog = self._terminalDialog
+    
+    -- 创建一个 LuaImage 视图作为终端绘制载体
+    local termViewObj = brls.LuaImage.new()
+    -- 设置足够大的尺寸
+    termViewObj:setWidth(1100)
+    termViewObj:setHeight(600)
+    termViewObj:setTranslationY(-20) -- 微调位置
 
-    dialog:addButton("发送 Ctrl+C", function()
-        if self._ssh:isConnected() then
-            self._ssh:send("\3")
-        end
+    -- 绑定视图并初始化
+    self._terminal:bindView(termViewObj)
+    self._terminal:resize(1100, 600)
+
+    -- 将视图添加到对话框（Dialog 是一个 Box）
+    dialog:addView(termViewObj)
+
+    dialog:addButton("键盘", function()
+        self._terminal._keyboard:openSwkbd()
     end)
 
     dialog:addButton("断开连接", function()
         self._ssh:disconnect()
         dialog:close()
+        self._terminalDialog = nil
     end)
 
     dialog:open()

@@ -11,6 +11,32 @@ local TerminalBuffer= require("terminal_buffer")
 local SSHManager    = require("ssh_manager")
 local Keyboard      = require("keyboard")
 
+-- ── NanoVG Aliases ──────────────────────────────────────────
+local nvgBeginPath    = brls.nvgBeginPath
+local nvgFill         = brls.nvgFill
+local nvgRect         = brls.nvgRect
+local nvgFillColor    = brls.nvgFillColor
+local nvgFontSize     = brls.nvgFontSize
+local nvgFontFace     = brls.nvgFontFace
+local nvgTextAlign    = brls.nvgTextAlign
+local nvgRoundedRect  = brls.nvgRoundedRect
+local nvgMoveTo       = brls.nvgMoveTo
+local nvgLineTo       = brls.nvgLineTo
+local nvgStrokeColor  = brls.nvgStrokeColor
+local nvgStrokeWidth  = brls.nvgStrokeWidth
+local nvgStroke       = brls.nvgStroke
+local nvgFontBlur     = brls.nvgFontBlur
+local nvgText         = brls.nvgText
+local nvgRGBA         = brls.nvgRGBA
+
+-- Alignment Constants
+local NVG_ALIGN_LEFT   = brls.NVG_ALIGN_LEFT
+local NVG_ALIGN_CENTER = brls.NVG_ALIGN_CENTER
+local NVG_ALIGN_RIGHT  = brls.NVG_ALIGN_RIGHT
+local NVG_ALIGN_TOP    = brls.NVG_ALIGN_TOP
+local NVG_ALIGN_MIDDLE = brls.NVG_ALIGN_MIDDLE
+local NVG_ALIGN_BOTTOM = brls.NVG_ALIGN_BOTTOM
+
 local TerminalView = {}
 TerminalView.__index = TerminalView
 
@@ -88,9 +114,11 @@ function TerminalView:bindView(view)
         end, false)
 
         -- 注册帧更新（光标闪烁 + 轮询驱动）
-        view:registerFrameCallback(function(dt)
-            self:_onFrame(dt)
-        end)
+        if view.registerFrameCallback then
+            view:registerFrameCallback(function(dt)
+                self:_onFrame(dt)
+            end)
+        end
     end
 end
 
@@ -126,7 +154,7 @@ function TerminalView:resize(width, height)
         self._rows = newRows
         self._buf:resize(newCols, newRows)
         self._ssh:resize(newCols, newRows)
-        print("[SSH Terminal] Resized to {}x{}", newCols, newRows)
+        print("[SSH Terminal] Resized to " .. newCols .. "x" .. newRows)
     end
 end
 
@@ -142,6 +170,11 @@ end
 
 -- ── NanoVG 绘制主函数 ────────────────────────────────────────
 function TerminalView:_draw(vg, x, y, w, h)
+    -- 如果没有 registerFrameCallback，在绘制函数里手动更新时间步长（粗略估计 16ms）
+    if not self._view.registerFrameCallback then
+        self:_onFrame(0.016)
+    end
+
     -- 背景
     nvgBeginPath(vg)
     nvgRect(vg, x, y, w, h)

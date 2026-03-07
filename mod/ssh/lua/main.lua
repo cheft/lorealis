@@ -19,7 +19,7 @@ local _activity = nil
 
 -- ── SSH 模块初始化 ─────────────────────────────────────────
 local function init()
-    print("[SSH Module] Initializing... ({})", Platform.info())
+    print("[SSH Module] Initializing... (" .. Platform.info() .. ")")
 
     -- 验证 SSH 绑定是否可用
     if not brls.SSH then
@@ -30,7 +30,7 @@ local function init()
         return false
     end
 
-    print("[SSH Module] libssh2 version: {}", brls.SSH.version())
+    print("[SSH Module] libssh2 version: " .. brls.SSH.version())
 
     -- 创建连接管理视图
     _connView = ConnectionView.new()

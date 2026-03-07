@@ -1,4 +1,5 @@
 #include "lua_manager.hpp"
+#include <nanovg.h>
 #include "xml_loader.hpp"
 #include "zip_loader.hpp"
 #include "ns_log.hpp"
@@ -191,6 +192,26 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     brls_ns["nvgText"]      = [](void* vg, float x, float y, const std::string& text) { 
         nvgText((NVGcontext*)vg, x, y, text.c_str(), nullptr); 
     };
+    brls_ns["nvgBeginPath"] = [](void* vg) { nvgBeginPath((NVGcontext*)vg); };
+    brls_ns["nvgFill"]      = [](void* vg) { nvgFill((NVGcontext*)vg); };
+    brls_ns["nvgRect"]      = [](void* vg, float x, float y, float w, float h) { nvgRect((NVGcontext*)vg, x, y, w, h); };
+    brls_ns["nvgFillColor"] = [](void* vg, NVGcolor color) { nvgFillColor((NVGcontext*)vg, color); };
+    brls_ns["nvgFontSize"]  = [](void* vg, float size) { nvgFontSize((NVGcontext*)vg, size); };
+    brls_ns["nvgFontFace"]  = [](void* vg, const std::string& font) { nvgFontFace((NVGcontext*)vg, font.c_str()); };
+    brls_ns["nvgTextAlign"] = [](void* vg, int align) { nvgTextAlign((NVGcontext*)vg, align); };
+    brls_ns["nvgRoundedRect"] = [](void* vg, float x, float y, float w, float h, float r) { nvgRoundedRect((NVGcontext*)vg, x, y, w, h, r); };
+    brls_ns["nvgMoveTo"]    = [](void* vg, float x, float y) { nvgMoveTo((NVGcontext*)vg, x, y); };
+    brls_ns["nvgLineTo"]    = [](void* vg, float x, float y) { nvgLineTo((NVGcontext*)vg, x, y); };
+    brls_ns["nvgStrokeColor"] = [](void* vg, NVGcolor color) { nvgStrokeColor((NVGcontext*)vg, color); };
+    brls_ns["nvgStrokeWidth"] = [](void* vg, float size) { nvgStrokeWidth((NVGcontext*)vg, size); };
+    brls_ns["nvgStroke"]      = [](void* vg) { nvgStroke((NVGcontext*)vg); };
+    brls_ns["nvgFontBlur"]    = [](void* vg, float blur) { nvgFontBlur((NVGcontext*)vg, blur); };
+    brls_ns["NVG_ALIGN_LEFT"]   = (int)NVG_ALIGN_LEFT;
+    brls_ns["NVG_ALIGN_CENTER"] = (int)NVG_ALIGN_CENTER;
+    brls_ns["NVG_ALIGN_RIGHT"]  = (int)NVG_ALIGN_RIGHT;
+    brls_ns["NVG_ALIGN_TOP"]    = (int)NVG_ALIGN_TOP;
+    brls_ns["NVG_ALIGN_MIDDLE"] = (int)NVG_ALIGN_MIDDLE;
+    brls_ns["NVG_ALIGN_BOTTOM"] = (int)NVG_ALIGN_BOTTOM;
 
     // VoidEvent for window size change, etc.
     auto void_event_ut = brls_ns.new_usertype<brls::VoidEvent>("VoidEvent", sol::no_construction());

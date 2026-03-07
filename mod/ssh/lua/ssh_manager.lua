@@ -87,14 +87,18 @@ function SSHManager:connect(params)
     end
 
     self._connected = true
-    print("[SSH] Connected to {}:{} as {}", params.host, params.port or 22, params.user)
+    print("[SSH] Connected to " .. params.host .. ":" .. (params.port or 22) .. " as " .. params.user)
 
     -- ④ 启动轮询定时器
     self:_startPolling()
 
     -- 触发连接成功回调
     if self.onConnect then
-        pcall(self.onConnect)
+        print("[SSH] Calling onConnect callback...")
+        local ok, err = pcall(self.onConnect)
+        if not ok then
+            print("[SSH] onConnect error: " .. tostring(err))
+        end
     end
 
     return true, ""
@@ -171,53 +175,51 @@ end
 
 -- ── 内部：启动轮询定时器 ─────────────────────────────────────
 function SSHManager:_startPolling()
-    self:_stopPolling()
-    -- brls 定时器每 N ms 回调一次
-    -- 注意：在 Borealis Lua 中，使用 brls.Application.setTimer 或类似 API
-    -- 这里使用 brls.sync 异步轮询机制
+    if self._polling then return end
     self._polling = true
-    self:_pollOnce()
+    self:_pollLoop()
 end
 
 function SSHManager:_stopPolling()
     self._polling = false
-    if self._pollTimer then
-        -- 取消定时器（若 brls 提供取消接口）
-        self._pollTimer = nil
-    end
+end
+
+-- ── 内部：循环轮询 ───────────────────────────────────────────
+function SSHManager:_pollLoop()
+    if not self._polling then return end
+
+    self:_pollOnce()
+
+    -- 使用 brls.delay 实现递归异步轮询
+    brls.delay(self._pollInterval, function()
+        self:_pollLoop()
+    end)
 end
 
 -- ── 内部：单次轮询读取 ────────────────────────────────────────
 function SSHManager:_pollOnce()
-    if not self._polling then return end
+    if not self._session or not self._connected then return end
 
     -- 读取数据（非阻塞）
-    if self._session and self._connected then
-        local data, err = self._session:recv(8192)
-        if err == "eof" then
-            -- 远端关闭连接
-            self:_handleDisconnect()
-            return
-        elseif err ~= "" and err ~= nil then
-            -- 读取错误（非暂无数据）
-            print("[SSH] Recv error: " .. tostring(err))
-            self:_handleDisconnect()
-            return
-        elseif data and #data > 0 then
-            -- 有数据，触发回调
-            if self.onData then
-                local ok, e = pcall(self.onData, data)
-                if not ok then
-                    print("[SSH] onData callback error: " .. tostring(e))
-                end
+    local data, err = self._session:recv(8192)
+    if err == "eof" then
+        -- 远端关闭连接
+        self:_handleDisconnect()
+        return
+    elseif err ~= "" and err ~= nil then
+        -- 读取错误（非暂无数据）
+        print("[SSH] Recv error: " .. tostring(err))
+        self:_handleDisconnect()
+        return
+    elseif data and #data > 0 then
+        -- 有数据，触发回调
+        if self.onData then
+            local ok, e = pcall(self.onData, data)
+            if not ok then
+                print("[SSH] onData callback error: " .. tostring(e))
             end
         end
     end
-
-    -- runAsync API 不存在，轮询机制禁用
-    -- 如需数据接收，需要手动调用 poll() 或实现其他机制
-    -- 暂时禁用自动轮询
-    self._polling = false
 end
 
 -- ── 内部：处理断开事件 ───────────────────────────────────────
