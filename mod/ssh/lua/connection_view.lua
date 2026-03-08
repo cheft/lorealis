@@ -8,6 +8,21 @@ local SavedConnections= require("saved_connections")
 local SSHManager      = require("ssh_manager")
 local TerminalView    = require("terminal_view")
 
+local TERMINAL_PAGE_WIDTH = 1280
+local TERMINAL_PAGE_HEIGHT = 720
+
+local function _setVisibilityIfExists(view, visibility)
+    if view and view.setVisibility then
+        view:setVisibility(visibility)
+    end
+end
+
+local function _setTextIfExists(view, text)
+    if view and view.setText then
+        view:setText(text)
+    end
+end
+
 local ConnectionView = {}
 ConnectionView.__index = ConnectionView
 
@@ -19,6 +34,9 @@ function ConnectionView.new()
     self._terminal     = TerminalView.new(self._ssh)
     self._connections  = SavedConnections.load()
     self._activity     = nil
+    self._terminalPage = nil
+    self._terminalRoot = nil
+    self._terminalCanvas = nil
 
     -- 配置 SSH 回调
     self._ssh.onData = function(data)
@@ -27,11 +45,13 @@ function ConnectionView.new()
     self._ssh.onConnect = function()
         print("[SSH] onConnect callback started")
         self._terminal:setStatus("已连接: " .. self._ssh:getInfo(), 80, 220, 80)
+        self:_updateTerminalPageMeta()
         print("[SSH] setStatus done")
         -- 这里不再调用 _showTerminal，由 _doConnect 在关闭连接对话框后调用
     end
     self._ssh.onDisconnect = function()
         self._terminal:setStatus("已断开连接", 220, 80, 80)
+        self:_popTerminalPageIfNeeded()
         -- runAsync API 不存在，直接返回列表
         self:_showConnectionList()
     end
@@ -46,6 +66,47 @@ function ConnectionView.new()
     end
 
     return self
+end
+
+function ConnectionView:_updateTerminalPageMeta()
+    if not self._terminalPage then return end
+
+    local lblConnInfo = self._terminalPage:getView("lbl_conn_info")
+    local lblSize = self._terminalPage:getView("lbl_terminal_size")
+    local hintSwitch = self._terminalPage:getView("lbl_hints_switch")
+    local hintDesktop = self._terminalPage:getView("lbl_hints_desktop")
+
+    local infoText = "未连接"
+    if self._ssh and self._ssh.getInfo then
+        local ok, text = pcall(function()
+            return self._ssh:getInfo()
+        end)
+        if ok and text and text ~= "" then
+            infoText = text
+        end
+    end
+
+    _setTextIfExists(lblConnInfo, infoText)
+    _setTextIfExists(lblSize, string.format("%d×%d", Platform.defaultCols, Platform.defaultRows))
+
+    if Platform.isSwitch then
+        _setVisibilityIfExists(hintSwitch, brls.Visibility.VISIBLE)
+        _setVisibilityIfExists(hintDesktop, brls.Visibility.GONE)
+    else
+        _setVisibilityIfExists(hintSwitch, brls.Visibility.GONE)
+        _setVisibilityIfExists(hintDesktop, brls.Visibility.VISIBLE)
+    end
+end
+
+function ConnectionView:_popTerminalPageIfNeeded()
+    if self._terminalRoot then
+        pcall(function()
+            brls.Application.popActivity(self._terminalRoot)
+        end)
+    end
+    self._terminalPage = nil
+    self._terminalRoot = nil
+    self._terminalCanvas = nil
 end
 
 function ConnectionView:setActivity(activity)
@@ -197,32 +258,29 @@ end
 function ConnectionView:_showTerminal()
     print("[SSH] Showing Terminal")
 
-    -- 创建全屏终端对话框
     self._terminalDialog = brls.Dialog.new("SSH 终端")
     local dialog = self._terminalDialog
-    
-    -- 创建一个 LuaImage 视图作为终端绘制载体
-    local termViewObj = brls.LuaImage.new()
-    -- 设置足够大的尺寸
-    termViewObj:setWidth(1280)
-    termViewObj:setHeight(720)
-    -- termViewObj:setTranslationY(-20) -- 微调位置
 
-    -- 将视图添加到对话框（Dialog 是一个 Box）
-    dialog:addView(termViewObj)
+    local terminalCanvas = brls.LuaImage.new()
+    terminalCanvas:setWidth(TERMINAL_PAGE_WIDTH)
+    terminalCanvas:setHeight(TERMINAL_PAGE_HEIGHT)
+    terminalCanvas:setFocusable(true)
 
-    -- 绑定视图并初始化 (必须在 addView 之后，确保 termViewObj 有 parent)
-    self._terminal:bindView(termViewObj)
-    self._terminal:resize(1280, 720)
+    dialog:addView(terminalCanvas)
 
-    -- 设置焦点，确保能接收键盘事件
-    termViewObj:setFocusable(true)
-    termViewObj:setFocus()
+    self._terminalPage = dialog
+    self._terminalRoot = dialog
+    self._terminalCanvas = terminalCanvas
 
-    -- 仅在 Switch 上显示“键盘”按钮，Desktop 使用物理键盘
+    self._terminal:bindView(terminalCanvas)
+    self._terminal:resize(TERMINAL_PAGE_WIDTH, TERMINAL_PAGE_HEIGHT)
+
     if Platform.isSwitch then
         dialog:addButton("键盘", function()
-            self._terminal._keyboard:openSwkbd()
+            self._terminal._keyboard:openSwkbd({
+                header = "SSH 输入",
+                guide = "输入命令并确认发送",
+            })
             return true
         end)
     end
@@ -231,9 +289,14 @@ function ConnectionView:_showTerminal()
         self._ssh:disconnect()
         dialog:close()
         self._terminalDialog = nil
+        return true
     end)
 
     dialog:open()
+
+    pcall(function()
+        terminalCanvas:setFocus()
+    end)
 end
 
 return ConnectionView
