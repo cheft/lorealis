@@ -66,7 +66,7 @@ function AnsiParser:_reset()
     -- 当前 SGR 属性状态
     self._attr = {
         fg     = {r=DEFAULT_FG.r, g=DEFAULT_FG.g, b=DEFAULT_FG.b, a=255},
-        bg     = {r=DEFAULT_BG.r, g=DEFAULT_BG.b, b=DEFAULT_BG.b, a=255},
+        bg     = {r=DEFAULT_BG.r, g=DEFAULT_BG.g, b=DEFAULT_BG.b, a=255},
         bold   = false,
         italic = false,
         underline = false,
@@ -81,9 +81,15 @@ end
 ---@param data string  原始终端输出（可包含部分转义序列）
 ---@return table  操作列表
 function AnsiParser:feed(data)
+    local hex = {}
+    for i=1,#data do hex[#hex+1] = string.format("%02X", data:byte(i)) end
+    print("[AnsiParser] hex: " .. table.concat(hex, " "))
+    
+    local oldLen = #self._buf
     self._buf = self._buf .. data
     self._ops = {}
     self:_parse()
+    print(string.format("[AnsiParser] feed: %d bytes -> %d ops (buf remained: %d)", #data, #self._ops, #self._buf))
     return self._ops
 end
 
@@ -257,8 +263,16 @@ function AnsiParser:_handleCSI(params, final)
     elseif final == "l" then
         if params == "?25" then self:_emit({type="cursor_hide"}) end
 
+    -- DSR: Device Status Report
+    elseif final == "n" then
+        if nums[1] == 6 then
+            self:_emit({type="dsr_report"})
+        end
+
     -- DA: Device Attributes（终端能力查询，忽略）
     -- 其他未识别序列：直接忽略
+    else
+        -- print("[AnsiParser] Unknown CSI: ESC[" .. params .. final)
     end
 end
 
@@ -342,6 +356,9 @@ end
 -- ── 辅助：发射一个操作 ───────────────────────────────────────
 function AnsiParser:_emit(op)
     self._ops[#self._ops + 1] = op
+    if op.type == "text" then
+        print("[AnsiParser] Emit text: '" .. op.text:gsub("\r", "\\r"):gsub("\n", "\\n") .. "'")
+    end
 end
 
 -- ── 辅助：深拷贝当前属性（避免引用共享）────────────────────

@@ -210,6 +210,43 @@ function Keyboard:handleKey(keyCode, mods)
         return true
     end
 
+    -- 字母数字退避处理 (如果 CharInputEvent 没响应)
+    if not ctrl then
+        -- 字母 A-Z (65-90)
+        if keyCode >= 65 and keyCode <= 90 then
+            local char = string.char(keyCode + (shift and 0 or 32))
+            self:_emit(char)
+            return true
+        end
+        -- 数字 0-9 (48-57) 和常用符号
+        local numShift = { [48]=")", [49]="!", [50]="@", [51]="#", [52]="$", [53]="%", [54]="^", [55]="&", [56]="*", [57]="(" }
+        if keyCode >= 48 and keyCode <= 57 then
+            local char = shift and numShift[keyCode] or string.char(keyCode)
+            self:_emit(char)
+            return true
+        end
+        -- 其他常用 ASCII 符号
+        local symMap = {
+            [32] = {" ", " "},   -- Space
+            [39] = {"'", "\""},  -- ' "
+            [44] = {",", "<"},   -- , <
+            [45] = {"-", "_"},   -- - _
+            [46] = {".", ">"},   -- . >
+            [47] = {"/", "?"},   -- / ?
+            [59] = {";", ":"},   -- ; :
+            [61] = {"=", "+"},   -- = +
+            [91] = {"[", "{"},   -- [ {
+            [92] = {"\\", "|"},  -- \ |
+            [93] = {"]", "}"},   -- ] }
+            [96] = {"`", "~"},   -- ` ~
+        }
+        local sym = symMap[keyCode]
+        if sym then
+            self:_emit(shift and sym[2] or sym[1])
+            return true
+        end
+    end
+
     -- 默认未处理
     return false
 end

@@ -105,6 +105,7 @@ function TerminalBuffer:applyOps(ops)
     for _, op in ipairs(ops) do
         self:_applyOp(op)
     end
+    print(string.format("[TerminalBuffer] After Ops: Cursor=(%d,%d)", self.curRow, self.curCol))
 end
 
 -- ── 单个操作处理 ──────────────────────────────────────────────

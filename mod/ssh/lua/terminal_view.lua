@@ -169,10 +169,13 @@ local function initGlobalKeyboardListeners()
             end
 
             if terminal then
+                print("[TerminalView] Character input: " .. tostring(codepoint))
                 terminal._keyboard:handleChar(codepoint)
             else
-                print("[TerminalView] No terminal mapping found in focus tree for: " .. tostring(focus:get_address()))
+                print("[TerminalView] No mapping for focus addr: " .. tostring(focus:get_address()))
             end
+        else
+            print("[TerminalView] CharInput call ignored: no active focus or terminals")
         end
     end)
 
@@ -180,6 +183,9 @@ local function initGlobalKeyboardListeners()
     inputManager:getKeyboardKeyStateChanged():subscribe(function(state)
         if state.pressed then
             local focus = brls.Application.getCurrentFocus()
+            print(string.format("[TerminalView] Global Key: key=%d mods=%d focus=%s", 
+                state.key, state.mods, focus and tostring(focus:get_address()) or "nil"))
+            
             if focus and _G.__SSH_TERMINALS then
                 local curr = focus
                 local terminal = nil
@@ -206,7 +212,17 @@ function TerminalView:feedData(data)
     if not data or #data == 0 then return end
     print("[TerminalView] feedData: " .. #data .. " bytes")
     local ops = self._parser:feed(data)
-    self._buf:applyOps(ops)
+    for _, op in ipairs(ops) do
+        if op.type == "dsr_report" then
+            -- 响应光标报告 ESC[row;colR
+            local resp = string.format("\27[%d;%dR", self._buf.curRow, self._buf.curCol)
+            print("[TerminalView] Responding to DSR with: " .. resp)
+            self:_sendInput(resp)
+        else
+            self._buf:_applyOp(op)
+        end
+    end
+
     -- 收到数据时自动滚动到底部
     self._scrollOffset = 0
     -- 标记视图需要重绘
@@ -354,7 +370,7 @@ function TerminalView:_drawRow(vg, x, y, row)
                 if attr.bold then
                     nvgFontBlur(vg, 0)
                     -- 粗体通过偏移绘制两次模拟（简单实现）
-                    nvgText(vg, cx + 0.5, y, ch, nil)
+                    nvgText(vg, cx + 0.5, y, ch)
                 end
                 nvgText(vg, cx, y, ch)
             end
@@ -416,6 +432,7 @@ end
 -- ── 向 SSH 发送输入 ──────────────────────────────────────────
 function TerminalView:_sendInput(data)
     if self._ssh:isConnected() then
+        print("[TerminalView] Sending input: '" .. data:gsub("\r", "\\r"):gsub("\n", "\\n") .. "' (" .. #data .. " bytes)")
         self._ssh:send(data)
     end
     -- 收到输入时滚动到底部
