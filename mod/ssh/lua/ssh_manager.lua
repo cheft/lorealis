@@ -77,7 +77,8 @@ function SSHManager:connect(params)
     -- ③ 打开 PTY Shell
     err = self._session:openShell(
         params.cols or Platform.defaultCols,
-        params.rows or Platform.defaultRows
+        params.rows or Platform.defaultRows,
+        "xterm-256color"
     )
     if err ~= "" then
         print("[SSH] Shell open failed: " .. err)

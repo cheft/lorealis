@@ -6,6 +6,77 @@
 #include <borealis/views/scrolling_frame.hpp>
 #include <borealis/views/applet_frame.hpp>
 
+#include <borealis/core/touch/tap_gesture.hpp>
+
+class LuaPointerRecognizer : public brls::GestureRecognizer
+{
+public:
+    typedef std::function<bool(brls::Point, brls::TouchPhase)> PointerCallback;
+    typedef std::function<bool(brls::Point)> ScrollCallback;
+
+    LuaPointerRecognizer(brls::View* view)
+        : view(view) {
+        this->state = brls::GestureState::STAY;
+    }
+
+    void onPointerDown(PointerCallback cb) { pointerDownCb = cb; }
+    void onPointerMove(PointerCallback cb) { pointerMoveCb = cb; }
+    void onPointerUp(PointerCallback cb) { pointerUpCb = cb; }
+    void onScroll(ScrollCallback cb) { scrollCb = cb; }
+
+    brls::GestureState recognitionLoop(brls::TouchState touch, brls::MouseState mouse, brls::View* view, brls::Sound* soundToPlay) override
+    {
+        // Handle Mouse
+        if (mouse.leftButton != brls::TouchPhase::NONE)
+        {
+            if (mouse.leftButton == brls::TouchPhase::START && pointerDownCb)
+                pointerDownCb(mouse.position, mouse.leftButton);
+            else if (mouse.leftButton == brls::TouchPhase::STAY && pointerMoveCb)
+                pointerMoveCb(mouse.position, mouse.leftButton);
+            else if (mouse.leftButton == brls::TouchPhase::END && pointerUpCb)
+                pointerUpCb(mouse.position, mouse.leftButton);
+        }
+
+        // Handle Scroll
+        if (mouse.scroll.x != 0 || mouse.scroll.y != 0)
+        {
+            if (scrollCb) scrollCb(mouse.scroll);
+        }
+
+        // Handle Touch (simplified, mapping to pointer events)
+        if (touch.phase != brls::TouchPhase::NONE)
+        {
+            if (touch.phase == brls::TouchPhase::START && pointerDownCb)
+                pointerDownCb(touch.position, touch.phase);
+            else if (touch.phase == brls::TouchPhase::STAY && pointerMoveCb)
+                pointerMoveCb(touch.position, touch.phase);
+            else if (touch.phase == brls::TouchPhase::END && pointerUpCb)
+                pointerUpCb(touch.position, touch.phase);
+        }
+
+        return brls::GestureState::STAY;
+    }
+
+private:
+    brls::View* view;
+    PointerCallback pointerDownCb;
+    PointerCallback pointerMoveCb;
+    PointerCallback pointerUpCb;
+    ScrollCallback scrollCb;
+};
+
+static LuaPointerRecognizer* getOrAddLuaPointerRecognizer(sol::state& lua, brls::View& self)
+{
+    for (auto* r : self.getGestureRecognizers())
+    {
+        if (auto* lpr = dynamic_cast<LuaPointerRecognizer*>(r))
+            return lpr;
+    }
+    auto* lpr = new LuaPointerRecognizer(&self);
+    self.addGestureRecognizer(lpr);
+    return lpr;
+}
+
 void LuaManager::registerViewBindings(sol::table& brls_ns) {
     // View
     auto view_ut = brls_ns.new_usertype<brls::View>("View", 
@@ -90,6 +161,32 @@ void LuaManager::registerViewBindings(sol::table& brls_ns) {
         });
     };
     view_ut["addGestureRecognizer"] = [](brls::View& self, brls::GestureRecognizer* g) { self.addGestureRecognizer(g); };
+    view_ut["onPointerDown"] = [this](brls::View& self, sol::protected_function func) {
+        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerDown([this, func](brls::Point p, brls::TouchPhase phase) {
+            auto res = func(lua.create_table_with("x", p.x, "y", p.y));
+            return true;
+        });
+    };
+    view_ut["onPointerMove"] = [this](brls::View& self, sol::protected_function func) {
+        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerMove([this, func](brls::Point p, brls::TouchPhase phase) {
+            auto res = func(lua.create_table_with("x", p.x, "y", p.y));
+            return true;
+        });
+    };
+    view_ut["onPointerUp"] = [this](brls::View& self, sol::protected_function func) {
+        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerUp([this, func](brls::Point p, brls::TouchPhase phase) {
+            auto res = func(lua.create_table_with("x", p.x, "y", p.y));
+            return true;
+        });
+    };
+    view_ut["onScroll"] = [this](brls::View& self, sol::protected_function func) {
+        getOrAddLuaPointerRecognizer(this->lua, self)->onScroll([this, func](brls::Point p) {
+            auto res = func(lua.create_table_with("x", p.x, "y", p.y));
+            if (res.valid() && res.get_type() == sol::type::boolean)
+                return res.get<bool>();
+            return true;
+        });
+    };
     view_ut["present"] = [](brls::View& self, brls::View* view) {
         self.present(view);
     };

@@ -44,6 +44,7 @@ TerminalView.__index = TerminalView
 local FONT_SIZE   = 16        -- 字体大小
 local LINE_HEIGHT = 18       -- 行高
 local CHAR_WIDTH  = 9      -- 字符宽度（Consolas 18px 约 10.5）
+local WIDE_CHAR_WIDTH = 10  -- 中文字符宽度（调整为比 2*CHAR_WIDTH 小一点，解决字间距过大问题）
 local PADDING_X   = 10
 local PADDING_Y   = 10
 local CURSOR_BLINK_RATE = 0.5 -- 秒
@@ -79,6 +80,10 @@ function TerminalView.new(sshManager)
     -- 状态栏信息
     self._statusText     = "未连接"
     self._statusColor    = {r=150, g=150, b=150}
+
+    -- 选择区域 {startRow, startCol, endRow, endCol} (绝对行号，包含历史)
+    self._selection      = nil
+    self._selecting      = false
 
     -- 日志（用于调试输出）
     self._log            = {}
@@ -144,6 +149,24 @@ function TerminalView:bindView(view)
                 end
             end)
         end
+
+        -- -- 注册鼠标/触摸事件（滚动与选择）
+        -- view:onPointerDown(function(event)
+        --     return self:_onPointerDown(event)
+        -- end)
+        -- view:onPointerMove(function(event)
+        --     return self:_onPointerMove(event)
+        -- end)
+        -- view:onPointerUp(function(event)
+        --     return self:_onPointerUp(event)
+        -- end)
+        -- view:onScroll(function(event)
+        --     if event.y ~= 0 then
+        --         if event.y > 0 then self:scrollUp(3) else self:scrollDown(3) end
+        --         return true
+        --     end
+        --     return false
+        -- end)
     end
 end
 
@@ -303,6 +326,11 @@ function TerminalView:_draw(vg, x, y, w, h)
         startScreenRow = startLine - histLen
     end
 
+    -- 绘制选择背景（如果在当前视野内）
+    if self._selection then
+        self:_drawSelection(vg, x, y, w, h, startLine, visRows)
+    end
+
     -- 绘制历史行
     local drawY = y + PADDING_Y
     if self._scrollOffset > 0 then
@@ -325,6 +353,8 @@ function TerminalView:_draw(vg, x, y, w, h)
            self._blinkOn and self._buf.cursorVisible then
             local cx = x + PADDING_X + (self._buf.curCol - 1) * CHAR_WIDTH
             nvgBeginPath(vg)
+            -- local cw = cell.wide and WIDE_CHAR_WIDTH or CHAR_WIDTH
+            -- nvgRect(vg, cx, drawY, cw, LINE_HEIGHT)
             nvgRect(vg, cx, drawY, CHAR_WIDTH, LINE_HEIGHT)
             nvgFillColor(vg, nvgRGBA(220, 220, 220, 180))
             nvgFill(vg)
@@ -355,11 +385,12 @@ function TerminalView:_drawRow(vg, x, y, row)
             local attr = cell.attr
             local ch   = cell.ch or " "
 
+            local cw = cell.wide and WIDE_CHAR_WIDTH or CHAR_WIDTH
             -- 背景色（非默认时才绘制）
             local bg = attr.bg
             if bg.r ~= BG_R or bg.g ~= BG_G or bg.b ~= BG_B then
                 nvgBeginPath(vg)
-                nvgRect(vg, cx, y, cell.wide and CHAR_WIDTH * 2 or CHAR_WIDTH, LINE_HEIGHT)
+                nvgRect(vg, cx, y, cw, LINE_HEIGHT)
                 nvgFillColor(vg, nvgRGBA(bg.r, bg.g, bg.b, 255))
                 nvgFill(vg)
             end
@@ -387,7 +418,7 @@ function TerminalView:_drawRow(vg, x, y, row)
                 nvgStroke(vg)
             end
 
-            cx = cx + (cell.wide and CHAR_WIDTH * 2 or CHAR_WIDTH)
+            cx = cx + (cell.wide and WIDE_CHAR_WIDTH or CHAR_WIDTH)
         end
     end
 end
@@ -459,6 +490,134 @@ function TerminalView:scrollDown(lines)
     lines = lines or 3
     self._scrollOffset = math.max(0, self._scrollOffset - lines)
     self:_invalidate()
+end
+
+-- ── 鼠标/指针事件处理 ─────────────────────────────────────────
+function TerminalView:_onPointerDown(event)
+    -- 计算点击的行列
+    local histLen = #self._buf.history
+    local visRows = math.floor((self._view:getHeight() - PADDING_Y * 2 - 20) / LINE_HEIGHT)
+    local totalRows = histLen + self._rows
+    local startLine = totalRows - self._scrollOffset - visRows + 1
+    if startLine < 1 then startLine = 1 end
+
+    local localX = event.x - self._view:getX() - PADDING_X
+    local localY = event.y - self._view:getY() - PADDING_Y
+    
+    local r = math.floor(localY / LINE_HEIGHT) + startLine
+    local c = math.floor(localX / CHAR_WIDTH) + 1
+    
+    self._selection = { startRow = r, startCol = c, endRow = r, endCol = c }
+    self._selecting = true
+    self:_invalidate()
+    return true
+end
+
+function TerminalView:_onPointerMove(event)
+    if not self._selecting then return false end
+    
+    local histLen = #self._buf.history
+    local visRows = math.floor((self._view:getHeight() - PADDING_Y * 2 - 20) / LINE_HEIGHT)
+    local totalRows = histLen + self._rows
+    local startLine = totalRows - self._scrollOffset - visRows + 1
+    if startLine < 1 then startLine = 1 end
+
+    local localX = event.x - self._view:getX() - PADDING_X
+    local localY = event.y - self._view:getY() - PADDING_Y
+    
+    local r = math.floor(localY / LINE_HEIGHT) + startLine
+    local c = math.floor(localX / CHAR_WIDTH) + 1
+    
+    self._selection.endRow = r
+    self._selection.endCol = c
+    self:_invalidate()
+    return true
+end
+
+function TerminalView:_onPointerUp(event)
+    if not self._selecting then return false end
+    self._selecting = false
+    
+    -- 如果是简单的点击（没拖拽），清除选择
+    if self._selection.startRow == self._selection.endRow and 
+       math.abs(self._selection.startCol - self._selection.endCol) < 2 then
+        self._selection = nil
+    else
+        -- 复制到剪贴板
+        local text = self:getSelectedText()
+        if text and #text > 0 then
+            brls.Application.getPlatform():setClipboard(text)
+            self:setStatus("已复制到剪贴板", 100, 255, 100)
+            -- 1.5秒后恢复状态
+            brls.get_timer():once(1500, function()
+                self:setStatus(self._ssh:isConnected() and "已连接" or "未连接")
+            end)
+        end
+    end
+    
+    self:_invalidate()
+    return true
+end
+
+-- ── 获取选中的文本 ───────────────────────────────────────────
+function TerminalView:getSelectedText()
+    if not self._selection then return nil end
+    local s = self._selection
+    local r1, c1, r2, c2 = s.startRow, s.startCol, s.endRow, s.endCol
+    if r1 > r2 or (r1 == r2 and c1 > c2) then
+        r1, c1, r2, c2 = r2, c2, r1, c1
+    end
+    
+    local histLen = #self._buf.history
+    local lyrics = {}
+    
+    for r = r1, r2 do
+        local rowData
+        if r <= histLen then
+            rowData = self._buf.history[r]
+        else
+            rowData = self._buf.screen[r - histLen]
+        end
+        
+        if rowData then
+            local lineText = ""
+            local cs = (r == r1) and c1 or 1
+            local ce = (r == r2) and c2 or self._cols
+            for c = math.max(1, cs), math.min(self._cols, ce) do
+                local cell = rowData[c]
+                if cell and cell.ch and not cell.widePlaceholder then
+                    lineText = lineText .. cell.ch
+                end
+            end
+            table.insert(lyrics, lineText)
+        end
+    end
+    return table.concat(lyrics, "\n")
+end
+
+-- ── 绘制选择高亮 ─────────────────────────────────────────────
+function TerminalView:_drawSelection(vg, x, y, w, h, startLine, visRows)
+    local s = self._selection
+    local r1, c1, r2, c2 = s.startRow, s.startCol, s.endRow, s.endCol
+    if r1 > r2 or (r1 == r2 and c1 > c2) then
+        r1, c1, r2, c2 = r2, c2, r1, c1
+    end
+    
+    local endLine = startLine + visRows - 1
+    
+    nvgBeginPath(vg)
+    for r = math.max(r1, startLine), math.min(r2, endLine) do
+        local cs = (r == r1) and c1 or 1
+        local ce = (r == r2) and c2 or self._cols
+        
+        local rx = x + PADDING_X + (cs - 1) * CHAR_WIDTH
+        local ry = y + PADDING_Y + (r - startLine) * LINE_HEIGHT
+        local rw = (ce - cs + 1) * CHAR_WIDTH
+        
+        nvgRect(vg, rx, ry, rw, LINE_HEIGHT)
+    end
+    nvgFillColor(vg, nvgRGBA(100, 150, 255, 100))
+    nvgFill(vg)
 end
 
 return TerminalView
