@@ -109,6 +109,7 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     app["popActivity"] = []() {
         brls::Application::popActivity(brls::TransitionAnimation::FADE);
     };
+    app["giveFocus"] = [](brls::View* view) { brls::Application::giveFocus(view); };
     app["notify"] = [](const std::string& text) {
         brls::Application::notify(text);
     };
@@ -213,6 +214,12 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     brls_ns["NVG_ALIGN_MIDDLE"] = (int)NVG_ALIGN_MIDDLE;
     brls_ns["NVG_ALIGN_BOTTOM"] = (int)NVG_ALIGN_BOTTOM;
 
+    // KeyState
+    auto key_state_ut = brls_ns.new_usertype<brls::KeyState>("KeyState", sol::no_construction());
+    key_state_ut["key"]     = &brls::KeyState::key;
+    key_state_ut["mods"]    = &brls::KeyState::mods;
+    key_state_ut["pressed"] = &brls::KeyState::pressed;
+
     // VoidEvent for window size change, etc.
     auto void_event_ut = brls_ns.new_usertype<brls::VoidEvent>("VoidEvent", sol::no_construction());
     void_event_ut["subscribe"] = [](brls::VoidEvent& self, sol::protected_function func) {
@@ -224,6 +231,30 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
         });
     };
     void_event_ut["clear"] = &brls::VoidEvent::clear;
+
+    // KeyStateEvent
+    using KeyStateEvent = brls::Event<brls::KeyState>;
+    auto key_state_event_ut = brls_ns.new_usertype<KeyStateEvent>("KeyStateEvent", sol::no_construction());
+    key_state_event_ut["subscribe"] = [](KeyStateEvent& self, sol::protected_function cb) {
+        self.subscribe([cb](brls::KeyState s) {
+            if (cb.valid()) {
+                auto res = cb(s);
+                if (!res.valid()) { sol::error err = res; brls::Logger::error("Lua error in KeyStateEvent: {}", err.what()); }
+            }
+        });
+    };
+
+    // CharInputEvent
+    using CharInputEvent = brls::Event<unsigned int>;
+    auto char_input_event_ut = brls_ns.new_usertype<CharInputEvent>("CharInputEvent", sol::no_construction());
+    char_input_event_ut["subscribe"] = [](CharInputEvent& self, sol::protected_function cb) {
+        self.subscribe([cb](unsigned int c) {
+            if (cb.valid()) {
+                auto res = cb(c);
+                if (!res.valid()) { sol::error err = res; brls::Logger::error("Lua error in CharInputEvent: {}", err.what()); }
+            }
+        });
+    };
 
     auto theme_values_ut = brls_ns.new_usertype<brls::Theme>("Theme", sol::no_construction());
     theme_values_ut["addColor"] = &brls::Theme::addColor;
@@ -309,6 +340,12 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     platform_ut["openBrowser"] = &brls::Platform::openBrowser;
     platform_ut["getThemeVariant"] = &brls::Platform::getThemeVariant;
     platform_ut["setThemeVariant"] = &brls::Platform::setThemeVariant;
+    platform_ut["getInputManager"] = &brls::Platform::getInputManager;
+    
+    // InputManager
+    auto input_manager_ut = brls_ns.new_usertype<brls::InputManager>("InputManager", sol::no_construction());
+    input_manager_ut["getKeyboardKeyStateChanged"] = &brls::InputManager::getKeyboardKeyStateChanged;
+    input_manager_ut["getCharInputEvent"] = &brls::InputManager::getCharInputEvent;
     platform_ut["readFile"] = [](brls::Platform& self, const std::string& path) -> std::string {
         std::ifstream file(path);
         if (!file.is_open()) return "";

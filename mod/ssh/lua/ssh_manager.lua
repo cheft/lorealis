@@ -187,7 +187,7 @@ end
 -- ── 内部：循环轮询 ───────────────────────────────────────────
 function SSHManager:_pollLoop()
     if not self._polling then return end
-
+    -- print("[SSH] Polling cycle...")
     self:_pollOnce()
 
     -- 使用 brls.delay 实现递归异步轮询
@@ -213,6 +213,7 @@ function SSHManager:_pollOnce()
         return
     elseif data and #data > 0 then
         -- 有数据，触发回调
+        print("[SSH] Received " .. #data .. " bytes")
         if self.onData then
             local ok, e = pcall(self.onData, data)
             if not ok then

@@ -113,18 +113,98 @@ function TerminalView:bindView(view)
             return true
         end, false)
 
+        -- 在全局表中注册此视图，方便键盘事件路由
+        _G.__SSH_TERMINALS = _G.__SSH_TERMINALS or {}
+        local addr = tostring(view:get_address())
+        _G.__SSH_TERMINALS[addr] = self
+        print("[TerminalView] Registered mapping for address: " .. addr)
+
+        -- 同时注册可能的所有上级视图，直到顶层（捕获不同层次的焦点）
+        local curr = view:getParent()
+        while curr do
+            local paddr = tostring(curr:get_address())
+            _G.__SSH_TERMINALS[paddr] = self
+            print("[TerminalView] Registered mapping for parent/ancestor address: " .. paddr)
+            curr = curr:getParent()
+        end
+
         -- 注册帧更新（光标闪烁 + 轮询驱动）
         if view.registerFrameCallback then
             view:registerFrameCallback(function(dt)
                 self:_onFrame(dt)
             end)
         end
+
+        -- 视图销毁时清理引用
+        if view.onWillDisappear then
+            view:onWillDisappear(function()
+                if _G.__SSH_TERMINALS then
+                    _G.__SSH_TERMINALS[view:get_address()] = nil
+                end
+            end)
+        end
     end
 end
+
+-- ── 全局物理键盘事件监听 (单例订阅，避免内存泄漏) ──────────────
+local function initGlobalKeyboardListeners()
+    local inputManager = brls.Application.getPlatform():getInputManager()
+    if not inputManager or not inputManager.getCharInputEvent then return end
+    
+    -- 防止重复初始化
+    if _G.__SSH_TERMINAL_INPUT_INITED then return end
+    _G.__SSH_TERMINAL_INPUT_INITED = true
+
+    -- 字符输入
+    inputManager:getCharInputEvent():subscribe(function(codepoint)
+        local focus = brls.Application.getCurrentFocus()
+        if focus and _G.__SSH_TERMINALS then
+            local curr = focus
+            local terminal = nil
+            while curr do
+                local addr = tostring(curr:get_address())
+                terminal = _G.__SSH_TERMINALS[addr]
+                if terminal then break end
+                curr = curr:getParent()
+            end
+
+            if terminal then
+                terminal._keyboard:handleChar(codepoint)
+            else
+                print("[TerminalView] No terminal mapping found in focus tree for: " .. tostring(focus:get_address()))
+            end
+        end
+    end)
+
+    -- 按键输入 (Enter, Backspace, Arrows, Ctrl+Keys)
+    inputManager:getKeyboardKeyStateChanged():subscribe(function(state)
+        if state.pressed then
+            local focus = brls.Application.getCurrentFocus()
+            if focus and _G.__SSH_TERMINALS then
+                local curr = focus
+                local terminal = nil
+                while curr do
+                    local addr = tostring(curr:get_address())
+                    terminal = _G.__SSH_TERMINALS[addr]
+                    if terminal then break end
+                    curr = curr:getParent()
+                end
+
+                if terminal then
+                    terminal._keyboard:handleKey(state.key, state.mods)
+                end
+            end
+        end
+    end)
+end
+
+-- 尝试初始化（如果环境已就绪）
+pcall(initGlobalKeyboardListeners)
 
 -- ── 接收 SSH 数据并更新缓冲区 ────────────────────────────────
 function TerminalView:feedData(data)
     if not data or #data == 0 then return end
+    print("[TerminalView] feedData: " .. #data .. " bytes")
     local ops = self._parser:feed(data)
     self._buf:applyOps(ops)
     -- 收到数据时自动滚动到底部
@@ -189,13 +269,21 @@ function TerminalView:_draw(vg, x, y, w, h)
     -- 可见行数
     local visRows = math.min(self._rows, math.floor((h - PADDING_Y * 2 - 20) / LINE_HEIGHT))
 
-    -- 计算渲染起始行（考虑历史滚动偏移）
+    -- 计算整体显示范围（从 1 到 histLen + rows）
     local histLen = #self._buf.history
-    local startHistRow = histLen - self._scrollOffset - visRows + 1
+    local totalRows = histLen + self._rows
+    local startLine = totalRows - self._scrollOffset - visRows + 1
+    if startLine < 1 then startLine = 1 end
+
+    local startHistRow = 1
     local startScreenRow = 1
-    if startHistRow < 1 then
-        startScreenRow = 1 - startHistRow + 1
-        startHistRow   = 1
+
+    if startLine <= histLen then
+        startHistRow = startLine
+        startScreenRow = 1
+    else
+        startHistRow = histLen + 1 -- 无需绘制历史
+        startScreenRow = startLine - histLen
     end
 
     -- 绘制历史行
@@ -268,7 +356,7 @@ function TerminalView:_drawRow(vg, x, y, row)
                     -- 粗体通过偏移绘制两次模拟（简单实现）
                     nvgText(vg, cx + 0.5, y, ch, nil)
                 end
-                nvgText(vg, cx, y, ch, nil)
+                nvgText(vg, cx, y, ch)
             end
 
             -- 下划线
@@ -301,13 +389,13 @@ function TerminalView:_drawStatusBar(vg, x, y, w, h)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     local c = self._statusColor
     nvgFillColor(vg, nvgRGBA(c.r, c.g, c.b, 255))
-    nvgText(vg, x + 4, y + h / 2, self._statusText, nil)
+    nvgText(vg, x + 4, y + h / 2, self._statusText)
 
     -- 右侧终端尺寸
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, nvgRGBA(100, 100, 100, 255))
     nvgText(vg, x + w - 4, y + h / 2,
-        string.format("%dx%d", self._cols, self._rows), nil)
+        string.format("%dx%d", self._cols, self._rows))
 end
 
 -- ── 绘制滚动指示器 ───────────────────────────────────────────

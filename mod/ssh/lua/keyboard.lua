@@ -105,7 +105,8 @@ end
 -- ============================================================
 function Keyboard:openSwkbd(opts)
     if not Platform.isSwitch then
-        -- Desktop 无软键盘，直接忽略
+        -- Desktop 弹出一个简单的输入框作为降级方案
+        self:_openFallbackInput(opts)
         return
     end
     if self._swkbdOpen then return end
@@ -209,6 +210,7 @@ function Keyboard:handleKey(keyCode, mods)
         return true
     end
 
+    -- 默认未处理
     return false
 end
 

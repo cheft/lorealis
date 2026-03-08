@@ -43,6 +43,9 @@ void LuaManager::registerViewBindings(sol::table& brls_ns) {
     view_ut["setTranslationX"] = &brls::View::setTranslationX;
     view_ut["setTranslationY"] = &brls::View::setTranslationY;
     view_ut["setBackgroundColor"] = &brls::View::setBackgroundColor;
+    view_ut["setFocusable"] = &brls::View::setFocusable;
+    view_ut["setFocus"] = [](brls::View& self) { brls::Application::giveFocus(&self); };
+    view_ut["isFocused"] = &brls::View::isFocused;
     view_ut["setMarginTop"] = &brls::View::setMarginTop;
     view_ut["setMarginRight"] = &brls::View::setMarginRight;
     view_ut["setMarginBottom"] = &brls::View::setMarginBottom;

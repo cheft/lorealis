@@ -208,16 +208,24 @@ function ConnectionView:_showTerminal()
     termViewObj:setHeight(600)
     termViewObj:setTranslationY(-20) -- 微调位置
 
-    -- 绑定视图并初始化
-    self._terminal:bindView(termViewObj)
-    self._terminal:resize(1100, 600)
-
     -- 将视图添加到对话框（Dialog 是一个 Box）
     dialog:addView(termViewObj)
 
-    dialog:addButton("键盘", function()
-        self._terminal._keyboard:openSwkbd()
-    end)
+    -- 绑定视图并初始化 (必须在 addView 之后，确保 termViewObj 有 parent)
+    self._terminal:bindView(termViewObj)
+    self._terminal:resize(1100, 600)
+
+    -- 设置焦点，确保能接收键盘事件
+    termViewObj:setFocusable(true)
+    termViewObj:setFocus()
+
+    -- 仅在 Switch 上显示“键盘”按钮，Desktop 使用物理键盘
+    if Platform.isSwitch then
+        dialog:addButton("键盘", function()
+            self._terminal._keyboard:openSwkbd()
+            return true
+        end)
+    end
 
     dialog:addButton("断开连接", function()
         self._ssh:disconnect()
