@@ -99,11 +99,13 @@ function ConnectionView:_updateTerminalPageMeta()
 end
 
 function ConnectionView:_popTerminalPageIfNeeded()
-    if self._terminalRoot then
+    local dialog = self._terminalDialog or self._terminalRoot or self._terminalPage
+    if dialog and dialog.close then
         pcall(function()
-            brls.Application.popActivity(self._terminalRoot)
+            dialog:close()
         end)
     end
+    self._terminalDialog = nil
     self._terminalPage = nil
     self._terminalRoot = nil
     self._terminalCanvas = nil
@@ -284,23 +286,18 @@ function ConnectionView:_showTerminal()
     end
 
     if Platform.isSwitch then
-        -- 打开 dialog
-        dialog:open()
-        
-        -- 不再自动弹键盘，等待用户按 + 按钮
         dialog:addButton("键盘", function()
             triggerKeyboard()
+            return true
         end)
-    else
-        dialog:open()
     end
 
     dialog:addButton("断开连接", function()
         self._ssh:disconnect()
-        dialog:close()
-        self._terminalDialog = nil
         return true
     end)
+
+    dialog:open()
 
     pcall(function()
         terminalCanvas:setFocus()

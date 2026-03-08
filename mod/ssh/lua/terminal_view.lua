@@ -112,6 +112,12 @@ function TerminalView:bindView(view)
             self._keyboard:openSwkbd()
             return true
         end, false)
+        -- Switch: BUTTON_START 对应 + 键
+        view:registerAction("弹出键盘", brls.ControllerButton.BUTTON_START, function()
+            print("[TerminalView] START(+) button pressed - opening keyboard")
+            self._keyboard:openSwkbd()
+            return true
+        end, false)
         view:registerAction("Ctrl+C", brls.ControllerButton.BUTTON_X, function()
             self:_sendInput("\3")
             return true
@@ -124,10 +130,18 @@ function TerminalView:bindView(view)
             end
             return true
         end, false)
-        -- Y 按钮：弹出系统键盘 (替代 PLUS，因为 PLUS 在 Lua 绑定中不存在)
+        -- Y 按钮：弹出系统键盘
         view:registerAction("弹出键盘", brls.ControllerButton.BUTTON_Y, function()
             print("[TerminalView] Y button pressed - opening keyboard")
             self._keyboard:openSwkbd()
+            return true
+        end, false)
+        -- Switch: BUTTON_BACK 对应 - 键
+        view:registerAction("返回", brls.ControllerButton.BUTTON_BACK, function()
+            print("[TerminalView] BACK(-) button pressed - closing terminal")
+            if self._ssh:isConnected() then
+                self._ssh:disconnect()
+            end
             return true
         end, false)
         -- B 按钮：返回并关闭终端
