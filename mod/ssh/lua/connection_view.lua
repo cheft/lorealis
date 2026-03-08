@@ -204,16 +204,16 @@ function ConnectionView:_showTerminal()
     -- 创建一个 LuaImage 视图作为终端绘制载体
     local termViewObj = brls.LuaImage.new()
     -- 设置足够大的尺寸
-    termViewObj:setWidth(1100)
-    termViewObj:setHeight(600)
-    termViewObj:setTranslationY(-20) -- 微调位置
+    termViewObj:setWidth(1280)
+    termViewObj:setHeight(720)
+    -- termViewObj:setTranslationY(-20) -- 微调位置
 
     -- 将视图添加到对话框（Dialog 是一个 Box）
     dialog:addView(termViewObj)
 
     -- 绑定视图并初始化 (必须在 addView 之后，确保 termViewObj 有 parent)
     self._terminal:bindView(termViewObj)
-    self._terminal:resize(1100, 600)
+    self._terminal:resize(1280, 720)
 
     -- 设置焦点，确保能接收键盘事件
     termViewObj:setFocusable(true)

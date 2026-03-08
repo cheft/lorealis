@@ -27,16 +27,17 @@ function onInit()
         brls.Application.addFontFallback("zh-Hans", "emoji")
         brls.Application.addFontFallback("zh-Hant", "emoji")
         brls.Application.addFontFallback("korean", "emoji")
-        
-        -- Load monospace font for terminal
-        print("main.lua: Loading monospace font (Consolas)...")
-        brls.Application.loadFontFromFile("monospace", "C:\\Windows\\Fonts\\consola.ttf")
-        
+     
         print("main.lua: [3/7] Emoji font loaded OK")
     else
         print("main.lua: [3/7] Skipping emoji font (Switch platform)")
     end
-
+       
+    -- Load monospace font for terminal
+    print("main.lua: Loading monospace font (Consolas)...")
+    brls.Application.loadFontFromFile("monospace", "./res/font/wqy-microhei_mono.ttf")
+    brls.Application.addFontFallback("monospace", "zh-Hans")
+    
     print("main.lua: [4/7] Configuring app settings...")
     brls.Application.setGlobalQuit(false)
     

@@ -83,13 +83,13 @@ end
 function AnsiParser:feed(data)
     local hex = {}
     for i=1,#data do hex[#hex+1] = string.format("%02X", data:byte(i)) end
-    print("[AnsiParser] hex: " .. table.concat(hex, " "))
+    -- print("[AnsiParser] hex: " .. table.concat(hex, " "))
     
     local oldLen = #self._buf
     self._buf = self._buf .. data
     self._ops = {}
     self:_parse()
-    print(string.format("[AnsiParser] feed: %d bytes -> %d ops (buf remained: %d)", #data, #self._ops, #self._buf))
+    -- print(string.format("[AnsiParser] feed: %d bytes -> %d ops (buf remained: %d)", #data, #self._ops, #self._buf))
     return self._ops
 end
 
@@ -356,9 +356,9 @@ end
 -- ── 辅助：发射一个操作 ───────────────────────────────────────
 function AnsiParser:_emit(op)
     self._ops[#self._ops + 1] = op
-    if op.type == "text" then
-        print("[AnsiParser] Emit text: '" .. op.text:gsub("\r", "\\r"):gsub("\n", "\\n") .. "'")
-    end
+    -- if op.type == "text" then
+    --     print("[AnsiParser] Emit text: '" .. op.text:gsub("\r", "\\r"):gsub("\n", "\\n") .. "'")
+    -- end
 end
 
 -- ── 辅助：深拷贝当前属性（避免引用共享）────────────────────

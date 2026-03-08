@@ -41,11 +41,12 @@ local TerminalView = {}
 TerminalView.__index = TerminalView
 
 -- ── 字体/渲染参数 ─────────────────────────────────────────────
-local FONT_SIZE    = Platform.isSwitch and 13 or 14  -- px（等宽字体）
-local LINE_HEIGHT  = FONT_SIZE + 3                   -- 行高
-local CHAR_WIDTH   = FONT_SIZE * 0.6                 -- 粗略字符宽度（等宽）
-local PADDING_X    = 6
-local PADDING_Y    = 4
+local FONT_SIZE   = 16        -- 字体大小
+local LINE_HEIGHT = 18       -- 行高
+local CHAR_WIDTH  = 9      -- 字符宽度（Consolas 18px 约 10.5）
+local PADDING_X   = 10
+local PADDING_Y   = 10
+local CURSOR_BLINK_RATE = 0.5 -- 秒
 local CURSOR_BLINK_INTERVAL = 500  -- ms
 
 -- 默认背景色（几乎纯黑）
