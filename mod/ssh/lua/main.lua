@@ -8,6 +8,9 @@
 -- 若 Lorealis 加载器已设置 package.path，此处不需要额外设置
 -- 否则在此追加：
 local _modPath = "mod/ssh/lua/"
+if BRLS_RESOURCES and BRLS_RESOURCES == "romfs:/" then
+    _modPath = "romfs:/mod/ssh/lua/"
+end
 package.path = package.path .. ";" .. _modPath .. "?.lua"
 
 local Platform       = require("platform")

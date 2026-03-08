@@ -19,6 +19,7 @@ bool LuaManager::init() {
         
         // Initialize globals
         lua["views"] = lua.create_table();
+        lua["BRLS_RESOURCES"] = BRLS_RESOURCES;
         
         NS_LOG("BRLS: LuaManager::init() - registering Borealis bindings...");
         registerBorealisBindings();

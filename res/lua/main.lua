@@ -35,7 +35,7 @@ function onInit()
        
     -- Load monospace font for terminal
     print("main.lua: Loading monospace font (Consolas)...")
-    brls.Application.loadFontFromFile("monospace", "./res/font/wqy-microhei_mono.ttf")
+    brls.Application.loadFontFromFile("monospace", BRLS_RESOURCES .. "font/wqy-microhei_mono.ttf")
     brls.Application.addFontFallback("monospace", "zh-Hans")
     
     print("main.lua: [4/7] Configuring app settings...")

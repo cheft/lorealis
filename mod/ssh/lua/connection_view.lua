@@ -107,7 +107,7 @@ function ConnectionView:_showConnectForm()
     end)
 
     if ok and inputHost then
-        inputHost:init("主机", "192.168.31.43", function(text) end, "192.168.31.43", "IP 或域名", 64)
+        inputHost:init("主机", "192.168.31.132", function(text) end, "192.168.31.132", "IP 或域名", 64)
         dialog:addView(inputHost)
 
         local inputUser = brls.InputCell.new()

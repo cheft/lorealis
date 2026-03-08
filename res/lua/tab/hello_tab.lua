@@ -120,12 +120,30 @@ function hello_tab.init(mainView)
         "SSH Client",
         function(v)
             print("HelloTab: SSH Client clicked")
-            -- Load SSH module main.lua
-            local ssh_main = dofile("mod/ssh/lua/main.lua")
-            if ssh_main and ssh_main.show then
-                ssh_main.show()
-            else
-                brls.Application.notify("Failed to load SSH module")
+            
+            -- Construct module path based on resources directory
+            -- On PC: ./res/ -> go up to get ./mod/
+            -- On Switch: romfs:/ -> mod/ is at root
+            local modPath = "mod/ssh/lua/main.lua"
+            if BRLS_RESOURCES and BRLS_RESOURCES == "romfs:/" then
+                modPath = "romfs:/mod/ssh/lua/main.lua"
+            end
+
+            local ok, err = pcall(function()
+                local ssh_main = dofile(modPath)
+                if ssh_main and ssh_main.show then
+                    ssh_main.show()
+                else
+                    error("SSH module entry point (.show) not found")
+                end
+            end)
+
+            if not ok then
+                local errMsg = "Failed to load SSH module: " .. tostring(err)
+                print(errMsg)
+                local dialog = brls.Dialog.new(errMsg)
+                dialog:addButton("OK", function() end)
+                dialog:open()
             end
             return true
         end

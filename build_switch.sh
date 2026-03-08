@@ -55,6 +55,8 @@ if [ -f "$ELF_FILE" ]; then
     rm -rf /tmp/romfs_final
     mkdir -p /tmp/romfs_final
     tar -C res -cf - . | tar -C /tmp/romfs_final -xf -
+    mkdir -p /tmp/romfs_final/mod
+    tar -C mod -cf - . | tar -C /tmp/romfs_final/mod -xf -
     
     # 移除可能引起干扰的文件
     find /tmp/romfs_final -name ".gitignore" -delete
