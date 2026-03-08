@@ -275,14 +275,24 @@ function ConnectionView:_showTerminal()
     self._terminal:bindView(terminalCanvas)
     self._terminal:resize(TERMINAL_PAGE_WIDTH, TERMINAL_PAGE_HEIGHT)
 
+    local function triggerKeyboard()
+        print("[SSH] Triggering keyboard via dialog button")
+        self._terminal._keyboard:openSwkbd({
+            header = "SSH 输入",
+            guide = "输入命令并确认发送",
+        })
+    end
+
     if Platform.isSwitch then
+        -- 打开 dialog
+        dialog:open()
+        
+        -- 不再自动弹键盘，等待用户按 + 按钮
         dialog:addButton("键盘", function()
-            self._terminal._keyboard:openSwkbd({
-                header = "SSH 输入",
-                guide = "输入命令并确认发送",
-            })
-            return true
+            triggerKeyboard()
         end)
+    else
+        dialog:open()
     end
 
     dialog:addButton("断开连接", function()
@@ -291,8 +301,6 @@ function ConnectionView:_showTerminal()
         self._terminalDialog = nil
         return true
     end)
-
-    dialog:open()
 
     pcall(function()
         terminalCanvas:setFocus()

@@ -101,6 +101,12 @@ function TerminalView:bindView(view)
         view:setDrawCallback(function(vg, x, y, w, h, style, ctx)
             self:_draw(vg, x, y, w, h)
         end)
+        
+        -- 确保视图可以获取焦点
+        if view.setFocusable then
+            view:setFocusable(true)
+        end
+        
         -- 注册控制器输入
         view:registerAction("虚拟键盘", brls.ControllerButton.BUTTON_A, function()
             self._keyboard:openSwkbd()
@@ -115,6 +121,20 @@ function TerminalView:bindView(view)
                 self._ssh:disconnect()
             else
                 self._ssh:reconnect()
+            end
+            return true
+        end, false)
+        -- Y 按钮：弹出系统键盘 (替代 PLUS，因为 PLUS 在 Lua 绑定中不存在)
+        view:registerAction("弹出键盘", brls.ControllerButton.BUTTON_Y, function()
+            print("[TerminalView] Y button pressed - opening keyboard")
+            self._keyboard:openSwkbd()
+            return true
+        end, false)
+        -- B 按钮：返回并关闭终端
+        view:registerAction("返回", brls.ControllerButton.BUTTON_B, function()
+            print("[TerminalView] B button pressed - closing terminal")
+            if self._ssh:isConnected() then
+                self._ssh:disconnect()
             end
             return true
         end, false)

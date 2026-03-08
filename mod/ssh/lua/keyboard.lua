@@ -114,10 +114,43 @@ function Keyboard:openSwkbd(opts)
     opts = opts or {}
     self._swkbdOpen = true
 
-    -- 使用 brls 提供的软键盘 API（Horizon SwkbdConfig）
-    -- 标题、提示文本、初始文本
+    -- 尝试使用 InputCell.openKeyboard 作为更可靠的弹键盘方案
+    local ok, inputCell = pcall(function()
+        return brls.InputCell.new()
+    end)
+
+    if ok and inputCell then
+        -- 创建一个隐藏的 InputCell 并调用其 openKeyboard 方法
+        -- 这是目前已知的、可以稳定在 Switch NRO 下弹出系统键盘的方式
+        local title = opts.header or "SSH 输入"
+        local hint = opts.guide or "输入命令"
+
+        inputCell:init(title, "", function(text)
+            -- 用户确认输入后回调
+            self._swkbdOpen = false
+            if text and #text > 0 then
+                self:_emit(text .. "\r")
+            end
+        end, hint, opts.maxLen or 256)
+
+        -- 调用 InputCell 内部的 openKeyboard 方法
+        -- 这会使用 brls::Application::getImeManager()->openForText
+        -- 比 brls.Application.openSwkbd 更可靠
+        local ok2, err2 = pcall(function()
+            inputCell:openKeyboard(opts.maxLen or 256)
+        end)
+
+        if not ok2 then
+            self._swkbdOpen = false
+            print("[SSH Keyboard] InputCell.openKeyboard failed: " .. tostring(err2))
+            self:_openFallbackInput(opts)
+        end
+        return
+    end
+
+    -- 降级：尝试旧的 brls.Application.openSwkbd
     local config = {
-        type         = opts.type or "normal",   -- "normal" | "numpad" | "qwerty"
+        type         = opts.type or "normal",
         headerText   = opts.header   or "输入命令",
         subText      = opts.sub      or "",
         guideText    = opts.guide    or "按 + 确认，按 - 取消",
@@ -126,22 +159,18 @@ function Keyboard:openSwkbd(opts)
         cancelable   = true,
     }
 
-    -- brls.Application.openSwkbd(config, callback)
-    -- callback(ok:bool, text:string)
-    local ok2, err = pcall(function()
+    local ok3, err3 = pcall(function()
         brls.Application.openSwkbd(config, function(confirmed, inputText)
             self._swkbdOpen = false
             if confirmed and inputText and #inputText > 0 then
-                -- 将输入文本发送到 SSH（末尾加回车）
                 self:_emit(inputText .. "\r")
             end
         end)
     end)
 
-    if not ok2 then
+    if not ok3 then
         self._swkbdOpen = false
-        print("[SSH Keyboard] openSwkbd failed: " .. tostring(err))
-        -- 降级：使用 brls 内置输入框
+        print("[SSH Keyboard] openSwkbd failed: " .. tostring(err3))
         self:_openFallbackInput(opts)
     end
 end
