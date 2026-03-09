@@ -137,13 +137,27 @@ function Keyboard:openSwkbd(opts)
     local hint = opts.guide or "Enter command"
     local initial = opts.initial or ""
     local maxLen = opts.maxLen or 256
+    local onSubmit = opts.onSubmit
+
+    local function _handleSubmit(inputText)
+        self._swkbdOpen = false
+        if not inputText then
+            return
+        end
+
+        if onSubmit then
+            onSubmit(inputText)
+            return
+        end
+
+        if #inputText > 0 then
+            self:_emit(inputText .. "\r")
+        end
+    end
 
     local okIme, imeOpenedOrErr = pcall(function()
         return brls.Application.openTextIME(function(inputText)
-            self._swkbdOpen = false
-            if inputText and #inputText > 0 then
-                self:_emit(inputText .. "\r")
-            end
+            _handleSubmit(inputText)
         end, title, opts.sub or "", maxLen, initial, 0)
     end)
 
@@ -164,10 +178,7 @@ function Keyboard:openSwkbd(opts)
     if ok and inputCell then
         local okInit, initErr = pcall(function()
             inputCell:init(title, initial, function(text)
-                self._swkbdOpen = false
-                if text and #text > 0 then
-                    self:_emit(text .. "\r")
-                end
+                _handleSubmit(text)
             end, "", hint, maxLen)
         end)
 
@@ -198,13 +209,27 @@ end
 
 function Keyboard:_openFallbackInput(opts)
     opts = opts or {}
+    local onSubmit = opts.onSubmit
+
+    local function _handleSubmit(inputText)
+        self._swkbdOpen = false
+        if not inputText then
+            return
+        end
+
+        if onSubmit then
+            onSubmit(inputText)
+            return
+        end
+
+        if #inputText > 0 then
+            self:_emit(inputText .. "\r")
+        end
+    end
 
     local okIme, imeOpenedOrErr = pcall(function()
         return brls.Application.openTextIME(function(inputText)
-            self._swkbdOpen = false
-            if inputText and #inputText > 0 then
-                self:_emit(inputText .. "\r")
-            end
+            _handleSubmit(inputText)
         end, opts.header or "SSH Input", opts.sub or "", opts.maxLen or 256, opts.initial or "", 0)
     end)
 

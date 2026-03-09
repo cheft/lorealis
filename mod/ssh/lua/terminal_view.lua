@@ -64,6 +64,38 @@ local CURSOR_BLINK_INTERVAL = 500  -- ms
 local SWITCH_HINT_TEXT = "A Enter  B Delete  X Ctrl+C  Y EOF  L Tab  R Reconnect  + Keyboard  - Close"
 local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+C interrupt | PageUp/Down history"
 
+local OVERLAY_HINT_TEXT = "D-Pad Move  A Type  B Backspace  X Page  Y Space  L Tab  R Enter  + IME  - Hide"
+
+local OVERLAY_LAYOUTS = {
+    {
+        name = "abc",
+        rows = {
+            { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
+            { "a", "s", "d", "f", "g", "h", "j", "k", "l", "/" },
+            { "z", "x", "c", "v", "b", "n", "m", ".", "-", "_" },
+            { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
+        },
+    },
+    {
+        name = "ABC",
+        rows = {
+            { "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P" },
+            { "A", "S", "D", "F", "G", "H", "J", "K", "L", "/" },
+            { "Z", "X", "C", "V", "B", "N", "M", ".", "-", "_" },
+            { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
+        },
+    },
+    {
+        name = "sym",
+        rows = {
+            { "!", "@", "#", "$", "%", "^", "&", "*", "(", ")" },
+            { "[", "]", "{", "}", "<", ">", "/", "\\", "|", ":" },
+            { ";", '"', "'", ",", ".", "?", "+", "=", "~", "`" },
+            { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
+        },
+    },
+}
+
 -- 默认背景色（几乎纯黑）
 local BG_R, BG_G, BG_B = 12, 12, 12
 
@@ -107,6 +139,11 @@ function TerminalView.new(sshManager)
     self._debugButtonsText = "DBG init"
     self._debugPollText = ""
     self._debugFrameCount = 0
+    self._overlayKeyboardVisible = false
+    self._overlayKeyboardPage = 1
+    self._overlayKeyboardRow = 1
+    self._overlayKeyboardCol = 1
+    self._overlayBuffer = ""
 
     return self
 end
@@ -326,6 +363,133 @@ function TerminalView:resize(width, height)
     end
 end
 
+function TerminalView:_getOverlayLayout()
+    return OVERLAY_LAYOUTS[self._overlayKeyboardPage] or OVERLAY_LAYOUTS[1]
+end
+
+function TerminalView:_clampOverlaySelection()
+    local layout = self:_getOverlayLayout()
+    local rows = layout.rows
+    if self._overlayKeyboardRow < 1 then self._overlayKeyboardRow = 1 end
+    if self._overlayKeyboardRow > #rows then self._overlayKeyboardRow = #rows end
+
+    local cols = #(rows[self._overlayKeyboardRow] or {})
+    if cols < 1 then cols = 1 end
+    if self._overlayKeyboardCol < 1 then self._overlayKeyboardCol = 1 end
+    if self._overlayKeyboardCol > cols then self._overlayKeyboardCol = cols end
+end
+
+function TerminalView:_moveOverlaySelection(dx, dy)
+    self._overlayKeyboardRow = self._overlayKeyboardRow + dy
+    self._overlayKeyboardCol = self._overlayKeyboardCol + dx
+    self:_clampOverlaySelection()
+    self:_invalidate()
+end
+
+function TerminalView:_cycleOverlayPage()
+    self._overlayKeyboardPage = self._overlayKeyboardPage + 1
+    if self._overlayKeyboardPage > #OVERLAY_LAYOUTS then
+        self._overlayKeyboardPage = 1
+    end
+    self:_clampOverlaySelection()
+    self:_invalidate()
+end
+
+function TerminalView:_getOverlaySelectedKey()
+    local layout = self:_getOverlayLayout()
+    local row = layout.rows[self._overlayKeyboardRow]
+    if not row then return nil end
+    return row[self._overlayKeyboardCol]
+end
+
+function TerminalView:_appendOverlayText(text)
+    if not text or text == "" then return end
+    self:_sendInput(text)
+    self._overlayBuffer = self._overlayBuffer .. text
+    self:_invalidate()
+end
+
+function TerminalView:_backspaceOverlayBuffer()
+    self:_sendInput(Platform.keyMap.BS)
+    if #self._overlayBuffer > 0 then
+        self._overlayBuffer = string.sub(self._overlayBuffer, 1, #self._overlayBuffer - 1)
+    end
+    self:_invalidate()
+end
+
+function TerminalView:_submitOverlayBuffer()
+    self:_sendInput(Platform.keyMap.ENTER)
+    self._overlayBuffer = ""
+    self:_invalidate()
+end
+
+function TerminalView:_syncOverlayBuffer(text)
+    text = text or ""
+    self:_sendInput(Platform.keyMap.CTRL_U)
+    if #text > 0 then
+        self:_sendInput(text)
+    end
+    self._overlayBuffer = text
+    self:_invalidate()
+end
+
+function TerminalView:_openOverlayIme()
+    self._keyboard:openSwkbd({
+        header = "SSH Command",
+        guide = "Edit current command buffer",
+        initial = self._overlayBuffer,
+        maxLen = 256,
+        onSubmit = function(inputText)
+            self:_syncOverlayBuffer(inputText or "")
+        end,
+    })
+end
+
+function TerminalView:_handleOverlayActions(justPressed)
+    local B = brls.ControllerButton
+
+    if justPressed(B.BUTTON_UP) then
+        self:_moveOverlaySelection(0, -1)
+    end
+    if justPressed(B.BUTTON_DOWN) then
+        self:_moveOverlaySelection(0, 1)
+    end
+    if justPressed(B.BUTTON_LEFT) then
+        self:_moveOverlaySelection(-1, 0)
+    end
+    if justPressed(B.BUTTON_RIGHT) then
+        self:_moveOverlaySelection(1, 0)
+    end
+    if justPressed(B.BUTTON_A) then
+        local key = self:_getOverlaySelectedKey()
+        if key then
+            self:_appendOverlayText(key)
+        end
+    end
+    if justPressed(B.BUTTON_B) then
+        self:_backspaceOverlayBuffer()
+    end
+    if justPressed(B.BUTTON_X) then
+        self:_cycleOverlayPage()
+    end
+    if justPressed(B.BUTTON_Y) then
+        self:_appendOverlayText(" ")
+    end
+    if justPressed(B.BUTTON_LB) then
+        self:_sendInput(Platform.keyMap.TAB)
+    end
+    if justPressed(B.BUTTON_RB) then
+        self:_submitOverlayBuffer()
+    end
+    if justPressed(B.BUTTON_START) then
+        self:_openOverlayIme()
+    end
+    if justPressed(B.BUTTON_BACK) then
+        self._overlayKeyboardVisible = false
+        self:_invalidate()
+    end
+end
+
 -- ── 帧更新（光标闪烁）────────────────────────────────────────
 local function _pollPressed(button)
     local pollFn = nil
@@ -372,6 +536,10 @@ function TerminalView:_pollControllerShortcuts()
         B.BUTTON_Y,
         B.BUTTON_LB,
         B.BUTTON_RB,
+        B.BUTTON_UP,
+        B.BUTTON_DOWN,
+        B.BUTTON_LEFT,
+        B.BUTTON_RIGHT,
         B.BUTTON_START,
         B.BUTTON_BACK,
     }
@@ -408,6 +576,12 @@ function TerminalView:_pollControllerShortcuts()
         return current[button] and not self._lastPolledButtons[button]
     end
 
+    if self._overlayKeyboardVisible then
+        self:_handleOverlayActions(justPressed)
+        self._lastPolledButtons = current
+        return
+    end
+
     if justPressed(B.BUTTON_A) then
         _trace("[TerminalView] Polled A -> Enter")
         self:_sendInput(Platform.keyMap.ENTER)
@@ -437,11 +611,9 @@ function TerminalView:_pollControllerShortcuts()
         end
     end
     if justPressed(B.BUTTON_START) then
-        _trace("[TerminalView] Polled + -> Keyboard")
-        self._keyboard:openSwkbd({
-            header = "SSH Input",
-            guide = "Press + to open keyboard, A to enter, B to delete",
-        })
+        _trace("[TerminalView] Polled + -> Overlay Keyboard")
+        self._overlayKeyboardVisible = true
+        self:_invalidate()
     end
     if justPressed(B.BUTTON_BACK) then
         _trace("[TerminalView] Polled - -> Close")
@@ -453,6 +625,75 @@ function TerminalView:_pollControllerShortcuts()
     end
 
     self._lastPolledButtons = current
+end
+
+function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
+    local panelH = 180
+    local panelY = y + h - 20 - panelH - 8
+    local panelX = x + 18
+    local panelW = w - 36
+    local headerH = 34
+    local layout = self:_getOverlayLayout()
+    local rows = layout.rows
+    local maxCols = 10
+    local cellGap = 8
+    local cellH = 24
+    local gridTop = panelY + headerH + 12
+    local availableW = panelW - 24
+    local cellW = math.floor((availableW - cellGap * (maxCols - 1)) / maxCols)
+
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, panelX, panelY, panelW, panelH, 14)
+    nvgFillColor(vg, nvgRGBA(20, 20, 24, 235))
+    nvgFill(vg)
+
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, panelX + 10, panelY + 8, panelW - 20, 24, 8)
+    nvgFillColor(vg, nvgRGBA(42, 42, 50, 255))
+    nvgFill(vg)
+
+    local preview = self._overlayBuffer
+    if preview == "" then preview = "_" end
+    if #preview > 72 then
+        preview = "..." .. string.sub(preview, -72)
+    end
+
+    nvgFontFace(vg, "regular")
+    nvgFontSize(vg, 12)
+    nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
+    nvgFillColor(vg, nvgRGBA(240, 240, 240, 255))
+    nvgText(vg, panelX + 16, panelY + 20, "CMD> " .. preview)
+
+    nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
+    nvgFillColor(vg, nvgRGBA(120, 180, 255, 255))
+    nvgText(vg, panelX + panelW - 16, panelY + 20, "Page: " .. layout.name)
+
+    for rowIndex, row in ipairs(rows) do
+        for colIndex, key in ipairs(row) do
+            local cellX = panelX + 12 + (colIndex - 1) * (cellW + cellGap)
+            local cellY = gridTop + (rowIndex - 1) * (cellH + 8)
+            local selected = (rowIndex == self._overlayKeyboardRow and colIndex == self._overlayKeyboardCol)
+
+            nvgBeginPath(vg)
+            nvgRoundedRect(vg, cellX, cellY, cellW, cellH, 7)
+            if selected then
+                nvgFillColor(vg, nvgRGBA(90, 140, 255, 230))
+            else
+                nvgFillColor(vg, nvgRGBA(55, 55, 64, 220))
+            end
+            nvgFill(vg)
+
+            nvgFontSize(vg, 13)
+            nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+            nvgFillColor(vg, nvgRGBA(255, 255, 255, 255))
+            nvgText(vg, cellX + cellW / 2, cellY + cellH / 2, key)
+        end
+    end
+
+    nvgFontSize(vg, 10)
+    nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_BOTTOM)
+    nvgFillColor(vg, nvgRGBA(170, 170, 170, 230))
+    nvgText(vg, panelX + panelW / 2, panelY + panelH - 8, OVERLAY_HINT_TEXT)
 end
 
 function TerminalView:_onFrame(dt)
@@ -542,6 +783,10 @@ function TerminalView:_draw(vg, x, y, w, h)
 
     -- 状态栏（底部）
     self:_drawStatusBar(vg, x, y + h - 20, w, 20)
+
+    if self._overlayKeyboardVisible then
+        self:_drawKeyboardOverlay(vg, x, y, w, h)
+    end
 
     -- 滚动位置指示器
     if self._scrollOffset > 0 then

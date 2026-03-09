@@ -101,6 +101,14 @@ if(NOT BRLS_DEPS_PATH)
     set(BRLS_DEPS_PATH "${CMAKE_CURRENT_BINARY_DIR}/_deps_local")
 endif()
 
+# Force FetchContent to use a project-local writable cache instead of CMake's
+# default `_deps` directory. This avoids permission issues in shared/container
+# build roots where `${CMAKE_CURRENT_BINARY_DIR}/_deps` may already exist with
+# incompatible ownership.
+file(MAKE_DIRECTORY "${BRLS_DEPS_PATH}")
+set(FETCHCONTENT_BASE_DIR "${BRLS_DEPS_PATH}" CACHE PATH "FetchContent base directory" FORCE)
+message(STATUS "--- FetchContent base dir: ${FETCHCONTENT_BASE_DIR} ---")
+
 FetchContent_Declare(
     pugixml
     URL https://github.com/zeux/pugixml/archive/refs/tags/v1.14.zip
