@@ -31,6 +31,35 @@ local function init()
         end)
     end
 
+    local openTextIMEValue = brls and brls.Application and brls.Application.openTextIME
+    local getControllerStateValue = brls and brls.Application and brls.Application.getControllerState
+    local openTextIMELog = "[SSH Module] brls.Application.openTextIME type=" .. type(openTextIMEValue) .. ", value=" .. tostring(openTextIMEValue)
+    local getControllerStateLog = "[SSH Module] brls.Application.getControllerState type=" .. type(getControllerStateValue) .. ", value=" .. tostring(getControllerStateValue)
+    local debugPath = (DebugLog and DebugLog.path and DebugLog.path()) or "unknown"
+    local debugSummary = "IME=" .. type(openTextIMEValue) .. "  Pad=" .. type(getControllerStateValue) .. "  Log=" .. tostring(debugPath)
+    print(openTextIMELog)
+    print(getControllerStateLog)
+    print("[SSH Module] debug log path=" .. tostring(debugPath))
+    if DebugLog and DebugLog.append then
+        pcall(function()
+            DebugLog.append(openTextIMELog)
+            DebugLog.append(getControllerStateLog)
+            DebugLog.append("[SSH Module] debug log path=" .. tostring(debugPath))
+        end)
+    end
+    pcall(function()
+        brls.Application.notify(debugSummary)
+    end)
+    pcall(function()
+        local dlgText = "SSH Debug" .. "\n\n"
+            .. openTextIMELog .. "\n"
+            .. getControllerStateLog .. "\n"
+            .. "Log: " .. tostring(debugPath)
+        local dlg = brls.Dialog.new(dlgText)
+        dlg:addButton("OK", function() end)
+        dlg:open()
+    end)
+
     -- 验证 SSH 绑定是否可用
     if not brls.SSH then
         print("[SSH Module] brls.SSH bindings not found! Check lua_ssh.cpp registration.")

@@ -10,6 +10,9 @@
 #include <sys/stat.h>
 #include <string>
 #include <sstream>
+#ifdef __SWITCH__
+#include <switch.h>
+#endif
 #ifdef _WIN32
 #include <direct.h>
 #endif
@@ -35,6 +38,68 @@ static bool portable_mkdirs(const std::string& path) {
     struct stat st;
     return (stat(path.c_str(), &st) == 0);
 }
+
+#ifdef __SWITCH__
+static uint64_t poll_default_switch_buttons()
+{
+    static bool initialized = false;
+    static PadState pad;
+
+    if (!initialized)
+    {
+        padInitializeDefault(&pad);
+        initialized = true;
+    }
+
+    padUpdate(&pad);
+    return padGetButtons(&pad);
+}
+
+static uint64_t map_controller_button_to_switch_mask(int button)
+{
+    switch ((brls::ControllerButton)button)
+    {
+        case brls::BUTTON_A:
+            return HidNpadButton_A;
+        case brls::BUTTON_B:
+            return HidNpadButton_B;
+        case brls::BUTTON_X:
+            return HidNpadButton_X;
+        case brls::BUTTON_Y:
+            return HidNpadButton_Y;
+        case brls::BUTTON_LB:
+            return HidNpadButton_L;
+        case brls::BUTTON_RB:
+            return HidNpadButton_R;
+        case brls::BUTTON_LT:
+            return HidNpadButton_ZL;
+        case brls::BUTTON_RT:
+            return HidNpadButton_ZR;
+        case brls::BUTTON_LSB:
+            return HidNpadButton_StickL;
+        case brls::BUTTON_RSB:
+            return HidNpadButton_StickR;
+        case brls::BUTTON_UP:
+        case brls::BUTTON_NAV_UP:
+            return HidNpadButton_Up;
+        case brls::BUTTON_RIGHT:
+        case brls::BUTTON_NAV_RIGHT:
+            return HidNpadButton_Right;
+        case brls::BUTTON_DOWN:
+        case brls::BUTTON_NAV_DOWN:
+            return HidNpadButton_Down;
+        case brls::BUTTON_LEFT:
+        case brls::BUTTON_NAV_LEFT:
+            return HidNpadButton_Left;
+        case brls::BUTTON_START:
+            return HidNpadButton_Plus;
+        case brls::BUTTON_BACK:
+            return HidNpadButton_Minus;
+        default:
+            return 0;
+    }
+}
+#endif
 
 void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     // Enums
@@ -112,6 +177,63 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     app["giveFocus"] = [](brls::View* view) { brls::Application::giveFocus(view); };
     app["notify"] = [](const std::string& text) {
         brls::Application::notify(text);
+    };
+    app["getControllerState"] = []() -> brls::ControllerState {
+        return brls::Application::getControllerState();
+    };
+    app["isControllerButtonPressed"] = [](int button) -> bool {
+        if (button < 0 || button >= brls::_BUTTON_MAX)
+            return false;
+
+        const auto& state = brls::Application::getControllerState();
+        return state.buttons[button];
+    };
+    app["isSwitchControllerButtonPressed"] = [](int button) -> bool {
+#ifdef __SWITCH__
+        if (button < 0 || button >= brls::_BUTTON_MAX)
+            return false;
+
+        uint64_t mask = map_controller_button_to_switch_mask(button);
+        if (mask == 0)
+            return false;
+
+        return (poll_default_switch_buttons() & mask) != 0;
+#else
+        (void)button;
+        return false;
+#endif
+    };
+    app["getSwitchButtonsDebug"] = []() -> std::string {
+#ifdef __SWITCH__
+        std::stringstream ss;
+        ss << "0x" << std::hex << std::uppercase << poll_default_switch_buttons();
+        return ss.str();
+#else
+        return "desktop";
+#endif
+    };
+    app["openTextIME"] = [](sol::protected_function cb,
+        sol::optional<std::string> headerText,
+        sol::optional<std::string> subText,
+        sol::optional<int> maxStringLength,
+        sol::optional<std::string> initialText,
+        sol::optional<int> kbdDisableBitmask) -> bool {
+        return brls::Application::getImeManager()->openForText(
+            [cb](std::string text) {
+                if (!cb.valid())
+                    return;
+
+                auto result = cb(text);
+                if (!result.valid()) {
+                    sol::error err = result;
+                    brls::Logger::error("Lua error in Application.openTextIME: {}", err.what());
+                }
+            },
+            headerText.value_or(""),
+            subText.value_or(""),
+            maxStringLength.value_or(256),
+            initialText.value_or(""),
+            kbdDisableBitmask.value_or(brls::KeyboardKeyDisableBitmask::KEYBOARD_DISABLE_NONE));
     };
     app["getPlatform"] = []() { return brls::Application::getPlatform(); };
     app["getFPS"] = []() { return brls::Application::getFPS(); };
@@ -302,6 +424,9 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
             }
         });
     };
+    dialog_ut["getAppletFrame"] = [this](brls::Dialog& self) {
+        return this->pushView(self.getAppletFrame());
+    };
     dialog_ut["open"] = &brls::Dialog::open;
     dialog_ut["close"] = &brls::Dialog::close;
 
@@ -346,6 +471,18 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     auto input_manager_ut = brls_ns.new_usertype<brls::InputManager>("InputManager", sol::no_construction());
     input_manager_ut["getKeyboardKeyStateChanged"] = &brls::InputManager::getKeyboardKeyStateChanged;
     input_manager_ut["getCharInputEvent"] = &brls::InputManager::getCharInputEvent;
+
+    auto controller_state_ut = brls_ns.new_usertype<brls::ControllerState>("ControllerState", sol::no_construction());
+    controller_state_ut["isButtonPressed"] = [](const brls::ControllerState& self, int button) {
+        if (button < 0 || button >= brls::_BUTTON_MAX)
+            return false;
+        return self.buttons[button];
+    };
+    controller_state_ut["getAxis"] = [](const brls::ControllerState& self, int axis) {
+        if (axis < 0 || axis >= brls::_AXES_MAX)
+            return 0.0f;
+        return self.axes[axis];
+    };
     platform_ut["readFile"] = [](brls::Platform& self, const std::string& path) -> std::string {
         std::ifstream file(path);
         if (!file.is_open()) return "";

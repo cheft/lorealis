@@ -56,8 +56,7 @@ function Keyboard:handleButton(button)
 
     -- A → 打开虚拟键盘
     elseif button == B.BUTTON_A then
-        self:openSwkbd()
-        return true
+        self:_emit(K.ENTER); return true
 
     -- B → Backspace
     elseif button == B.BUTTON_B then
@@ -70,6 +69,14 @@ function Keyboard:handleButton(button)
     -- Y → Ctrl+D (EOF / logout)
     elseif button == B.BUTTON_Y then
         self:_emit(K.CTRL_D); return true
+
+    -- + fallback
+    elseif button == B.BUTTON_START then
+        self:openSwkbd(); return true
+
+    -- - let parent close
+    elseif button == B.BUTTON_BACK then
+        return false
 
     -- L → Tab 补全
     elseif button == B.BUTTON_LB then
@@ -117,7 +124,7 @@ end
 function Keyboard:openSwkbd(opts)
     _trace("[SSH Keyboard] openSwkbd called; isSwitch=" .. tostring(Platform.isSwitch) .. ", swkbdOpen=" .. tostring(self._swkbdOpen))
     if not Platform.isSwitch then
-        -- Desktop 弹出一个简单的输入框作为降级方案
+        -- Desktop fallback input path
         self:_openFallbackInput(opts)
         return
     end
@@ -126,35 +133,58 @@ function Keyboard:openSwkbd(opts)
     opts = opts or {}
     self._swkbdOpen = true
 
-    -- 尝试使用 InputCell.openKeyboard 作为更可靠的弹键盘方案
+    local title = opts.header or "SSH Input"
+    local hint = opts.guide or "Enter command"
+    local initial = opts.initial or ""
+    local maxLen = opts.maxLen or 256
+
+    local okIme, imeOpenedOrErr = pcall(function()
+        return brls.Application.openTextIME(function(inputText)
+            self._swkbdOpen = false
+            if inputText and #inputText > 0 then
+                self:_emit(inputText .. "\r")
+            end
+        end, title, opts.sub or "", maxLen, initial, 0)
+    end)
+
+    if okIme and imeOpenedOrErr then
+        _trace("[SSH Keyboard] Application.openTextIME accepted by IME")
+        return
+    end
+
+    if not okIme then
+        _trace("[SSH Keyboard] Application.openTextIME failed: " .. tostring(imeOpenedOrErr))
+    end
+
+    -- Fallback to InputCell.openKeyboard for compatibility
     local ok, inputCell = pcall(function()
         return brls.InputCell.new()
     end)
 
     if ok and inputCell then
-        -- 创建一个隐藏的 InputCell 并调用其 openKeyboard 方法
-        -- 这是目前已知的、可以稳定在 Switch NRO 下弹出系统键盘的方式
-        local title = opts.header or "SSH 输入"
-        local hint = opts.guide or "输入命令"
-
-        inputCell:init(title, "", function(text)
-            -- 用户确认输入后回调
-            self._swkbdOpen = false
-            if text and #text > 0 then
-                self:_emit(text .. "\r")
-            end
-        end, hint, opts.maxLen or 256)
-
-        -- 调用 InputCell 内部的 openKeyboard 方法
-        -- 这会使用 brls::Application::getImeManager()->openForText
-        -- 比 brls.Application.openSwkbd 更可靠
-        local ok2, imeOpenedOrErr = pcall(function()
-            return inputCell:openKeyboard(opts.maxLen or 256)
+        local okInit, initErr = pcall(function()
+            inputCell:init(title, initial, function(text)
+                self._swkbdOpen = false
+                if text and #text > 0 then
+                    self:_emit(text .. "\r")
+                end
+            end, "", hint, maxLen)
         end)
 
-        if (not ok2) or imeOpenedOrErr == false then
+        if not okInit then
             self._swkbdOpen = false
-            _trace("[SSH Keyboard] InputCell.openKeyboard failed: " .. tostring(imeOpenedOrErr))
+            _trace("[SSH Keyboard] InputCell.init failed: " .. tostring(initErr))
+            self:_openFallbackInput(opts)
+            return
+        end
+
+        local ok2, inputImeOpenedOrErr = pcall(function()
+            return inputCell:openKeyboard(maxLen)
+        end)
+
+        if (not ok2) or inputImeOpenedOrErr == false then
+            self._swkbdOpen = false
+            _trace("[SSH Keyboard] InputCell.openKeyboard failed: " .. tostring(inputImeOpenedOrErr))
             self:_openFallbackInput(opts)
         else
             _trace("[SSH Keyboard] InputCell.openKeyboard accepted by IME")
@@ -162,48 +192,30 @@ function Keyboard:openSwkbd(opts)
         return
     end
 
-    -- 降级：尝试旧的 brls.Application.openSwkbd
-    local config = {
-        type         = opts.type or "normal",
-        headerText   = opts.header   or "输入命令",
-        subText      = opts.sub      or "",
-        guideText    = opts.guide    or "按 + 确认，按 - 取消",
-        initialText  = opts.initial  or "",
-        maxLength    = opts.maxLen   or 256,
-        cancelable   = true,
-    }
-
-    local ok3, err3 = pcall(function()
-        brls.Application.openSwkbd(config, function(confirmed, inputText)
-            self._swkbdOpen = false
-            if confirmed and inputText and #inputText > 0 then
-                self:_emit(inputText .. "\r")
-            end
-        end)
-    end)
-
-    if not ok3 then
-        self._swkbdOpen = false
-        _trace("[SSH Keyboard] openSwkbd failed: " .. tostring(err3))
-        self:_openFallbackInput(opts)
-    end
+    self._swkbdOpen = false
+    self:_openFallbackInput(opts)
 end
 
--- ── 降级输入框（Desktop 或软键盘不可用时）──────────────────
 function Keyboard:_openFallbackInput(opts)
     opts = opts or {}
-    -- 使用 brls.Dialog + InputCell
-    local dialog = brls.Dialog.new(opts.header or "SSH 输入")
-    -- TODO: 根据实际 Borealis Lua API 调整
-    -- 这里示意弹出一个可编辑输入对话框
-    dialog:addButton("发送", function()
-        local text = dialog:getInputText()
-        if text and #text > 0 then
-            self:_emit(text .. "\r")
-        end
+
+    local okIme, imeOpenedOrErr = pcall(function()
+        return brls.Application.openTextIME(function(inputText)
+            self._swkbdOpen = false
+            if inputText and #inputText > 0 then
+                self:_emit(inputText .. "\r")
+            end
+        end, opts.header or "SSH Input", opts.sub or "", opts.maxLen or 256, opts.initial or "", 0)
     end)
-    dialog:addButton("取消", function() end)
-    dialog:open()
+
+    if okIme and imeOpenedOrErr then
+        return
+    end
+
+    _trace("[SSH Keyboard] fallback IME failed: " .. tostring(imeOpenedOrErr))
+    pcall(function()
+        brls.Application.notify("System keyboard unavailable")
+    end)
 end
 
 -- ============================================================

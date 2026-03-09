@@ -61,6 +61,9 @@ local PADDING_Y   = 10
 local CURSOR_BLINK_RATE = 0.5 -- 秒
 local CURSOR_BLINK_INTERVAL = 500  -- ms
 
+local SWITCH_HINT_TEXT = "A Enter  B Delete  X Ctrl+C  Y EOF  L Tab  R Reconnect  + Keyboard  - Close"
+local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+C interrupt | PageUp/Down history"
+
 -- 默认背景色（几乎纯黑）
 local BG_R, BG_G, BG_B = 12, 12, 12
 
@@ -99,6 +102,11 @@ function TerminalView.new(sshManager)
     -- 日志（用于调试输出）
     self._log            = {}
     self._logEnabled     = false
+    self._lastPolledButtons = {}
+    self._onCloseRequest = nil
+    self._debugButtonsText = "DBG init"
+    self._debugPollText = ""
+    self._debugFrameCount = 0
 
     return self
 end
@@ -119,21 +127,27 @@ function TerminalView:bindView(view)
         end
         
         -- 注册控制器输入
-        view:registerAction("虚拟键盘", brls.ControllerButton.BUTTON_A, function()
-            self._keyboard:openSwkbd()
+        view:registerAction("Enter", brls.ControllerButton.BUTTON_A, function()
+            self:_sendInput(Platform.keyMap.ENTER)
             return true
         end, false)
-        -- Switch: BUTTON_START 对应 + 键
-        view:registerAction("弹出键盘", brls.ControllerButton.BUTTON_START, function()
-            _trace("[TerminalView] START(+) button pressed - opening keyboard")
-            self._keyboard:openSwkbd()
+        view:registerAction("Delete", brls.ControllerButton.BUTTON_B, function()
+            self:_sendInput(Platform.keyMap.BS)
             return true
         end, false)
         view:registerAction("Ctrl+C", brls.ControllerButton.BUTTON_X, function()
-            self:_sendInput("\3")
+            self:_sendInput(Platform.keyMap.CTRL_C)
             return true
         end, false)
-        view:registerAction("断开/重连", brls.ControllerButton.BUTTON_RB, function()
+        view:registerAction("EOF", brls.ControllerButton.BUTTON_Y, function()
+            self:_sendInput(Platform.keyMap.CTRL_D)
+            return true
+        end, false)
+        view:registerAction("Tab", brls.ControllerButton.BUTTON_LB, function()
+            self:_sendInput(Platform.keyMap.TAB)
+            return true
+        end, false)
+        view:registerAction("Reconnect", brls.ControllerButton.BUTTON_RB, function()
             if self._ssh:isConnected() then
                 self._ssh:disconnect()
             else
@@ -141,29 +155,18 @@ function TerminalView:bindView(view)
             end
             return true
         end, false)
-        -- Y 按钮：弹出系统键盘
-        view:registerAction("弹出键盘", brls.ControllerButton.BUTTON_Y, function()
-            _trace("[TerminalView] Y button pressed - opening keyboard")
+        view:registerAction("Keyboard", brls.ControllerButton.BUTTON_START, function()
+            _trace("[TerminalView] START(+) button pressed - opening keyboard")
             self._keyboard:openSwkbd()
             return true
         end, false)
-        -- Switch: BUTTON_BACK 对应 - 键
-        view:registerAction("返回", brls.ControllerButton.BUTTON_BACK, function()
+        view:registerAction("Close", brls.ControllerButton.BUTTON_BACK, function()
             _trace("[TerminalView] BACK(-) button pressed - closing terminal")
             if self._ssh:isConnected() then
                 self._ssh:disconnect()
             end
             return true
         end, false)
-        -- B 按钮：返回并关闭终端
-        view:registerAction("返回", brls.ControllerButton.BUTTON_B, function()
-            _trace("[TerminalView] B button pressed - closing terminal")
-            if self._ssh:isConnected() then
-                self._ssh:disconnect()
-            end
-            return true
-        end, false)
-
         -- 在全局表中注册此视图，方便键盘事件路由
         _G.__SSH_TERMINALS = _G.__SSH_TERMINALS or {}
         local addr = tostring(view:get_address())
@@ -324,7 +327,137 @@ function TerminalView:resize(width, height)
 end
 
 -- ── 帧更新（光标闪烁）────────────────────────────────────────
+local function _pollPressed(button)
+    local pollFn = nil
+
+    if Platform.isSwitch and brls.Application.isSwitchControllerButtonPressed then
+        pollFn = brls.Application.isSwitchControllerButtonPressed
+    elseif brls.Application.isControllerButtonPressed then
+        pollFn = brls.Application.isControllerButtonPressed
+    end
+
+    if not pollFn then
+        return false, "no-button-api"
+    end
+
+    local ok, pressed = pcall(function()
+        return pollFn(button)
+    end)
+
+    if not ok then
+        return false, tostring(pressed)
+    end
+
+    return pressed and true or false, nil
+end
+
+function TerminalView:_pollControllerShortcuts()
+    self._debugFrameCount = self._debugFrameCount + 1
+
+    if not Platform.isSwitch then
+        self._debugButtonsText = "DBG platform=desktop"
+        return
+    end
+
+    if not brls.Application.isSwitchControllerButtonPressed and not brls.Application.isControllerButtonPressed then
+        self._debugButtonsText = "DBG no-button-api"
+        return
+    end
+
+    local B = brls.ControllerButton
+    local watched = {
+        B.BUTTON_A,
+        B.BUTTON_B,
+        B.BUTTON_X,
+        B.BUTTON_Y,
+        B.BUTTON_LB,
+        B.BUTTON_RB,
+        B.BUTTON_START,
+        B.BUTTON_BACK,
+    }
+
+    local current = {}
+    local errors = {}
+    for _, button in ipairs(watched) do
+        local pressed, err = _pollPressed(button)
+        current[button] = pressed
+        if err then
+            table.insert(errors, err)
+        end
+    end
+
+    local pollMode = (Platform.isSwitch and brls.Application.isSwitchControllerButtonPressed) and "raw" or "brls"
+    local rawButtons = brls.Application.getSwitchButtonsDebug and brls.Application.getSwitchButtonsDebug() or "n/a"
+
+    self._debugButtonsText = string.format(
+        "DBG[%s] A=%d B=%d X=%d Y=%d L=%d R=%d +=%d -=%d F=%d RAW=%s",
+        pollMode,
+        current[B.BUTTON_A] and 1 or 0,
+        current[B.BUTTON_B] and 1 or 0,
+        current[B.BUTTON_X] and 1 or 0,
+        current[B.BUTTON_Y] and 1 or 0,
+        current[B.BUTTON_LB] and 1 or 0,
+        current[B.BUTTON_RB] and 1 or 0,
+        current[B.BUTTON_START] and 1 or 0,
+        current[B.BUTTON_BACK] and 1 or 0,
+        self._debugFrameCount,
+        rawButtons)
+    self._debugPollText = (#errors > 0) and ("ERR " .. table.concat(errors, " | ")) or ""
+
+    local function justPressed(button)
+        return current[button] and not self._lastPolledButtons[button]
+    end
+
+    if justPressed(B.BUTTON_A) then
+        _trace("[TerminalView] Polled A -> Enter")
+        self:_sendInput(Platform.keyMap.ENTER)
+    end
+    if justPressed(B.BUTTON_B) then
+        _trace("[TerminalView] Polled B -> Delete")
+        self:_sendInput(Platform.keyMap.BS)
+    end
+    if justPressed(B.BUTTON_X) then
+        _trace("[TerminalView] Polled X -> Ctrl+C")
+        self:_sendInput(Platform.keyMap.CTRL_C)
+    end
+    if justPressed(B.BUTTON_Y) then
+        _trace("[TerminalView] Polled Y -> EOF")
+        self:_sendInput(Platform.keyMap.CTRL_D)
+    end
+    if justPressed(B.BUTTON_LB) then
+        _trace("[TerminalView] Polled L -> Tab")
+        self:_sendInput(Platform.keyMap.TAB)
+    end
+    if justPressed(B.BUTTON_RB) then
+        _trace("[TerminalView] Polled R -> Reconnect")
+        if self._ssh:isConnected() then
+            self._ssh:disconnect()
+        else
+            self._ssh:reconnect()
+        end
+    end
+    if justPressed(B.BUTTON_START) then
+        _trace("[TerminalView] Polled + -> Keyboard")
+        self._keyboard:openSwkbd({
+            header = "SSH Input",
+            guide = "Press + to open keyboard, A to enter, B to delete",
+        })
+    end
+    if justPressed(B.BUTTON_BACK) then
+        _trace("[TerminalView] Polled - -> Close")
+        if self._onCloseRequest then
+            self._onCloseRequest()
+        elseif self._ssh:isConnected() then
+            self._ssh:disconnect()
+        end
+    end
+
+    self._lastPolledButtons = current
+end
+
 function TerminalView:_onFrame(dt)
+    self:_pollControllerShortcuts()
+
     self._blinkTimer = self._blinkTimer + dt
     if self._blinkTimer >= CURSOR_BLINK_INTERVAL then
         self._blinkTimer = self._blinkTimer - CURSOR_BLINK_INTERVAL
@@ -470,28 +603,44 @@ end
 
 -- ── 绘制底部状态栏 ───────────────────────────────────────────
 function TerminalView:_drawStatusBar(vg, x, y, w, h)
-    -- 背景
+    -- ??
     nvgBeginPath(vg)
     nvgRect(vg, x, y, w, h)
     nvgFillColor(vg, nvgRGBA(30, 30, 30, 230))
     nvgFill(vg)
 
-    -- 状态文字
-    nvgFontSize(vg, 11)
     nvgFontFace(vg, "regular")
+
+    -- ????
+    nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     local c = self._statusColor
     nvgFillColor(vg, nvgRGBA(c.r, c.g, c.b, 255))
     nvgText(vg, x + 4, y + h / 2, self._statusText)
 
-    -- 右侧终端尺寸
+    local hintText = Platform.isSwitch and SWITCH_HINT_TEXT or DESKTOP_HINT_TEXT
+    if hintText and hintText ~= "" then
+        nvgFontSize(vg, 10)
+        nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(vg, nvgRGBA(140, 140, 140, 220))
+        nvgText(vg, x + w / 2, y + h / 2 - 5, hintText)
+    end
+
+    if Platform.isSwitch and self._debugButtonsText then
+        nvgFontSize(vg, 9)
+        nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(vg, nvgRGBA(220, 180, 80, 230))
+        nvgText(vg, x + w / 2, y + h / 2 + 5, self._debugButtonsText)
+    end
+
+    -- ??????
+    nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, nvgRGBA(100, 100, 100, 255))
     nvgText(vg, x + w - 4, y + h / 2,
         string.format("%dx%d", self._cols, self._rows))
 end
 
--- ── 绘制滚动指示器 ───────────────────────────────────────────
 function TerminalView:_drawScrollIndicator(vg, x, y, w, h)
     local total = #self._buf.history + self._rows
     if total <= self._rows then return end

@@ -181,7 +181,7 @@ function ConnectionView:_showConnectForm()
     end)
 
     if ok and inputHost then
-        inputHost:init("主机", "192.168.31.132", function(text) end, "192.168.31.132", "IP 或域名", 64)
+        inputHost:init("主机", "192.168.31.43", function(text) end, "192.168.31.43", "IP 或域名", 64)
         dialog:addView(inputHost)
 
         local inputUser = brls.InputCell.new()
@@ -293,11 +293,19 @@ function ConnectionView:_showTerminal()
     self._terminal:bindView(terminalCanvas)
     self._terminal:resize(TERMINAL_PAGE_WIDTH, TERMINAL_PAGE_HEIGHT)
 
+    local terminalFrame = nil
+    pcall(function()
+        terminalFrame = dialog:getAppletFrame()
+        if terminalFrame and terminalFrame.setFooterVisibility then
+            terminalFrame:setFooterVisibility(brls.Visibility.VISIBLE)
+        end
+    end)
+
     local function triggerKeyboard()
         _trace("[SSH] Triggering keyboard via dialog button")
         self._terminal._keyboard:openSwkbd({
-            header = "SSH 输入",
-            guide = "输入命令并确认发送",
+            header = "SSH Input",
+            guide = "Press + to open keyboard, A to enter, B to delete",
         })
     end
 
@@ -310,37 +318,64 @@ function ConnectionView:_showTerminal()
         end
     end
 
-    if Platform.isSwitch then
-        dialog:addButton("键盘", function()
-            triggerKeyboard()
+    self._terminal._onCloseRequest = closeTerminal
+
+    if not Platform.isSwitch then
+        dialog:addButton("Disconnect", function()
+            closeTerminal()
             return true
         end)
     end
 
-    dialog:addButton("断开连接", function()
-        closeTerminal()
-        return true
-    end)
-
     dialog:open()
     _trace("[SSH] Terminal dialog opened")
 
-    -- Switch 下对话框按钮经常会抢焦点，额外在 Dialog 根节点兜底绑定 +/-
-    if Platform.isSwitch then
+    -- Switch: bind actions on the Dialog AppletFrame itself so they win over Dialog defaults
+    if Platform.isSwitch and terminalFrame then
         local ok, err = pcall(function()
-            dialog:registerAction("弹出键盘", brls.ControllerButton.BUTTON_START, function()
-                _trace("[SSH] Dialog START(+) pressed")
+            terminalFrame:registerAction("Enter", brls.ControllerButton.BUTTON_A, function()
+                _trace("[SSH] Frame A pressed")
+                self._terminal:_sendInput(Platform.keyMap.ENTER)
+                return true
+            end)
+            terminalFrame:registerAction("Delete", brls.ControllerButton.BUTTON_B, function()
+                _trace("[SSH] Frame B pressed")
+                self._terminal:_sendInput(Platform.keyMap.BS)
+                return true
+            end)
+            terminalFrame:registerAction("Ctrl+C", brls.ControllerButton.BUTTON_X, function()
+                self._terminal:_sendInput(Platform.keyMap.CTRL_C)
+                return true
+            end)
+            terminalFrame:registerAction("EOF", brls.ControllerButton.BUTTON_Y, function()
+                self._terminal:_sendInput(Platform.keyMap.CTRL_D)
+                return true
+            end)
+            terminalFrame:registerAction("Tab", brls.ControllerButton.BUTTON_LB, function()
+                self._terminal:_sendInput(Platform.keyMap.TAB)
+                return true
+            end)
+            terminalFrame:registerAction("Reconnect", brls.ControllerButton.BUTTON_RB, function()
+                if self._ssh:isConnected() then
+                    self._ssh:disconnect()
+                else
+                    self._ssh:reconnect()
+                end
+                return true
+            end)
+            terminalFrame:registerAction("Keyboard", brls.ControllerButton.BUTTON_START, function()
+                _trace("[SSH] Frame START(+) pressed")
                 triggerKeyboard()
                 return true
             end)
-            dialog:registerAction("返回", brls.ControllerButton.BUTTON_BACK, function()
-                _trace("[SSH] Dialog BACK(-) pressed")
+            terminalFrame:registerAction("Close", brls.ControllerButton.BUTTON_BACK, function()
+                _trace("[SSH] Frame BACK(-) pressed")
                 closeTerminal()
                 return true
             end)
         end)
         if not ok then
-            _trace("[SSH] Dialog action bind failed: " .. tostring(err))
+            _trace("[SSH] Frame action bind failed: " .. tostring(err))
         end
     end
 
