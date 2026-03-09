@@ -36,7 +36,6 @@ local function init()
     local openTextIMELog = "[SSH Module] brls.Application.openTextIME type=" .. type(openTextIMEValue) .. ", value=" .. tostring(openTextIMEValue)
     local getControllerStateLog = "[SSH Module] brls.Application.getControllerState type=" .. type(getControllerStateValue) .. ", value=" .. tostring(getControllerStateValue)
     local debugPath = (DebugLog and DebugLog.path and DebugLog.path()) or "unknown"
-    local debugSummary = "IME=" .. type(openTextIMEValue) .. "  Pad=" .. type(getControllerStateValue) .. "  Log=" .. tostring(debugPath)
     print(openTextIMELog)
     print(getControllerStateLog)
     print("[SSH Module] debug log path=" .. tostring(debugPath))
@@ -47,18 +46,6 @@ local function init()
             DebugLog.append("[SSH Module] debug log path=" .. tostring(debugPath))
         end)
     end
-    pcall(function()
-        brls.Application.notify(debugSummary)
-    end)
-    pcall(function()
-        local dlgText = "SSH Debug" .. "\n\n"
-            .. openTextIMELog .. "\n"
-            .. getControllerStateLog .. "\n"
-            .. "Log: " .. tostring(debugPath)
-        local dlg = brls.Dialog.new(dlgText)
-        dlg:addButton("OK", function() end)
-        dlg:open()
-    end)
 
     -- 验证 SSH 绑定是否可用
     if not brls.SSH then

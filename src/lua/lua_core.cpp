@@ -78,7 +78,7 @@ static uint64_t map_controller_button_to_switch_mask(int button)
         case brls::BUTTON_LSB:
             return HidNpadButton_StickL;
         case brls::BUTTON_RSB:
-            return HidNpadButton_StickR;
+            return HidNpadButton_StickR | HidNpadButton_R;
         case brls::BUTTON_UP:
         case brls::BUTTON_NAV_UP:
             return HidNpadButton_Up;

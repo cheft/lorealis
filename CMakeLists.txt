@@ -297,11 +297,17 @@ else()
     else()
         # 获取并构建 mbedTLS（CMake 原生支持，比 OpenSSL 更易构建）
         message(STATUS "--- SSH: Fetching and building mbedTLS ---")
+        set(MBEDTLS_FETCH_DIR "${FETCHCONTENT_BASE_DIR}/mbedtls_v2_28_4")
         FetchContent_Declare(
             mbedtls_src
             GIT_REPOSITORY "https://github.com/Mbed-TLS/mbedtls.git"
             GIT_TAG "v2.28.4"  # LTS 版本，稳定兼容
             GIT_SHALLOW TRUE
+            GIT_PROGRESS TRUE
+            UPDATE_DISCONNECTED TRUE
+            SOURCE_DIR "${MBEDTLS_FETCH_DIR}/src"
+            BINARY_DIR "${MBEDTLS_FETCH_DIR}/build"
+            SUBBUILD_DIR "${MBEDTLS_FETCH_DIR}/subbuild"
         )
         # 为 mbedTLS 设置兼容性策略（它使用旧版 CMake 语法）
         set(CMAKE_POLICY_VERSION_MINIMUM 3.5)

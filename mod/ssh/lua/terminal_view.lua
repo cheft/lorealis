@@ -61,38 +61,98 @@ local PADDING_Y   = 10
 local CURSOR_BLINK_RATE = 0.5 -- 秒
 local CURSOR_BLINK_INTERVAL = 500  -- ms
 
-local SWITCH_HINT_TEXT = "A Enter  B Delete  X Ctrl+C  Y EOF  L Tab  R Reconnect  + Keyboard  - Close"
+local SWITCH_HINT_TEXT = "DPad Arrows  A Enter  B BS  L Tab  + IME  R3 Keyboard  - Close"
 local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+C interrupt | PageUp/Down history"
 
-local OVERLAY_HINT_TEXT = "D-Pad Move  A Type  B Backspace  X Page  Y Space  L Tab  R Enter  + IME  - Hide"
+local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter key submit  + IME  R3 Hide"
 
-local OVERLAY_LAYOUTS = {
+local function _key(label, opts)
+    opts = opts or {}
+    opts.label = label
+    opts.width = opts.width or 1
+    return opts
+end
+
+local OVERLAY_QUICK_COMMANDS = { "ls", "cd", "pwd", "clear" }
+local OVERLAY_QUICK_SYMBOLS = { "~", "$", "*", "|", "&&" }
+local OVERLAY_COMMON_COMMANDS = {
+    "ls", "cd", "pwd", "clear", "cat", "echo", "mkdir", "rm", "cp", "mv",
+    "touch", "grep", "find", "git", "top", "htop", "vim", "nano", "ssh", "scp",
+}
+
+local OVERLAY_LAYOUT = {
     {
-        name = "abc",
-        rows = {
-            { "q", "w", "e", "r", "t", "y", "u", "i", "o", "p" },
-            { "a", "s", "d", "f", "g", "h", "j", "k", "l", "/" },
-            { "z", "x", "c", "v", "b", "n", "m", ".", "-", "_" },
-            { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
-        },
+        _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1.25 }),
+        _key("1", { action = "char", base = "1", shift = "!" }),
+        _key("2", { action = "char", base = "2", shift = "@" }),
+        _key("3", { action = "char", base = "3", shift = "#" }),
+        _key("4", { action = "char", base = "4", shift = "$" }),
+        _key("5", { action = "char", base = "5", shift = "%" }),
+        _key("6", { action = "char", base = "6", shift = "^" }),
+        _key("7", { action = "char", base = "7", shift = "&" }),
+        _key("8", { action = "char", base = "8", shift = "*" }),
+        _key("9", { action = "char", base = "9", shift = "(" }),
+        _key("0", { action = "char", base = "0", shift = ")" }),
+        _key("-", { action = "char", base = "-", shift = "_" }),
+        _key("=", { action = "char", base = "=", shift = "+" }),
+        _key("BS", { action = "backspace", width = 1.75 }),
     },
     {
-        name = "ABC",
-        rows = {
-            { "Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P" },
-            { "A", "S", "D", "F", "G", "H", "J", "K", "L", "/" },
-            { "Z", "X", "C", "V", "B", "N", "M", ".", "-", "_" },
-            { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
-        },
+        _key("Tab", { action = "tab", width = 1.6 }),
+        _key("q", { action = "char", base = "q", letter = true }),
+        _key("w", { action = "char", base = "w", letter = true }),
+        _key("e", { action = "char", base = "e", letter = true }),
+        _key("r", { action = "char", base = "r", letter = true }),
+        _key("t", { action = "char", base = "t", letter = true }),
+        _key("y", { action = "char", base = "y", letter = true }),
+        _key("u", { action = "char", base = "u", letter = true }),
+        _key("i", { action = "char", base = "i", letter = true }),
+        _key("o", { action = "char", base = "o", letter = true }),
+        _key("p", { action = "char", base = "p", letter = true }),
+        _key("[", { action = "char", base = "[", shift = "{" }),
+        _key("]", { action = "char", base = "]", shift = "}" }),
+        _key("\\", { action = "char", base = "\\", shift = "|", width = 1.35 }),
     },
     {
-        name = "sym",
-        rows = {
-            { "!", "@", "#", "$", "%", "^", "&", "*", "(", ")" },
-            { "[", "]", "{", "}", "<", ">", "/", "\\", "|", ":" },
-            { ";", '"', "'", ",", ".", "?", "+", "=", "~", "`" },
-            { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" },
-        },
+        _key("Caps", { action = "caps", width = 1.95 }),
+        _key("a", { action = "char", base = "a", letter = true }),
+        _key("s", { action = "char", base = "s", letter = true }),
+        _key("d", { action = "char", base = "d", letter = true }),
+        _key("f", { action = "char", base = "f", letter = true }),
+        _key("g", { action = "char", base = "g", letter = true }),
+        _key("h", { action = "char", base = "h", letter = true }),
+        _key("j", { action = "char", base = "j", letter = true }),
+        _key("k", { action = "char", base = "k", letter = true }),
+        _key("l", { action = "char", base = "l", letter = true }),
+        _key(";", { action = "char", base = ";", shift = ":" }),
+        _key("'", { action = "char", base = "'", shift = '"' }),
+        _key("Enter", { action = "enter", width = 2.15 }),
+    },
+    {
+        _key("Shift", { action = "shift", width = 2.3 }),
+        _key("z", { action = "char", base = "z", letter = true }),
+        _key("x", { action = "char", base = "x", letter = true }),
+        _key("c", { action = "char", base = "c", letter = true }),
+        _key("v", { action = "char", base = "v", letter = true }),
+        _key("b", { action = "char", base = "b", letter = true }),
+        _key("n", { action = "char", base = "n", letter = true }),
+        _key("m", { action = "char", base = "m", letter = true }),
+        _key(",", { action = "char", base = ",", shift = "<" }),
+        _key(".", { action = "char", base = ".", shift = ">" }),
+        _key("/", { action = "char", base = "/", shift = "?" }),
+        _key("`", { action = "char", base = "`", shift = "~", width = 1.35 }),
+    },
+    {
+        _key("Ctrl", { action = "ctrl", width = 1.4 }),
+        _key("Alt", { action = "alt", width = 1.4 }),
+        _key("Space", { action = "space", width = 4.9 }),
+        _key("←", { action = "send", value = Platform.keyMap.LEFT, width = 1.2 }),
+        _key("↓", { action = "send", value = Platform.keyMap.DOWN, width = 1.2 }),
+        _key("↑", { action = "send", value = Platform.keyMap.UP, width = 1.2 }),
+        _key("→", { action = "send", value = Platform.keyMap.RIGHT, width = 1.2 }),
+        _key("Tab", { action = "tab", width = 1.2 }),
+        _key("&&", { action = "text", value = "&&", width = 1.3 }),
+        _key("|", { action = "text", value = "|", width = 1.0 }),
     },
 }
 
@@ -140,10 +200,15 @@ function TerminalView.new(sshManager)
     self._debugPollText = ""
     self._debugFrameCount = 0
     self._overlayKeyboardVisible = false
-    self._overlayKeyboardPage = 1
-    self._overlayKeyboardRow = 1
-    self._overlayKeyboardCol = 1
     self._overlayBuffer = ""
+    self._overlayShift = false
+    self._overlayCaps = false
+    self._overlayCtrl = false
+    self._overlayAlt = false
+    self._overlayTouchTargets = {}
+    self._overlayPanelRect = nil
+    self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
+    self._overlayRecentCommands = {}
 
     return self
 end
@@ -163,47 +228,39 @@ function TerminalView:bindView(view)
             view:setFocusable(true)
         end
         
-        -- 注册控制器输入
-        view:registerAction("Enter", brls.ControllerButton.BUTTON_A, function()
-            self:_sendInput(Platform.keyMap.ENTER)
-            return true
-        end, false)
-        view:registerAction("Delete", brls.ControllerButton.BUTTON_B, function()
-            self:_sendInput(Platform.keyMap.BS)
-            return true
-        end, false)
-        view:registerAction("Ctrl+C", brls.ControllerButton.BUTTON_X, function()
-            self:_sendInput(Platform.keyMap.CTRL_C)
-            return true
-        end, false)
-        view:registerAction("EOF", brls.ControllerButton.BUTTON_Y, function()
-            self:_sendInput(Platform.keyMap.CTRL_D)
-            return true
-        end, false)
-        view:registerAction("Tab", brls.ControllerButton.BUTTON_LB, function()
-            self:_sendInput(Platform.keyMap.TAB)
-            return true
-        end, false)
-        view:registerAction("Reconnect", brls.ControllerButton.BUTTON_RB, function()
-            if self._ssh:isConnected() then
-                self._ssh:disconnect()
-            else
-                self._ssh:reconnect()
-            end
-            return true
-        end, false)
-        view:registerAction("Keyboard", brls.ControllerButton.BUTTON_START, function()
-            _trace("[TerminalView] START(+) button pressed - opening keyboard")
-            self._keyboard:openSwkbd()
-            return true
-        end, false)
-        view:registerAction("Close", brls.ControllerButton.BUTTON_BACK, function()
-            _trace("[TerminalView] BACK(-) button pressed - closing terminal")
-            if self._ssh:isConnected() then
-                self._ssh:disconnect()
-            end
-            return true
-        end, false)
+        -- Switch 上统一使用原始轮询，避免和 Dialog/AppletFrame action 链重复触发。
+        if not Platform.isSwitch then
+            view:registerAction("Enter", brls.ControllerButton.BUTTON_A, function()
+                self:_sendInput(Platform.keyMap.ENTER)
+                return true
+            end, false)
+            view:registerAction("Delete", brls.ControllerButton.BUTTON_B, function()
+                self:_sendInput(Platform.keyMap.BS)
+                return true
+            end, false)
+            view:registerAction("Ctrl+C", brls.ControllerButton.BUTTON_X, function()
+                self:_sendInput(Platform.keyMap.CTRL_C)
+                return true
+            end, false)
+            view:registerAction("EOF", brls.ControllerButton.BUTTON_Y, function()
+                self:_sendInput(Platform.keyMap.CTRL_D)
+                return true
+            end, false)
+            view:registerAction("Tab", brls.ControllerButton.BUTTON_LB, function()
+                self:_sendInput(Platform.keyMap.TAB)
+                return true
+            end, false)
+            view:registerAction("System IME", brls.ControllerButton.BUTTON_START, function()
+                self:_openSystemIme()
+                return true
+            end, false)
+            view:registerAction("Close", brls.ControllerButton.BUTTON_BACK, function()
+                if self._ssh:isConnected() then
+                    self._ssh:disconnect()
+                end
+                return true
+            end, false)
+        end
         -- 在全局表中注册此视图，方便键盘事件路由
         _G.__SSH_TERMINALS = _G.__SSH_TERMINALS or {}
         local addr = tostring(view:get_address())
@@ -235,23 +292,25 @@ function TerminalView:bindView(view)
             end)
         end
 
-        -- -- 注册鼠标/触摸事件（滚动与选择）
-        -- view:onPointerDown(function(event)
-        --     return self:_onPointerDown(event)
-        -- end)
-        -- view:onPointerMove(function(event)
-        --     return self:_onPointerMove(event)
-        -- end)
-        -- view:onPointerUp(function(event)
-        --     return self:_onPointerUp(event)
-        -- end)
-        -- view:onScroll(function(event)
-        --     if event.y ~= 0 then
-        --         if event.y > 0 then self:scrollUp(3) else self:scrollDown(3) end
-        --         return true
-        --     end
-        --     return false
-        -- end)
+        view:onPointerDown(function(event)
+            return self:_onPointerDown(event)
+        end)
+        view:onPointerMove(function(event)
+            return self:_onPointerMove(event)
+        end)
+        view:onPointerUp(function(event)
+            return self:_onPointerUp(event)
+        end)
+        view:onScroll(function(event)
+            if self._overlayKeyboardVisible and self:_isPointInOverlay(event.x, event.y) then
+                return true
+            end
+            if event.y ~= 0 then
+                if event.y > 0 then self:scrollUp(3) else self:scrollDown(3) end
+                return true
+            end
+            return false
+        end)
     end
 end
 
@@ -363,43 +422,33 @@ function TerminalView:resize(width, height)
     end
 end
 
-function TerminalView:_getOverlayLayout()
-    return OVERLAY_LAYOUTS[self._overlayKeyboardPage] or OVERLAY_LAYOUTS[1]
+local function _overlayTrim(text)
+    return (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
-function TerminalView:_clampOverlaySelection()
-    local layout = self:_getOverlayLayout()
-    local rows = layout.rows
-    if self._overlayKeyboardRow < 1 then self._overlayKeyboardRow = 1 end
-    if self._overlayKeyboardRow > #rows then self._overlayKeyboardRow = #rows end
-
-    local cols = #(rows[self._overlayKeyboardRow] or {})
-    if cols < 1 then cols = 1 end
-    if self._overlayKeyboardCol < 1 then self._overlayKeyboardCol = 1 end
-    if self._overlayKeyboardCol > cols then self._overlayKeyboardCol = cols end
-end
-
-function TerminalView:_moveOverlaySelection(dx, dy)
-    self._overlayKeyboardRow = self._overlayKeyboardRow + dy
-    self._overlayKeyboardCol = self._overlayKeyboardCol + dx
-    self:_clampOverlaySelection()
-    self:_invalidate()
-end
-
-function TerminalView:_cycleOverlayPage()
-    self._overlayKeyboardPage = self._overlayKeyboardPage + 1
-    if self._overlayKeyboardPage > #OVERLAY_LAYOUTS then
-        self._overlayKeyboardPage = 1
+function TerminalView:_clearOverlayModifiers(clearCaps)
+    self._overlayShift = false
+    self._overlayCtrl = false
+    self._overlayAlt = false
+    if clearCaps then
+        self._overlayCaps = false
     end
-    self:_clampOverlaySelection()
-    self:_invalidate()
 end
 
-function TerminalView:_getOverlaySelectedKey()
-    local layout = self:_getOverlayLayout()
-    local row = layout.rows[self._overlayKeyboardRow]
-    if not row then return nil end
-    return row[self._overlayKeyboardCol]
+function TerminalView:_rememberCommand(command)
+    command = _overlayTrim(command)
+    if command == "" then return end
+
+    local nextRecent = { command }
+    for _, item in ipairs(self._overlayRecentCommands) do
+        if item ~= command then
+            table.insert(nextRecent, item)
+        end
+        if #nextRecent >= 8 then
+            break
+        end
+    end
+    self._overlayRecentCommands = nextRecent
 end
 
 function TerminalView:_appendOverlayText(text)
@@ -409,17 +458,58 @@ function TerminalView:_appendOverlayText(text)
     self:_invalidate()
 end
 
+function TerminalView:_applyOverlayModifiers(text)
+    local out = text or ""
+
+    if self._overlayCtrl and #out == 1 then
+        local byte = string.byte(string.upper(out))
+        if byte and byte >= 65 and byte <= 90 then
+            out = string.char(byte - 64)
+        end
+    end
+
+    if self._overlayAlt then
+        out = Platform.keyMap.ESC .. out
+    end
+
+    self._overlayShift = false
+    self._overlayCtrl = false
+    self._overlayAlt = false
+    return out
+end
+
+function TerminalView:_resolveOverlayChar(key)
+    if key.letter then
+        local useUpper = (self._overlayCaps and not self._overlayShift) or (self._overlayShift and not self._overlayCaps)
+        return useUpper and string.upper(key.base) or string.lower(key.base)
+    end
+
+    if self._overlayShift and key.shift then
+        return key.shift
+    end
+
+    return key.base or key.value or key.label
+end
+
 function TerminalView:_backspaceOverlayBuffer()
     self:_sendInput(Platform.keyMap.BS)
     if #self._overlayBuffer > 0 then
         self._overlayBuffer = string.sub(self._overlayBuffer, 1, #self._overlayBuffer - 1)
     end
+    self._overlayShift = false
+    self._overlayCtrl = false
+    self._overlayAlt = false
     self:_invalidate()
 end
 
 function TerminalView:_submitOverlayBuffer()
+    local command = _overlayTrim(self._overlayBuffer)
+    if command ~= "" then
+        self:_rememberCommand(command)
+    end
     self:_sendInput(Platform.keyMap.ENTER)
     self._overlayBuffer = ""
+    self:_clearOverlayModifiers(false)
     self:_invalidate()
 end
 
@@ -430,17 +520,119 @@ function TerminalView:_syncOverlayBuffer(text)
         self:_sendInput(text)
     end
     self._overlayBuffer = text
+    self:_clearOverlayModifiers(false)
     self:_invalidate()
 end
 
-function TerminalView:_openOverlayIme()
+function TerminalView:_activateOverlayKey(key)
+    if not key then return end
+    self._overlaySelectedKey = key
+
+    if key.action == "char" then
+        self:_appendOverlayText(self:_applyOverlayModifiers(self:_resolveOverlayChar(key)))
+    elseif key.action == "text" then
+        self:_appendOverlayText(self:_applyOverlayModifiers(key.value or key.label))
+    elseif key.action == "space" then
+        self:_appendOverlayText(self:_applyOverlayModifiers(" "))
+    elseif key.action == "send" then
+        self:_sendInput(self:_applyOverlayModifiers(key.value or ""))
+        self:_invalidate()
+    elseif key.action == "tab" then
+        self:_sendInput(Platform.keyMap.TAB)
+        self:_clearOverlayModifiers(false)
+        self:_invalidate()
+    elseif key.action == "enter" then
+        self:_submitOverlayBuffer()
+    elseif key.action == "backspace" then
+        self:_backspaceOverlayBuffer()
+    elseif key.action == "shift" then
+        self._overlayShift = not self._overlayShift
+        self:_invalidate()
+    elseif key.action == "caps" then
+        self._overlayCaps = not self._overlayCaps
+        self:_invalidate()
+    elseif key.action == "ctrl" then
+        self._overlayCtrl = not self._overlayCtrl
+        self:_invalidate()
+    elseif key.action == "alt" then
+        self._overlayAlt = not self._overlayAlt
+        self:_invalidate()
+    end
+end
+
+function TerminalView:_collectOverlaySuggestions()
+    local items = {}
+    local seen = {}
+
+    local function addItem(text, mode)
+        if not text or text == "" or seen[text] then return end
+        seen[text] = true
+        table.insert(items, { text = text, mode = mode or "text" })
+    end
+
+    for _, cmd in ipairs(OVERLAY_QUICK_COMMANDS) do
+        addItem(cmd, "replace")
+    end
+    for _, sym in ipairs(OVERLAY_QUICK_SYMBOLS) do
+        addItem(sym, "text")
+    end
+
+    local prefix = self._overlayBuffer:match("([%w%._%-/]*)$") or ""
+    local lowerPrefix = string.lower(prefix)
+
+    if lowerPrefix ~= "" then
+        for _, cmd in ipairs(self._overlayRecentCommands) do
+            if string.sub(string.lower(cmd), 1, #lowerPrefix) == lowerPrefix then
+                addItem(cmd, "replace")
+            end
+        end
+        for _, cmd in ipairs(OVERLAY_COMMON_COMMANDS) do
+            if string.sub(string.lower(cmd), 1, #lowerPrefix) == lowerPrefix then
+                addItem(cmd, "replace")
+            end
+        end
+    else
+        for _, cmd in ipairs(self._overlayRecentCommands) do
+            addItem(cmd, "replace")
+        end
+    end
+
+    local limited = {}
+    for i, item in ipairs(items) do
+        limited[i] = item
+        if i >= 12 then break end
+    end
+    return limited
+end
+
+function TerminalView:_applySuggestion(item)
+    if not item then return end
+    if item.mode == "replace" then
+        self:_syncOverlayBuffer(item.text)
+    else
+        self:_appendOverlayText(item.text)
+    end
+end
+
+function TerminalView:_openSystemIme()
+    local editingOverlay = self._overlayKeyboardVisible
     self._keyboard:openSwkbd({
-        header = "SSH Command",
-        guide = "Edit current command buffer",
+        header = editingOverlay and "SSH Command" or "SSH Input",
+        guide = editingOverlay and "Edit current command buffer" or "Input a full command",
         initial = self._overlayBuffer,
         maxLen = 256,
         onSubmit = function(inputText)
-            self:_syncOverlayBuffer(inputText or "")
+            local text = inputText or ""
+            if editingOverlay then
+                self:_syncOverlayBuffer(text)
+            else
+                self._overlayBuffer = text
+                if _overlayTrim(text) ~= "" then
+                    self:_submitOverlayBuffer()
+                else
+                    self:_invalidate()
+                end
+            end
         end,
     })
 end
@@ -448,46 +640,46 @@ end
 function TerminalView:_handleOverlayActions(justPressed)
     local B = brls.ControllerButton
 
-    if justPressed(B.BUTTON_UP) then
-        self:_moveOverlaySelection(0, -1)
-    end
-    if justPressed(B.BUTTON_DOWN) then
-        self:_moveOverlaySelection(0, 1)
-    end
-    if justPressed(B.BUTTON_LEFT) then
-        self:_moveOverlaySelection(-1, 0)
-    end
-    if justPressed(B.BUTTON_RIGHT) then
-        self:_moveOverlaySelection(1, 0)
-    end
     if justPressed(B.BUTTON_A) then
-        local key = self:_getOverlaySelectedKey()
-        if key then
-            self:_appendOverlayText(key)
-        end
+        self:_activateOverlayKey(self._overlaySelectedKey)
     end
     if justPressed(B.BUTTON_B) then
         self:_backspaceOverlayBuffer()
     end
     if justPressed(B.BUTTON_X) then
-        self:_cycleOverlayPage()
+        self._overlayShift = not self._overlayShift
+        self:_invalidate()
     end
     if justPressed(B.BUTTON_Y) then
-        self:_appendOverlayText(" ")
+        self:_appendOverlayText(self:_applyOverlayModifiers(" "))
     end
     if justPressed(B.BUTTON_LB) then
         self:_sendInput(Platform.keyMap.TAB)
-    end
-    if justPressed(B.BUTTON_RB) then
-        self:_submitOverlayBuffer()
+        self:_clearOverlayModifiers(false)
     end
     if justPressed(B.BUTTON_START) then
-        self:_openOverlayIme()
+        self:_openSystemIme()
     end
-    if justPressed(B.BUTTON_BACK) then
+    if justPressed(B.BUTTON_RSB) or justPressed(B.BUTTON_RB) then
         self._overlayKeyboardVisible = false
         self:_invalidate()
     end
+end
+
+function TerminalView:_isPointInOverlay(absX, absY)
+    local rect = self._overlayPanelRect
+    if not rect then return false end
+    return absX >= rect.x and absX <= rect.x + rect.w and absY >= rect.y and absY <= rect.y + rect.h
+end
+
+function TerminalView:_hitOverlayTarget(absX, absY)
+    for i = #self._overlayTouchTargets, 1, -1 do
+        local target = self._overlayTouchTargets[i]
+        if absX >= target.x and absX <= target.x + target.w and absY >= target.y and absY <= target.y + target.h then
+            return target
+        end
+    end
+    return nil
 end
 
 -- ── 帧更新（光标闪烁）────────────────────────────────────────
@@ -536,6 +728,7 @@ function TerminalView:_pollControllerShortcuts()
         B.BUTTON_Y,
         B.BUTTON_LB,
         B.BUTTON_RB,
+        B.BUTTON_RSB,
         B.BUTTON_UP,
         B.BUTTON_DOWN,
         B.BUTTON_LEFT,
@@ -558,7 +751,7 @@ function TerminalView:_pollControllerShortcuts()
     local rawButtons = brls.Application.getSwitchButtonsDebug and brls.Application.getSwitchButtonsDebug() or "n/a"
 
     self._debugButtonsText = string.format(
-        "DBG[%s] A=%d B=%d X=%d Y=%d L=%d R=%d +=%d -=%d F=%d RAW=%s",
+        "DBG[%s] A=%d B=%d X=%d Y=%d L=%d R=%d R3=%d +=%d -=%d F=%d RAW=%s",
         pollMode,
         current[B.BUTTON_A] and 1 or 0,
         current[B.BUTTON_B] and 1 or 0,
@@ -566,6 +759,7 @@ function TerminalView:_pollControllerShortcuts()
         current[B.BUTTON_Y] and 1 or 0,
         current[B.BUTTON_LB] and 1 or 0,
         current[B.BUTTON_RB] and 1 or 0,
+        current[B.BUTTON_RSB] and 1 or 0,
         current[B.BUTTON_START] and 1 or 0,
         current[B.BUTTON_BACK] and 1 or 0,
         self._debugFrameCount,
@@ -574,6 +768,19 @@ function TerminalView:_pollControllerShortcuts()
 
     local function justPressed(button)
         return current[button] and not self._lastPolledButtons[button]
+    end
+
+    if justPressed(B.BUTTON_UP) then
+        self:_sendInput(Platform.keyMap.UP)
+    end
+    if justPressed(B.BUTTON_DOWN) then
+        self:_sendInput(Platform.keyMap.DOWN)
+    end
+    if justPressed(B.BUTTON_LEFT) then
+        self:_sendInput(Platform.keyMap.LEFT)
+    end
+    if justPressed(B.BUTTON_RIGHT) then
+        self:_sendInput(Platform.keyMap.RIGHT)
     end
 
     if self._overlayKeyboardVisible then
@@ -602,18 +809,14 @@ function TerminalView:_pollControllerShortcuts()
         _trace("[TerminalView] Polled L -> Tab")
         self:_sendInput(Platform.keyMap.TAB)
     end
-    if justPressed(B.BUTTON_RB) then
-        _trace("[TerminalView] Polled R -> Reconnect")
-        if self._ssh:isConnected() then
-            self._ssh:disconnect()
-        else
-            self._ssh:reconnect()
-        end
+    if justPressed(B.BUTTON_RSB) or justPressed(B.BUTTON_RB) then
+        _trace("[TerminalView] Polled R3 -> Overlay Keyboard")
+        self._overlayKeyboardVisible = not self._overlayKeyboardVisible
+        self:_invalidate()
     end
     if justPressed(B.BUTTON_START) then
-        _trace("[TerminalView] Polled + -> Overlay Keyboard")
-        self._overlayKeyboardVisible = true
-        self:_invalidate()
+        _trace("[TerminalView] Polled + -> System IME")
+        self:_openSystemIme()
     end
     if justPressed(B.BUTTON_BACK) then
         _trace("[TerminalView] Polled - -> Close")
@@ -628,72 +831,128 @@ function TerminalView:_pollControllerShortcuts()
 end
 
 function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
-    local panelH = 180
+    local panelH = math.floor(h * 0.4)
+    if panelH < 250 then panelH = 250 end
     local panelY = y + h - 20 - panelH - 8
-    local panelX = x + 18
-    local panelW = w - 36
-    local headerH = 34
-    local layout = self:_getOverlayLayout()
-    local rows = layout.rows
-    local maxCols = 10
-    local cellGap = 8
-    local cellH = 24
-    local gridTop = panelY + headerH + 12
-    local availableW = panelW - 24
-    local cellW = math.floor((availableW - cellGap * (maxCols - 1)) / maxCols)
+    local panelX = x + 12
+    local panelW = w - 24
+    local headerH = 30
+    local chipsH = 28
+    local footerH = 18
+    local rowGap = 6
+    local keyGap = 5
+    local rows = OVERLAY_LAYOUT
+    local rowAreaH = panelH - headerH - chipsH - footerH - 28
+    local keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
+    if keyH < 28 then keyH = 28 end
+
+    self._overlayTouchTargets = {}
+    self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
 
     nvgBeginPath(vg)
     nvgRoundedRect(vg, panelX, panelY, panelW, panelH, 14)
-    nvgFillColor(vg, nvgRGBA(20, 20, 24, 235))
-    nvgFill(vg)
-
-    nvgBeginPath(vg)
-    nvgRoundedRect(vg, panelX + 10, panelY + 8, panelW - 20, 24, 8)
-    nvgFillColor(vg, nvgRGBA(42, 42, 50, 255))
+    nvgFillColor(vg, nvgRGBA(18, 18, 22, 242))
     nvgFill(vg)
 
     local preview = self._overlayBuffer
     if preview == "" then preview = "_" end
-    if #preview > 72 then
-        preview = "..." .. string.sub(preview, -72)
+    if #preview > 110 then
+        preview = "..." .. string.sub(preview, -110)
     end
 
     nvgFontFace(vg, "regular")
     nvgFontSize(vg, 12)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
-    nvgFillColor(vg, nvgRGBA(240, 240, 240, 255))
-    nvgText(vg, panelX + 16, panelY + 20, "CMD> " .. preview)
+    nvgFillColor(vg, nvgRGBA(245, 245, 245, 255))
+    nvgText(vg, panelX + 14, panelY + headerH / 2, "CMD> " .. preview)
 
+    local modeText = string.format("Shift:%s Caps:%s Ctrl:%s Alt:%s", self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0")
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, nvgRGBA(120, 180, 255, 255))
-    nvgText(vg, panelX + panelW - 16, panelY + 20, "Page: " .. layout.name)
+    nvgText(vg, panelX + panelW - 14, panelY + headerH / 2, modeText)
 
-    for rowIndex, row in ipairs(rows) do
-        for colIndex, key in ipairs(row) do
-            local cellX = panelX + 12 + (colIndex - 1) * (cellW + cellGap)
-            local cellY = gridTop + (rowIndex - 1) * (cellH + 8)
-            local selected = (rowIndex == self._overlayKeyboardRow and colIndex == self._overlayKeyboardCol)
+    local suggestions = self:_collectOverlaySuggestions()
+    local chipX = panelX + 12
+    local chipY = panelY + headerH + 6
+    for _, item in ipairs(suggestions) do
+        local label = item.text
+        local chipW = math.min(panelW * 0.22, math.max(42, 18 + #label * 8))
+        if chipX + chipW > panelX + panelW - 12 then
+            break
+        end
+
+        nvgBeginPath(vg)
+        nvgRoundedRect(vg, chipX, chipY, chipW, chipsH - 6, 8)
+        nvgFillColor(vg, nvgRGBA(48, 58, 76, 230))
+        nvgFill(vg)
+
+        nvgFontSize(vg, 11)
+        nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+        nvgFillColor(vg, nvgRGBA(235, 235, 235, 255))
+        nvgText(vg, chipX + chipW / 2, chipY + (chipsH - 6) / 2, label)
+
+        table.insert(self._overlayTouchTargets, {
+            x = chipX, y = chipY, w = chipW, h = chipsH - 6,
+            type = "suggestion", item = item,
+        })
+
+        chipX = chipX + chipW + 6
+    end
+
+    local rowY = panelY + headerH + chipsH + 10
+    local contentW = panelW - 24
+    for _, row in ipairs(rows) do
+        local units = 0
+        for _, key in ipairs(row) do
+            units = units + (key.width or 1)
+        end
+        local keyUnitW = (contentW - keyGap * (#row - 1)) / units
+        local keyX = panelX + 12
+
+        for _, key in ipairs(row) do
+            local keyW = keyUnitW * (key.width or 1)
+            local selected = (self._overlaySelectedKey == key)
+            local active = (key.action == "shift" and self._overlayShift)
+                or (key.action == "caps" and self._overlayCaps)
+                or (key.action == "ctrl" and self._overlayCtrl)
+                or (key.action == "alt" and self._overlayAlt)
 
             nvgBeginPath(vg)
-            nvgRoundedRect(vg, cellX, cellY, cellW, cellH, 7)
-            if selected then
-                nvgFillColor(vg, nvgRGBA(90, 140, 255, 230))
+            nvgRoundedRect(vg, keyX, rowY, keyW, keyH, 7)
+            if active then
+                nvgFillColor(vg, nvgRGBA(76, 120, 235, 240))
+            elseif selected then
+                nvgFillColor(vg, nvgRGBA(88, 100, 125, 235))
             else
-                nvgFillColor(vg, nvgRGBA(55, 55, 64, 220))
+                nvgFillColor(vg, nvgRGBA(54, 54, 62, 228))
             end
             nvgFill(vg)
 
-            nvgFontSize(vg, 13)
+            local label = key.label
+            if key.action == "char" then
+                label = self:_resolveOverlayChar(key)
+            end
+
+            nvgFontSize(vg, keyH >= 34 and 13 or 11)
             nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
             nvgFillColor(vg, nvgRGBA(255, 255, 255, 255))
-            nvgText(vg, cellX + cellW / 2, cellY + cellH / 2, key)
+            nvgText(vg, keyX + keyW / 2, rowY + keyH / 2, label)
+
+            table.insert(self._overlayTouchTargets, {
+                x = keyX, y = rowY, w = keyW, h = keyH,
+                type = "key", key = key,
+            })
+
+            keyX = keyX + keyW + keyGap
         end
+
+        rowY = rowY + keyH + rowGap
     end
 
     nvgFontSize(vg, 10)
     nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_BOTTOM)
     nvgFillColor(vg, nvgRGBA(170, 170, 170, 230))
-    nvgText(vg, panelX + panelW / 2, panelY + panelH - 8, OVERLAY_HINT_TEXT)
+    nvgText(vg, panelX + panelW / 2, panelY + panelH - 4, OVERLAY_HINT_TEXT)
 end
 
 function TerminalView:_onFrame(dt)
@@ -902,9 +1161,12 @@ end
 
 -- ── 向 SSH 发送输入 ──────────────────────────────────────────
 function TerminalView:_sendInput(data)
-    if self._ssh:isConnected() then
+    if self._ssh and self._ssh.send then
         print("[TerminalView] Sending input: '" .. data:gsub("\r", "\\r"):gsub("\n", "\\n") .. "' (" .. #data .. " bytes)")
-        self._ssh:send(data)
+        local ok = self._ssh:send(data)
+        if not ok then
+            _trace("[TerminalView] send() returned false")
+        end
     end
     -- 收到输入时滚动到底部
     self._scrollOffset = 0
@@ -933,6 +1195,18 @@ end
 
 -- ── 鼠标/指针事件处理 ─────────────────────────────────────────
 function TerminalView:_onPointerDown(event)
+    if self._overlayKeyboardVisible and self:_isPointInOverlay(event.x, event.y) then
+        local target = self:_hitOverlayTarget(event.x, event.y)
+        if target then
+            if target.type == "key" then
+                self:_activateOverlayKey(target.key)
+            elseif target.type == "suggestion" then
+                self:_applySuggestion(target.item)
+            end
+        end
+        return true
+    end
+
     -- 计算点击的行列
     local histLen = #self._buf.history
     local visRows = math.floor((self._view:getHeight() - PADDING_Y * 2 - 20) / LINE_HEIGHT)
@@ -953,6 +1227,15 @@ function TerminalView:_onPointerDown(event)
 end
 
 function TerminalView:_onPointerMove(event)
+    if self._overlayKeyboardVisible and self:_isPointInOverlay(event.x, event.y) then
+        local target = self:_hitOverlayTarget(event.x, event.y)
+        if target and target.type == "key" then
+            self._overlaySelectedKey = target.key
+            self:_invalidate()
+        end
+        return true
+    end
+
     if not self._selecting then return false end
     
     local histLen = #self._buf.history
@@ -974,6 +1257,10 @@ function TerminalView:_onPointerMove(event)
 end
 
 function TerminalView:_onPointerUp(event)
+    if self._overlayKeyboardVisible and self:_isPointInOverlay(event.x, event.y) then
+        return true
+    end
+
     if not self._selecting then return false end
     self._selecting = false
     

@@ -63,8 +63,10 @@ function ConnectionView.new()
     self._ssh.onDisconnect = function()
         self._terminal:setStatus("已断开连接", 220, 80, 80)
         self:_popTerminalPageIfNeeded()
-        -- runAsync API 不存在，直接返回列表
-        self:_showConnectionList()
+        -- 对话框关闭需要一帧完成；立即再次 open 新 Dialog 会导致输入焦点卡死
+        brls.delay(80, function()
+            self:_showConnectionList()
+        end)
     end
     self._ssh.onError = function(msg)
         self._errorDialog = brls.Dialog.new("SSH 错误: " .. msg)
@@ -301,14 +303,6 @@ function ConnectionView:_showTerminal()
         end
     end)
 
-    local function triggerKeyboard()
-        _trace("[SSH] Triggering keyboard via dialog button")
-        self._terminal._keyboard:openSwkbd({
-            header = "SSH Input",
-            guide = "Press + to open keyboard, A to enter, B to delete",
-        })
-    end
-
     local function closeTerminal()
         _trace("[SSH] closeTerminal invoked, connected=" .. tostring(self._ssh:isConnected()))
         if self._ssh:isConnected() then
@@ -330,54 +324,7 @@ function ConnectionView:_showTerminal()
     dialog:open()
     _trace("[SSH] Terminal dialog opened")
 
-    -- Switch: bind actions on the Dialog AppletFrame itself so they win over Dialog defaults
-    if Platform.isSwitch and terminalFrame then
-        local ok, err = pcall(function()
-            terminalFrame:registerAction("Enter", brls.ControllerButton.BUTTON_A, function()
-                _trace("[SSH] Frame A pressed")
-                self._terminal:_sendInput(Platform.keyMap.ENTER)
-                return true
-            end)
-            terminalFrame:registerAction("Delete", brls.ControllerButton.BUTTON_B, function()
-                _trace("[SSH] Frame B pressed")
-                self._terminal:_sendInput(Platform.keyMap.BS)
-                return true
-            end)
-            terminalFrame:registerAction("Ctrl+C", brls.ControllerButton.BUTTON_X, function()
-                self._terminal:_sendInput(Platform.keyMap.CTRL_C)
-                return true
-            end)
-            terminalFrame:registerAction("EOF", brls.ControllerButton.BUTTON_Y, function()
-                self._terminal:_sendInput(Platform.keyMap.CTRL_D)
-                return true
-            end)
-            terminalFrame:registerAction("Tab", brls.ControllerButton.BUTTON_LB, function()
-                self._terminal:_sendInput(Platform.keyMap.TAB)
-                return true
-            end)
-            terminalFrame:registerAction("Reconnect", brls.ControllerButton.BUTTON_RB, function()
-                if self._ssh:isConnected() then
-                    self._ssh:disconnect()
-                else
-                    self._ssh:reconnect()
-                end
-                return true
-            end)
-            terminalFrame:registerAction("Keyboard", brls.ControllerButton.BUTTON_START, function()
-                _trace("[SSH] Frame START(+) pressed")
-                triggerKeyboard()
-                return true
-            end)
-            terminalFrame:registerAction("Close", brls.ControllerButton.BUTTON_BACK, function()
-                _trace("[SSH] Frame BACK(-) pressed")
-                closeTerminal()
-                return true
-            end)
-        end)
-        if not ok then
-            _trace("[SSH] Frame action bind failed: " .. tostring(err))
-        end
-    end
+    -- Switch 输入统一交给 TerminalView 的原始轮询处理，避免与 Dialog/AppletFrame 的 action 链冲突。
 
     pcall(function()
         terminalCanvas:setFocus()
