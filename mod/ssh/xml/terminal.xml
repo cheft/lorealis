@@ -80,7 +80,7 @@
             id="lbl_hints_switch"
             width="fill"
             height="fill"
-            text="A 键盘  B 退格  X Ctrl+C  Y EOF  L Tab  R 回车  LT↑  RT↓  + 返回"
+            text="A 键盘  B 退格  X Ctrl+C  Y EOF  L Tab  R 回车  LT↑  RT↓  + 键盘  - 返回"
             fontSize="10"
             textColor="#3A3A3A"
             verticalAlign="center"/>

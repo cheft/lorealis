@@ -10,6 +10,17 @@ local AnsiParser    = require("ansi_parser")
 local TerminalBuffer= require("terminal_buffer")
 local SSHManager    = require("ssh_manager")
 local Keyboard      = require("keyboard")
+local _dbgOk, DebugLog = pcall(require, "debug_log")
+if not _dbgOk then DebugLog = nil end
+
+local function _trace(msg)
+    print(msg)
+    if DebugLog and DebugLog.append then
+        pcall(function()
+            DebugLog.append(msg)
+        end)
+    end
+end
 
 -- ── NanoVG Aliases ──────────────────────────────────────────
 local nvgBeginPath    = brls.nvgBeginPath
@@ -114,7 +125,7 @@ function TerminalView:bindView(view)
         end, false)
         -- Switch: BUTTON_START 对应 + 键
         view:registerAction("弹出键盘", brls.ControllerButton.BUTTON_START, function()
-            print("[TerminalView] START(+) button pressed - opening keyboard")
+            _trace("[TerminalView] START(+) button pressed - opening keyboard")
             self._keyboard:openSwkbd()
             return true
         end, false)
@@ -132,13 +143,13 @@ function TerminalView:bindView(view)
         end, false)
         -- Y 按钮：弹出系统键盘
         view:registerAction("弹出键盘", brls.ControllerButton.BUTTON_Y, function()
-            print("[TerminalView] Y button pressed - opening keyboard")
+            _trace("[TerminalView] Y button pressed - opening keyboard")
             self._keyboard:openSwkbd()
             return true
         end, false)
         -- Switch: BUTTON_BACK 对应 - 键
         view:registerAction("返回", brls.ControllerButton.BUTTON_BACK, function()
-            print("[TerminalView] BACK(-) button pressed - closing terminal")
+            _trace("[TerminalView] BACK(-) button pressed - closing terminal")
             if self._ssh:isConnected() then
                 self._ssh:disconnect()
             end
@@ -146,7 +157,7 @@ function TerminalView:bindView(view)
         end, false)
         -- B 按钮：返回并关闭终端
         view:registerAction("返回", brls.ControllerButton.BUTTON_B, function()
-            print("[TerminalView] B button pressed - closing terminal")
+            _trace("[TerminalView] B button pressed - closing terminal")
             if self._ssh:isConnected() then
                 self._ssh:disconnect()
             end

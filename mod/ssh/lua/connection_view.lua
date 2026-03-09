@@ -7,6 +7,8 @@ local Platform        = require("platform")
 local SavedConnections= require("saved_connections")
 local SSHManager      = require("ssh_manager")
 local TerminalView    = require("terminal_view")
+local _dbgOk, DebugLog = pcall(require, "debug_log")
+if not _dbgOk then DebugLog = nil end
 
 local TERMINAL_PAGE_WIDTH = 1280
 local TERMINAL_PAGE_HEIGHT = 720
@@ -25,6 +27,15 @@ end
 
 local ConnectionView = {}
 ConnectionView.__index = ConnectionView
+
+local function _trace(msg)
+    print(msg)
+    if DebugLog and DebugLog.append then
+        pcall(function()
+            DebugLog.append(msg)
+        end)
+    end
+end
 
 -- ── 构造函数 ─────────────────────────────────────────────────
 function ConnectionView.new()
@@ -221,7 +232,12 @@ end
 
 -- ── 内部：执行连接 ────────────────────────────────────────────
 function ConnectionView:_doConnect(conn)
-    print("[SSH] Connecting to " .. conn.user .. "@" .. conn.host .. ":" .. (conn.port or 22))
+    if DebugLog and DebugLog.clear then
+        pcall(function()
+            DebugLog.clear()
+        end)
+    end
+    _trace("[SSH] Connecting to " .. conn.user .. "@" .. conn.host .. ":" .. (conn.port or 22))
 
     local params = {
         host        = conn.host,
@@ -246,7 +262,7 @@ function ConnectionView:_doConnect(conn)
     local ok, err = self._ssh:connect(params)
     pcall(function() connectingDlg:close() end)
     if not ok then
-        print("[SSH] Connection failed: " .. tostring(err))
+        _trace("[SSH] Connection failed: " .. tostring(err))
         local errDlg = brls.Dialog.new("连接失败: " .. tostring(err))
         errDlg:addButton("确定", function() return true end)
         errDlg:open()
@@ -258,7 +274,7 @@ end
 
 -- ── 内部：切换到终端视图 ─────────────────────────────────────
 function ConnectionView:_showTerminal()
-    print("[SSH] Showing Terminal")
+    _trace("[SSH] Showing Terminal")
 
     self._terminalDialog = brls.Dialog.new("SSH 终端")
     local dialog = self._terminalDialog
@@ -278,11 +294,20 @@ function ConnectionView:_showTerminal()
     self._terminal:resize(TERMINAL_PAGE_WIDTH, TERMINAL_PAGE_HEIGHT)
 
     local function triggerKeyboard()
-        print("[SSH] Triggering keyboard via dialog button")
+        _trace("[SSH] Triggering keyboard via dialog button")
         self._terminal._keyboard:openSwkbd({
             header = "SSH 输入",
             guide = "输入命令并确认发送",
         })
+    end
+
+    local function closeTerminal()
+        _trace("[SSH] closeTerminal invoked, connected=" .. tostring(self._ssh:isConnected()))
+        if self._ssh:isConnected() then
+            self._ssh:disconnect()
+        else
+            self:_popTerminalPageIfNeeded()
+        end
     end
 
     if Platform.isSwitch then
@@ -293,14 +318,40 @@ function ConnectionView:_showTerminal()
     end
 
     dialog:addButton("断开连接", function()
-        self._ssh:disconnect()
+        closeTerminal()
         return true
     end)
 
     dialog:open()
+    _trace("[SSH] Terminal dialog opened")
+
+    -- Switch 下对话框按钮经常会抢焦点，额外在 Dialog 根节点兜底绑定 +/-
+    if Platform.isSwitch then
+        local ok, err = pcall(function()
+            dialog:registerAction("弹出键盘", brls.ControllerButton.BUTTON_START, function()
+                _trace("[SSH] Dialog START(+) pressed")
+                triggerKeyboard()
+                return true
+            end)
+            dialog:registerAction("返回", brls.ControllerButton.BUTTON_BACK, function()
+                _trace("[SSH] Dialog BACK(-) pressed")
+                closeTerminal()
+                return true
+            end)
+        end)
+        if not ok then
+            _trace("[SSH] Dialog action bind failed: " .. tostring(err))
+        end
+    end
 
     pcall(function()
         terminalCanvas:setFocus()
+    end)
+    -- 对话框打开后会重置一次焦点，延迟再给一次
+    brls.delay(50, function()
+        pcall(function()
+            terminalCanvas:setFocus()
+        end)
     end)
 end
 

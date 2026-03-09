@@ -6,9 +6,20 @@
 -- =============================================================
 
 local Platform = require("platform")
+local _dbgOk, DebugLog = pcall(require, "debug_log")
+if not _dbgOk then DebugLog = nil end
 
 local Keyboard = {}
 Keyboard.__index = Keyboard
+
+local function _trace(msg)
+    print(msg)
+    if DebugLog and DebugLog.append then
+        pcall(function()
+            DebugLog.append(msg)
+        end)
+    end
+end
 
 -- ── 构造函数 ─────────────────────────────────────────────────
 ---@param onInput function(data:string)  接收输入数据的回调
@@ -104,6 +115,7 @@ end
 -- Switch 系统软键盘
 -- ============================================================
 function Keyboard:openSwkbd(opts)
+    _trace("[SSH Keyboard] openSwkbd called; isSwitch=" .. tostring(Platform.isSwitch) .. ", swkbdOpen=" .. tostring(self._swkbdOpen))
     if not Platform.isSwitch then
         -- Desktop 弹出一个简单的输入框作为降级方案
         self:_openFallbackInput(opts)
@@ -136,14 +148,16 @@ function Keyboard:openSwkbd(opts)
         -- 调用 InputCell 内部的 openKeyboard 方法
         -- 这会使用 brls::Application::getImeManager()->openForText
         -- 比 brls.Application.openSwkbd 更可靠
-        local ok2, err2 = pcall(function()
-            inputCell:openKeyboard(opts.maxLen or 256)
+        local ok2, imeOpenedOrErr = pcall(function()
+            return inputCell:openKeyboard(opts.maxLen or 256)
         end)
 
-        if not ok2 then
+        if (not ok2) or imeOpenedOrErr == false then
             self._swkbdOpen = false
-            print("[SSH Keyboard] InputCell.openKeyboard failed: " .. tostring(err2))
+            _trace("[SSH Keyboard] InputCell.openKeyboard failed: " .. tostring(imeOpenedOrErr))
             self:_openFallbackInput(opts)
+        else
+            _trace("[SSH Keyboard] InputCell.openKeyboard accepted by IME")
         end
         return
     end
@@ -170,7 +184,7 @@ function Keyboard:openSwkbd(opts)
 
     if not ok3 then
         self._swkbdOpen = false
-        print("[SSH Keyboard] openSwkbd failed: " .. tostring(err3))
+        _trace("[SSH Keyboard] openSwkbd failed: " .. tostring(err3))
         self:_openFallbackInput(opts)
     end
 end

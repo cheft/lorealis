@@ -131,9 +131,9 @@ void LuaManager::registerCellBindings(sol::table& brls_ns) {
     };
     input_cell_ut["setValue"] = &brls::InputCell::setValue;
     input_cell_ut["getValue"] = &brls::InputCell::getValue;
-    input_cell_ut["openKeyboard"] = [](brls::InputCell& self, sol::optional<int> maxInputLength) {
-        // This simulates the behavior of Clicking on the cell
-        brls::Application::getImeManager()->openForText([&self](std::string text) {
+    input_cell_ut["openKeyboard"] = [](brls::InputCell& self, sol::optional<int> maxInputLength) -> bool {
+        // This simulates the behavior of clicking on the cell and returns whether IME opened successfully.
+        return brls::Application::getImeManager()->openForText([&self](std::string text) {
             self.setValue(text);
         },
         ((brls::Label*)self.title)->getFullText(), self.getHint(), maxInputLength.value_or(256), self.getValue(), 0);

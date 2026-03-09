@@ -15,6 +15,8 @@ package.path = package.path .. ";" .. _modPath .. "?.lua"
 
 local Platform       = require("platform")
 local ConnectionView = require("connection_view")
+local _dbgOk, DebugLog = pcall(require, "debug_log")
+if not _dbgOk then DebugLog = nil end
 
 -- ── 全局状态 ───────────────────────────────────────────────
 local _connView = nil
@@ -23,6 +25,11 @@ local _activity = nil
 -- ── SSH 模块初始化 ─────────────────────────────────────────
 local function init()
     print("[SSH Module] Initializing... (" .. Platform.info() .. ")")
+    if DebugLog and DebugLog.append then
+        pcall(function()
+            DebugLog.append("[SSH Module] init, logPath=" .. tostring(DebugLog.path and DebugLog.path() or "unknown"))
+        end)
+    end
 
     -- 验证 SSH 绑定是否可用
     if not brls.SSH then
