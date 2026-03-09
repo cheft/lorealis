@@ -302,7 +302,7 @@ function TerminalView:bindView(view)
             return self:_onPointerUp(event)
         end)
         view:onScroll(function(event)
-            if self._overlayKeyboardVisible and self:_isPointInOverlay(event.x, event.y) then
+            if self._overlayKeyboardVisible then
                 return true
             end
             if event.y ~= 0 then
@@ -614,6 +614,43 @@ function TerminalView:_applySuggestion(item)
     end
 end
 
+function TerminalView:_findOverlayKeyPosition(target)
+    if not target then
+        return 2, 2
+    end
+
+    for rowIndex, row in ipairs(OVERLAY_LAYOUT) do
+        for colIndex, key in ipairs(row) do
+            if key == target then
+                return rowIndex, colIndex
+            end
+        end
+    end
+
+    return 2, 2
+end
+
+function TerminalView:_moveOverlaySelection(dx, dy)
+    local rowIndex, colIndex = self:_findOverlayKeyPosition(self._overlaySelectedKey)
+    local nextRow = math.max(1, math.min(#OVERLAY_LAYOUT, rowIndex + dy))
+    local nextCol = colIndex + dx
+    local row = OVERLAY_LAYOUT[nextRow]
+
+    if nextCol < 1 then nextCol = 1 end
+    if nextCol > #row then nextCol = #row end
+
+    self._overlaySelectedKey = row[nextCol]
+    self:_invalidate()
+end
+
+function TerminalView:_toLocalPoint(absX, absY)
+    local viewX = 0
+    local viewY = 0
+    if self._view and self._view.getX then viewX = self._view:getX() or 0 end
+    if self._view and self._view.getY then viewY = self._view:getY() or 0 end
+    return absX - viewX, absY - viewY
+end
+
 function TerminalView:_openSystemIme()
     local editingOverlay = self._overlayKeyboardVisible
     self._keyboard:openSwkbd({
@@ -639,6 +676,19 @@ end
 
 function TerminalView:_handleOverlayActions(justPressed)
     local B = brls.ControllerButton
+
+    if justPressed(B.BUTTON_UP) then
+        self:_moveOverlaySelection(0, -1)
+    end
+    if justPressed(B.BUTTON_DOWN) then
+        self:_moveOverlaySelection(0, 1)
+    end
+    if justPressed(B.BUTTON_LEFT) then
+        self:_moveOverlaySelection(-1, 0)
+    end
+    if justPressed(B.BUTTON_RIGHT) then
+        self:_moveOverlaySelection(1, 0)
+    end
 
     if justPressed(B.BUTTON_A) then
         self:_activateOverlayKey(self._overlaySelectedKey)
@@ -770,6 +820,12 @@ function TerminalView:_pollControllerShortcuts()
         return current[button] and not self._lastPolledButtons[button]
     end
 
+    if self._overlayKeyboardVisible then
+        self:_handleOverlayActions(justPressed)
+        self._lastPolledButtons = current
+        return
+    end
+
     if justPressed(B.BUTTON_UP) then
         self:_sendInput(Platform.keyMap.UP)
     end
@@ -781,12 +837,6 @@ function TerminalView:_pollControllerShortcuts()
     end
     if justPressed(B.BUTTON_RIGHT) then
         self:_sendInput(Platform.keyMap.RIGHT)
-    end
-
-    if self._overlayKeyboardVisible then
-        self:_handleOverlayActions(justPressed)
-        self._lastPolledButtons = current
-        return
     end
 
     if justPressed(B.BUTTON_A) then
@@ -831,40 +881,35 @@ function TerminalView:_pollControllerShortcuts()
 end
 
 function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
-    local panelH = math.floor(h * 0.4)
-    if panelH < 250 then panelH = 250 end
-    local panelY = y + h - 20 - panelH - 8
+    local panelH = math.floor(h * 0.5)
+    if panelH < 320 then panelH = 320 end
+    local panelY = y + h - 20 - panelH - 2
     local panelX = x + 12
     local panelW = w - 24
-    local headerH = 30
+    local headerH = 18
     local chipsH = 28
-    local footerH = 18
-    local rowGap = 6
-    local keyGap = 5
+    local footerH = 16
+    local rowGap = 4
+    local keyGap = 4
     local rows = OVERLAY_LAYOUT
-    local rowAreaH = panelH - headerH - chipsH - footerH - 28
+    local rowAreaH = panelH - headerH - chipsH - footerH - 18
     local keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
-    if keyH < 28 then keyH = 28 end
+    if keyH < 34 then keyH = 34 end
 
     self._overlayTouchTargets = {}
-    self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
+    local localPanelX, localPanelY = self:_toLocalPoint(panelX, panelY)
+    self._overlayPanelRect = { x = localPanelX, y = localPanelY, w = panelW, h = panelH }
 
     nvgBeginPath(vg)
     nvgRoundedRect(vg, panelX, panelY, panelW, panelH, 14)
     nvgFillColor(vg, nvgRGBA(18, 18, 22, 242))
     nvgFill(vg)
 
-    local preview = self._overlayBuffer
-    if preview == "" then preview = "_" end
-    if #preview > 110 then
-        preview = "..." .. string.sub(preview, -110)
-    end
-
     nvgFontFace(vg, "regular")
-    nvgFontSize(vg, 12)
+    nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
-    nvgFillColor(vg, nvgRGBA(245, 245, 245, 255))
-    nvgText(vg, panelX + 14, panelY + headerH / 2, "CMD> " .. preview)
+    nvgFillColor(vg, nvgRGBA(200, 200, 200, 255))
+    nvgText(vg, panelX + 14, panelY + headerH / 2, "Touch Keyboard")
 
     local modeText = string.format("Shift:%s Caps:%s Ctrl:%s Alt:%s", self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0")
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
@@ -873,7 +918,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
 
     local suggestions = self:_collectOverlaySuggestions()
     local chipX = panelX + 12
-    local chipY = panelY + headerH + 6
+    local chipY = panelY + headerH + 4
     for _, item in ipairs(suggestions) do
         local label = item.text
         local chipW = math.min(panelW * 0.22, math.max(42, 18 + #label * 8))
@@ -891,15 +936,18 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
         nvgFillColor(vg, nvgRGBA(235, 235, 235, 255))
         nvgText(vg, chipX + chipW / 2, chipY + (chipsH - 6) / 2, label)
 
+        local chipLocalX, chipLocalY = self:_toLocalPoint(chipX, chipY)
         table.insert(self._overlayTouchTargets, {
-            x = chipX, y = chipY, w = chipW, h = chipsH - 6,
+            x = chipLocalX,
+            y = chipLocalY,
+            w = chipW, h = chipsH - 6,
             type = "suggestion", item = item,
         })
 
         chipX = chipX + chipW + 6
     end
 
-    local rowY = panelY + headerH + chipsH + 10
+    local rowY = panelY + headerH + chipsH + 8
     local contentW = panelW - 24
     for _, row in ipairs(rows) do
         local units = 0
@@ -938,8 +986,11 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
             nvgFillColor(vg, nvgRGBA(255, 255, 255, 255))
             nvgText(vg, keyX + keyW / 2, rowY + keyH / 2, label)
 
+            local keyLocalX, keyLocalY = self:_toLocalPoint(keyX, rowY)
             table.insert(self._overlayTouchTargets, {
-                x = keyX, y = rowY, w = keyW, h = keyH,
+                x = keyLocalX,
+                y = keyLocalY,
+                w = keyW, h = keyH,
                 type = "key", key = key,
             })
 
@@ -1195,8 +1246,10 @@ end
 
 -- ── 鼠标/指针事件处理 ─────────────────────────────────────────
 function TerminalView:_onPointerDown(event)
-    if self._overlayKeyboardVisible and self:_isPointInOverlay(event.x, event.y) then
-        local target = self:_hitOverlayTarget(event.x, event.y)
+    local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
+
+    if self._overlayKeyboardVisible and self:_isPointInOverlay(localEventX, localEventY) then
+        local target = self:_hitOverlayTarget(localEventX, localEventY)
         if target then
             if target.type == "key" then
                 self:_activateOverlayKey(target.key)
@@ -1227,8 +1280,10 @@ function TerminalView:_onPointerDown(event)
 end
 
 function TerminalView:_onPointerMove(event)
-    if self._overlayKeyboardVisible and self:_isPointInOverlay(event.x, event.y) then
-        local target = self:_hitOverlayTarget(event.x, event.y)
+    local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
+
+    if self._overlayKeyboardVisible and self:_isPointInOverlay(localEventX, localEventY) then
+        local target = self:_hitOverlayTarget(localEventX, localEventY)
         if target and target.type == "key" then
             self._overlaySelectedKey = target.key
             self:_invalidate()
@@ -1257,7 +1312,9 @@ function TerminalView:_onPointerMove(event)
 end
 
 function TerminalView:_onPointerUp(event)
-    if self._overlayKeyboardVisible and self:_isPointInOverlay(event.x, event.y) then
+    local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
+
+    if self._overlayKeyboardVisible and self:_isPointInOverlay(localEventX, localEventY) then
         return true
     end
 
