@@ -65,6 +65,8 @@ local SWITCH_HINT_TEXT = "DPad Arrows  A Enter  B BS  L Tab  + IME  R3 Keyboard 
 local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+C interrupt | PageUp/Down history"
 
 local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter key submit  + IME  R3 Hide"
+local DPAD_REPEAT_DELAY_MS = 550
+local DPAD_REPEAT_INTERVAL_MS = 180
 
 local function _key(label, opts)
     opts = opts or {}
@@ -209,6 +211,12 @@ function TerminalView.new(sshManager)
     self._overlayPanelRect = nil
     self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
     self._overlayRecentCommands = {}
+    self._drawX = 0
+    self._drawY = 0
+    self._drawW = 0
+    self._drawH = 0
+    self._buttonRepeatState = {}
+    self._touchState = { pressed = false, x = 0, y = 0, id = -1 }
 
     return self
 end
@@ -644,11 +652,11 @@ function TerminalView:_moveOverlaySelection(dx, dy)
 end
 
 function TerminalView:_toLocalPoint(absX, absY)
-    local viewX = 0
-    local viewY = 0
-    if self._view and self._view.getX then viewX = self._view:getX() or 0 end
-    if self._view and self._view.getY then viewY = self._view:getY() or 0 end
-    return absX - viewX, absY - viewY
+    return absX - (self._drawX or 0), absY - (self._drawY or 0)
+end
+
+local function _nowMs()
+    return math.floor(os.clock() * 1000)
 end
 
 function TerminalView:_openSystemIme()
@@ -677,16 +685,20 @@ end
 function TerminalView:_handleOverlayActions(justPressed)
     local B = brls.ControllerButton
 
-    if justPressed(B.BUTTON_UP) then
+    local function triggered(button)
+        return justPressed(button, true)
+    end
+
+    if triggered(B.BUTTON_UP) then
         self:_moveOverlaySelection(0, -1)
     end
-    if justPressed(B.BUTTON_DOWN) then
+    if triggered(B.BUTTON_DOWN) then
         self:_moveOverlaySelection(0, 1)
     end
-    if justPressed(B.BUTTON_LEFT) then
+    if triggered(B.BUTTON_LEFT) then
         self:_moveOverlaySelection(-1, 0)
     end
-    if justPressed(B.BUTTON_RIGHT) then
+    if triggered(B.BUTTON_RIGHT) then
         self:_moveOverlaySelection(1, 0)
     end
 
@@ -730,6 +742,49 @@ function TerminalView:_hitOverlayTarget(absX, absY)
         end
     end
     return nil
+end
+
+function TerminalView:_pollOverlayTouch()
+    if not self._overlayKeyboardVisible then
+        self._touchState.pressed = false
+        return
+    end
+
+    if not Platform.isSwitch or not brls.Application.getSwitchTouchState then
+        return
+    end
+
+    local ok, touch = pcall(function()
+        return brls.Application.getSwitchTouchState()
+    end)
+
+    if not ok or not touch then
+        return
+    end
+
+    local wasPressed = self._touchState.pressed and true or false
+    local isPressed = touch.pressed and true or false
+
+    if isPressed then
+        local target = self:_hitOverlayTarget(touch.x, touch.y)
+        if target and target.type == "key" then
+            self._overlaySelectedKey = target.key
+            if not wasPressed or self._touchState.id ~= touch.id then
+                self:_activateOverlayKey(target.key)
+            end
+        elseif target and target.type == "suggestion" then
+            if not wasPressed or self._touchState.id ~= touch.id then
+                self:_applySuggestion(target.item)
+            end
+        end
+    end
+
+    self._touchState = {
+        pressed = isPressed,
+        x = touch.x or 0,
+        y = touch.y or 0,
+        id = touch.id or -1,
+    }
 end
 
 -- ── 帧更新（光标闪烁）────────────────────────────────────────
@@ -816,8 +871,32 @@ function TerminalView:_pollControllerShortcuts()
         rawButtons)
     self._debugPollText = (#errors > 0) and ("ERR " .. table.concat(errors, " | ")) or ""
 
-    local function justPressed(button)
-        return current[button] and not self._lastPolledButtons[button]
+    local nowMs = _nowMs()
+    local function justPressed(button, allowRepeat)
+        local wasPressed = self._lastPolledButtons[button] and true or false
+        local isPressed = current[button] and true or false
+        local state = self._buttonRepeatState[button] or { nextAt = 0 }
+
+        if isPressed and not wasPressed then
+            state.nextAt = nowMs + DPAD_REPEAT_DELAY_MS
+            self._buttonRepeatState[button] = state
+            return true
+        end
+
+        if (not isPressed) then
+            state.nextAt = 0
+            self._buttonRepeatState[button] = state
+            return false
+        end
+
+        if allowRepeat and state.nextAt > 0 and nowMs >= state.nextAt then
+            state.nextAt = nowMs + DPAD_REPEAT_INTERVAL_MS
+            self._buttonRepeatState[button] = state
+            return true
+        end
+
+        self._buttonRepeatState[button] = state
+        return false
     end
 
     if self._overlayKeyboardVisible then
@@ -826,16 +905,16 @@ function TerminalView:_pollControllerShortcuts()
         return
     end
 
-    if justPressed(B.BUTTON_UP) then
+    if justPressed(B.BUTTON_UP, true) then
         self:_sendInput(Platform.keyMap.UP)
     end
-    if justPressed(B.BUTTON_DOWN) then
+    if justPressed(B.BUTTON_DOWN, true) then
         self:_sendInput(Platform.keyMap.DOWN)
     end
-    if justPressed(B.BUTTON_LEFT) then
+    if justPressed(B.BUTTON_LEFT, true) then
         self:_sendInput(Platform.keyMap.LEFT)
     end
-    if justPressed(B.BUTTON_RIGHT) then
+    if justPressed(B.BUTTON_RIGHT, true) then
         self:_sendInput(Platform.keyMap.RIGHT)
     end
 
@@ -897,8 +976,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     if keyH < 34 then keyH = 34 end
 
     self._overlayTouchTargets = {}
-    local localPanelX, localPanelY = self:_toLocalPoint(panelX, panelY)
-    self._overlayPanelRect = { x = localPanelX, y = localPanelY, w = panelW, h = panelH }
+    self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
 
     nvgBeginPath(vg)
     nvgRoundedRect(vg, panelX, panelY, panelW, panelH, 14)
@@ -936,10 +1014,9 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
         nvgFillColor(vg, nvgRGBA(235, 235, 235, 255))
         nvgText(vg, chipX + chipW / 2, chipY + (chipsH - 6) / 2, label)
 
-        local chipLocalX, chipLocalY = self:_toLocalPoint(chipX, chipY)
         table.insert(self._overlayTouchTargets, {
-            x = chipLocalX,
-            y = chipLocalY,
+            x = chipX,
+            y = chipY,
             w = chipW, h = chipsH - 6,
             type = "suggestion", item = item,
         })
@@ -986,10 +1063,9 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
             nvgFillColor(vg, nvgRGBA(255, 255, 255, 255))
             nvgText(vg, keyX + keyW / 2, rowY + keyH / 2, label)
 
-            local keyLocalX, keyLocalY = self:_toLocalPoint(keyX, rowY)
             table.insert(self._overlayTouchTargets, {
-                x = keyLocalX,
-                y = keyLocalY,
+                x = keyX,
+                y = rowY,
                 w = keyW, h = keyH,
                 type = "key", key = key,
             })
@@ -1008,6 +1084,7 @@ end
 
 function TerminalView:_onFrame(dt)
     self:_pollControllerShortcuts()
+    self:_pollOverlayTouch()
 
     self._blinkTimer = self._blinkTimer + dt
     if self._blinkTimer >= CURSOR_BLINK_INTERVAL then
@@ -1019,6 +1096,11 @@ end
 
 -- ── NanoVG 绘制主函数 ────────────────────────────────────────
 function TerminalView:_draw(vg, x, y, w, h)
+    self._drawX = x or 0
+    self._drawY = y or 0
+    self._drawW = w or 0
+    self._drawH = h or 0
+
     -- 如果没有 registerFrameCallback，在绘制函数里手动更新时间步长（粗略估计 16ms）
     if not self._view.registerFrameCallback then
         self:_onFrame(0.016)
@@ -1248,27 +1330,19 @@ end
 function TerminalView:_onPointerDown(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
-    if self._overlayKeyboardVisible and self:_isPointInOverlay(localEventX, localEventY) then
-        local target = self:_hitOverlayTarget(localEventX, localEventY)
-        if target then
-            if target.type == "key" then
-                self:_activateOverlayKey(target.key)
-            elseif target.type == "suggestion" then
-                self:_applySuggestion(target.item)
-            end
-        end
+    if self._overlayKeyboardVisible then
         return true
     end
 
     -- 计算点击的行列
     local histLen = #self._buf.history
-    local visRows = math.floor((self._view:getHeight() - PADDING_Y * 2 - 20) / LINE_HEIGHT)
+    local visRows = math.floor(((self._drawH > 0 and self._drawH or self._view:getHeight()) - PADDING_Y * 2 - 20) / LINE_HEIGHT)
     local totalRows = histLen + self._rows
     local startLine = totalRows - self._scrollOffset - visRows + 1
     if startLine < 1 then startLine = 1 end
 
-    local localX = event.x - self._view:getX() - PADDING_X
-    local localY = event.y - self._view:getY() - PADDING_Y
+    local localX = localEventX - PADDING_X
+    local localY = localEventY - PADDING_Y
     
     local r = math.floor(localY / LINE_HEIGHT) + startLine
     local c = math.floor(localX / CHAR_WIDTH) + 1
@@ -1282,25 +1356,20 @@ end
 function TerminalView:_onPointerMove(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
-    if self._overlayKeyboardVisible and self:_isPointInOverlay(localEventX, localEventY) then
-        local target = self:_hitOverlayTarget(localEventX, localEventY)
-        if target and target.type == "key" then
-            self._overlaySelectedKey = target.key
-            self:_invalidate()
-        end
+    if self._overlayKeyboardVisible then
         return true
     end
 
     if not self._selecting then return false end
     
     local histLen = #self._buf.history
-    local visRows = math.floor((self._view:getHeight() - PADDING_Y * 2 - 20) / LINE_HEIGHT)
+    local visRows = math.floor(((self._drawH > 0 and self._drawH or self._view:getHeight()) - PADDING_Y * 2 - 20) / LINE_HEIGHT)
     local totalRows = histLen + self._rows
     local startLine = totalRows - self._scrollOffset - visRows + 1
     if startLine < 1 then startLine = 1 end
 
-    local localX = event.x - self._view:getX() - PADDING_X
-    local localY = event.y - self._view:getY() - PADDING_Y
+    local localX = localEventX - PADDING_X
+    local localY = localEventY - PADDING_Y
     
     local r = math.floor(localY / LINE_HEIGHT) + startLine
     local c = math.floor(localX / CHAR_WIDTH) + 1
@@ -1314,7 +1383,7 @@ end
 function TerminalView:_onPointerUp(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
-    if self._overlayKeyboardVisible and self:_isPointInOverlay(localEventX, localEventY) then
+    if self._overlayKeyboardVisible then
         return true
     end
 

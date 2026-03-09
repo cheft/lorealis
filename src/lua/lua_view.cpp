@@ -111,6 +111,10 @@ void LuaManager::registerViewBindings(sol::table& brls_ns) {
     view_ut["setVisibility"] = &brls::View::setVisibility;
     view_ut["setWidth"] = &brls::View::setWidth;
     view_ut["setHeight"] = &brls::View::setHeight;
+    view_ut["getWidth"] = &brls::View::getWidth;
+    view_ut["getHeight"] = &brls::View::getHeight;
+    view_ut["getX"] = &brls::View::getX;
+    view_ut["getY"] = &brls::View::getY;
     view_ut["setTranslationX"] = &brls::View::setTranslationX;
     view_ut["setTranslationY"] = &brls::View::setTranslationY;
     view_ut["setBackgroundColor"] = &brls::View::setBackgroundColor;

@@ -212,6 +212,34 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
         return "desktop";
 #endif
     };
+    app["getSwitchTouchState"] = [this]() -> sol::object {
+#ifdef __SWITCH__
+        HidTouchScreenState hidState;
+        if (hidGetTouchScreenStates(&hidState, 1) && hidState.count > 0)
+        {
+            return sol::make_object(lua, lua.create_table_with(
+                "pressed", true,
+                "count", (int)hidState.count,
+                "x", (float)hidState.touches[0].x / brls::Application::windowScale,
+                "y", (float)hidState.touches[0].y / brls::Application::windowScale,
+                "id", (int)hidState.touches[0].finger_id));
+        }
+
+        return sol::make_object(lua, lua.create_table_with(
+            "pressed", false,
+            "count", 0,
+            "x", 0.0f,
+            "y", 0.0f,
+            "id", -1));
+#else
+        return sol::make_object(lua, lua.create_table_with(
+            "pressed", false,
+            "count", 0,
+            "x", 0.0f,
+            "y", 0.0f,
+            "id", -1));
+#endif
+    };
     app["openTextIME"] = [](sol::protected_function cb,
         sol::optional<std::string> headerText,
         sol::optional<std::string> subText,
