@@ -10,6 +10,7 @@ local AnsiParser    = require("ansi_parser")
 local TerminalBuffer= require("terminal_buffer")
 local SSHManager    = require("ssh_manager")
 local Keyboard      = require("keyboard")
+local PinyinIme     = require("pinyin_ime")
 local _dbgOk, DebugLog = pcall(require, "debug_log")
 if not _dbgOk then DebugLog = nil end
 
@@ -458,6 +459,11 @@ function TerminalView.new(sshManager)
     self._overlayCtrl = false
     self._overlayAlt = false
     self._overlayFn = false
+    self._overlayCn = false
+    self._overlayPinyin = ""
+    self._overlayImeCandidates = {}
+    self._overlayImePage = 1
+    self._overlayImeLastCommit = nil
     self._overlayTouchTargets = {}
     self._overlayPanelRect = nil
     self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
@@ -592,6 +598,21 @@ local function initGlobalKeyboardListeners()
 
             if terminal then
                 print("[TerminalView] Character input: " .. tostring(codepoint))
+                if terminal._overlayKeyboardVisible and terminal._overlayCn and (not terminal._overlayFn) then
+                    if codepoint >= 65 and codepoint <= 90 then
+                        terminal:_appendOverlayIme(string.lower(string.char(codepoint)))
+                        return
+                    elseif codepoint >= 97 and codepoint <= 122 then
+                        terminal:_appendOverlayIme(string.char(codepoint))
+                        return
+                    elseif codepoint >= 49 and codepoint <= 56 and #(terminal._overlayPinyin or "") > 0 then
+                        terminal:_commitOverlayIme(codepoint - 48, false)
+                        return
+                    elseif codepoint == 32 and #(terminal._overlayPinyin or "") > 0 then
+                        terminal:_commitOverlayIme(1, true)
+                        return
+                    end
+                end
                 terminal._keyboard:handleChar(codepoint)
             else
                 print("[TerminalView] No mapping for focus addr: " .. tostring(focus:get_address()))
@@ -623,6 +644,25 @@ local function initGlobalKeyboardListeners()
                         terminal._overlayKeyboardVisible = not terminal._overlayKeyboardVisible
                         terminal:_invalidate()
                         return
+                    end
+
+                    if terminal._overlayKeyboardVisible and terminal._overlayCn and (not terminal._overlayFn) and #(terminal._overlayPinyin or "") > 0 then
+                        if state.key == 257 then
+                            terminal:_commitOverlayIme(1, true)
+                            return
+                        elseif state.key == 259 then
+                            if terminal:_backspaceOverlayIme() then
+                                return
+                            end
+                        elseif state.key == 266 then
+                            if terminal:_changeOverlayImePage(-1) then
+                                return
+                            end
+                        elseif state.key == 267 then
+                            if terminal:_changeOverlayImePage(1) then
+                                return
+                            end
+                        end
                     end
 
                     terminal._keyboard:handleKey(state.key, state.mods)
@@ -690,6 +730,11 @@ function TerminalView:reset()
     self._overlayCtrl = false
     self._overlayAlt = false
     self._overlayFn = false
+    self._overlayCn = false
+    self._overlayPinyin = ""
+    self._overlayImeCandidates = {}
+    self._overlayImePage = 1
+    self._overlayImeLastCommit = nil
     self._overlayTouchTargets = {}
     self._overlayPanelRect = nil
     self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
@@ -705,6 +750,128 @@ end
 
 local function _overlayTrim(text)
     return (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
+end
+
+function TerminalView:_refreshOverlayImeCandidates()
+    if self._overlayCn and not self._overlayFn and #self._overlayPinyin > 0 then
+        self._overlayImeCandidates = PinyinIme.getCandidates(self._overlayPinyin, {
+            limit = 48,
+            prev_text = self._overlayImeLastCommit,
+        })
+    else
+        self._overlayImeCandidates = {}
+    end
+
+    local pageCount = self:_getOverlayImePageCount()
+    if self._overlayImePage > pageCount then
+        self._overlayImePage = pageCount
+    end
+    if self._overlayImePage < 1 then
+        self._overlayImePage = 1
+    end
+end
+
+function TerminalView:_clearOverlayIme()
+    self._overlayPinyin = ""
+    self._overlayImeCandidates = {}
+    self._overlayImePage = 1
+end
+
+function TerminalView:_appendOverlayIme(char)
+    if not char or char == "" then return end
+    self._overlayPinyin = string.lower((self._overlayPinyin or "") .. char)
+    self._overlayImePage = 1
+    self:_refreshOverlayImeCandidates()
+    self:_invalidate()
+end
+
+function TerminalView:_backspaceOverlayIme()
+    if #self._overlayPinyin <= 0 then
+        return false
+    end
+    self._overlayPinyin = string.sub(self._overlayPinyin, 1, #self._overlayPinyin - 1)
+    self._overlayImePage = 1
+    self:_refreshOverlayImeCandidates()
+    self:_invalidate()
+    return true
+end
+
+function TerminalView:_getOverlayImePageCount()
+    local pageSize = PinyinIme.PAGE_SIZE or 8
+    local count = #self._overlayImeCandidates
+    return math.max(1, math.ceil(count / pageSize))
+end
+
+function TerminalView:_getOverlayImeVisibleCandidates()
+    local pageSize = PinyinIme.PAGE_SIZE or 8
+    local page = self._overlayImePage or 1
+    local startIndex = (page - 1) * pageSize + 1
+    local out = {}
+    for index = startIndex, math.min(#self._overlayImeCandidates, startIndex + pageSize - 1) do
+        table.insert(out, self._overlayImeCandidates[index])
+    end
+    return out
+end
+
+function TerminalView:_changeOverlayImePage(delta)
+    local pageCount = self:_getOverlayImePageCount()
+    if pageCount <= 1 then
+        return false
+    end
+    local nextPage = math.max(1, math.min(pageCount, (self._overlayImePage or 1) + delta))
+    if nextPage == self._overlayImePage then
+        return false
+    end
+    self._overlayImePage = nextPage
+    self:_rumbleOverlayTap("nav")
+    self:_invalidate()
+    return true
+end
+
+function TerminalView:_selectOverlayImeCandidate(candidate, fallbackToRaw)
+    if not self._overlayCn or self._overlayFn then
+        return false
+    end
+
+    local raw = self._overlayPinyin or ""
+    if raw == "" then
+        return false
+    end
+
+    local text = candidate and candidate.text or nil
+    local remaining = candidate and candidate.remaining or ""
+    if (not text or text == "") and fallbackToRaw then
+        text = raw
+        remaining = ""
+    end
+    if not text or text == "" then
+        return false
+    end
+
+    self:_appendOverlayText(text)
+    PinyinIme.rememberSelection(raw, text, self._overlayImeLastCommit)
+    self._overlayImeLastCommit = text
+    self._overlayPinyin = remaining or ""
+    self._overlayImePage = 1
+    self:_refreshOverlayImeCandidates()
+    self:_invalidate()
+    return true
+end
+
+function TerminalView:_commitOverlayIme(index, fallbackToRaw)
+    if not self._overlayCn or self._overlayFn then
+        return false
+    end
+    self:_refreshOverlayImeCandidates()
+    local visible = self:_getOverlayImeVisibleCandidates()
+    return self:_selectOverlayImeCandidate(visible[index or 1], fallbackToRaw)
+end
+
+function TerminalView:_flushOverlayIme(fallbackToRaw)
+    if not self._overlayCn or self._overlayFn or #self._overlayPinyin == 0 then
+        return false
+    end
+    return self:_commitOverlayIme(1, fallbackToRaw)
 end
 
 function TerminalView:_clearOverlayModifiers(clearCaps)
@@ -760,7 +927,19 @@ function TerminalView:_applyOverlayModifiers(text)
 end
 
 function TerminalView:_resolveOverlayKey(key)
-    if self._overlayFn and key and key.fnLabel then
+    if not key then
+        return key
+    end
+
+    if key.action == "cn" then
+        return {
+            label = self._overlayCn and "EN" or "\228\184\173",
+            action = "cn",
+            width = key.width,
+        }
+    end
+
+    if self._overlayFn and key.fnLabel then
         return {
             label = key.fnLabel,
             action = key.fnAction or key.action,
@@ -826,6 +1005,30 @@ function TerminalView:_activateOverlayKey(key)
     self:_rumbleOverlayTap()
 
     local resolved = self:_resolveOverlayKey(key)
+    local composingCn = self._overlayCn and not self._overlayFn and #self._overlayPinyin > 0
+
+    if self._overlayCn and not self._overlayFn and resolved.action == "char" and resolved.letter then
+        self:_appendOverlayIme(string.lower(resolved.base or resolved.label or ""))
+        return
+    elseif composingCn and resolved.action == "char" and (resolved.base or ""):match("^%d$") then
+        local idx = tonumber(resolved.base)
+        if idx then
+            self:_commitOverlayIme(idx, false)
+        end
+        return
+    elseif composingCn and resolved.action == "backspace" then
+        if self:_backspaceOverlayIme() then
+            return
+        end
+    elseif composingCn and resolved.action == "space" then
+        self:_commitOverlayIme(1, true)
+        return
+    elseif composingCn and resolved.action == "enter" then
+        self:_commitOverlayIme(1, true)
+        return
+    elseif composingCn and (resolved.action == "text" or resolved.action == "send" or resolved.action == "tab" or (resolved.action == "char" and not resolved.letter)) then
+        self:_flushOverlayIme(true)
+    end
 
     if resolved.action == "char" then
         self:_appendOverlayText(self:_applyOverlayModifiers(self:_resolveOverlayChar(resolved)))
@@ -860,8 +1063,16 @@ function TerminalView:_activateOverlayKey(key)
         self:_cycleOverlayTheme()
     elseif resolved.action == "fn" then
         self._overlayFn = not self._overlayFn
+        if not self._overlayFn then
+            self:_refreshOverlayImeCandidates()
+        end
         self:_invalidate()
     elseif resolved.action == "cn" then
+        if self._overlayCn and #self._overlayPinyin > 0 then
+            self:_flushOverlayIme(true)
+        end
+        self._overlayCn = not self._overlayCn
+        self:_refreshOverlayImeCandidates()
         self:_invalidate()
     end
 end
@@ -934,53 +1145,47 @@ end
 
 function TerminalView:_collectOverlaySuggestions()
     local items = {}
-    local seen = {}
 
-    local function addItem(text, mode)
-        if not text or text == "" or seen[text] then return end
-        seen[text] = true
-        table.insert(items, { text = text, mode = mode or "text" })
+    if not (self._overlayCn and not self._overlayFn and #self._overlayPinyin > 0) then
+        return items
     end
 
-    for _, cmd in ipairs(OVERLAY_QUICK_COMMANDS) do
-        addItem(cmd, "replace")
-    end
-    for _, sym in ipairs(OVERLAY_QUICK_SYMBOLS) do
-        addItem(sym, "text")
+    self:_refreshOverlayImeCandidates()
+    local page = self._overlayImePage or 1
+    local pageCount = self:_getOverlayImePageCount()
+    local visible = self:_getOverlayImeVisibleCandidates()
+
+    if page > 1 then
+        table.insert(items, { mode = "ime_prev", display = string.format("< %d/%d", page, pageCount) })
     end
 
-    local prefix = self._overlayBuffer:match("([%w%._%-/]*)$") or ""
-    local lowerPrefix = string.lower(prefix)
-
-    if lowerPrefix ~= "" then
-        for _, cmd in ipairs(self._overlayRecentCommands) do
-            if string.sub(string.lower(cmd), 1, #lowerPrefix) == lowerPrefix then
-                addItem(cmd, "replace")
-            end
-        end
-        for _, cmd in ipairs(OVERLAY_COMMON_COMMANDS) do
-            if string.sub(string.lower(cmd), 1, #lowerPrefix) == lowerPrefix then
-                addItem(cmd, "replace")
-            end
-        end
-    else
-        for _, cmd in ipairs(self._overlayRecentCommands) do
-            addItem(cmd, "replace")
-        end
+    for index, candidate in ipairs(visible) do
+        local suffix = (candidate.remaining and candidate.remaining ~= "") and "+" or ""
+        table.insert(items, {
+            text = candidate.text,
+            mode = "ime",
+            candidate = candidate,
+            display = string.format("%d.%s%s", index, candidate.text, suffix),
+        })
     end
 
-    local limited = {}
-    for i, item in ipairs(items) do
-        limited[i] = item
-        if i >= 12 then break end
+    if page < pageCount then
+        table.insert(items, { mode = "ime_next", display = string.format("%d/%d >", page, pageCount) })
     end
-    return limited
+
+    return items
 end
 
 function TerminalView:_applySuggestion(item)
     if not item then return end
     self:_rumbleOverlayTap()
-    if item.mode == "replace" then
+    if item.mode == "ime" then
+        self:_selectOverlayImeCandidate(item.candidate or { text = item.text }, true)
+    elseif item.mode == "ime_prev" then
+        self:_changeOverlayImePage(-1)
+    elseif item.mode == "ime_next" then
+        self:_changeOverlayImePage(1)
+    elseif item.mode == "replace" then
         self:_syncOverlayBuffer(item.text)
     else
         self:_appendOverlayText(item.text)
@@ -1071,27 +1276,46 @@ function TerminalView:_handleOverlayActions(justPressed)
         self:_moveOverlaySelection(1, 0)
     end
 
+    local composingCn = self._overlayCn and (not self._overlayFn) and #self._overlayPinyin > 0
+
     if justPressed(B.BUTTON_A) then
-        self:_activateOverlayKey(self._overlaySelectedKey)
+        if composingCn then
+            self:_commitOverlayIme(1, true)
+        else
+            self:_activateOverlayKey(self._overlaySelectedKey)
+        end
     end
     if justPressed(B.BUTTON_B) then
-        self:_backspaceOverlayBuffer()
+        if not self:_backspaceOverlayIme() then
+            self:_backspaceOverlayBuffer()
+        end
     end
     if justPressed(B.BUTTON_X) then
         self._overlayShift = not self._overlayShift
         self:_invalidate()
     end
     if justPressed(B.BUTTON_Y) then
-        self:_appendOverlayText(self:_applyOverlayModifiers(" "))
+        if composingCn then
+            self:_commitOverlayIme(1, true)
+        else
+            self:_appendOverlayText(self:_applyOverlayModifiers(" "))
+        end
     end
     if justPressed(B.BUTTON_LB) then
-        self:_sendInput(Platform.keyMap.TAB)
-        self:_clearOverlayModifiers(false)
+        if not (composingCn and self:_changeOverlayImePage(-1)) then
+            self:_sendInput(Platform.keyMap.TAB)
+            self:_clearOverlayModifiers(false)
+        end
+    end
+    if justPressed(B.BUTTON_RB) then
+        if composingCn then
+            self:_changeOverlayImePage(1)
+        end
     end
     if justPressed(B.BUTTON_START) then
         self:_openSystemIme()
     end
-    if justPressed(B.BUTTON_RSB) or justPressed(B.BUTTON_RB) then
+    if justPressed(B.BUTTON_RSB) then
         self._overlayKeyboardVisible = false
         self:_invalidate()
     end
@@ -1357,13 +1581,14 @@ function TerminalView:_pollControllerShortcuts()
 end
 
 function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
-    local panelH = math.floor(h * 0.54)
-    if panelH < 344 then panelH = 344 end
+    local panelH = math.floor(h * 0.60)
+    if panelH < 392 then panelH = 392 end
     local panelY = y + h - panelH - 4
     local panelX = x + 12
     local panelW = w - 24
     local headerH = 30
-    local chipsH = 0
+    local suggestions = self:_collectOverlaySuggestions()
+    local chipsH = (#suggestions > 0) and 46 or 0
     local footerH = 0
     local rowGap = 2
     local keyGap = 4
@@ -1403,13 +1628,57 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgText(vg, panelX + panelW / 2, panelY + headerH / 2, OVERLAY_HINT_TEXT)
 
     local themeName = OVERLAY_THEME.name or "THEME"
-    local modeText = string.format("%s  Shift:%s Caps:%s Ctrl:%s Alt:%s Fn:%s", themeName, self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0", self._overlayFn and "1" or "0")
+    local imeMode = self._overlayCn and "\228\184\173" or "EN"
+    local composeText = (#self._overlayPinyin > 0) and (" [" .. self._overlayPinyin .. "]") or ""
+    local pageText = (#self._overlayImeCandidates > 0) and string.format(" %d/%d", self._overlayImePage or 1, self:_getOverlayImePageCount()) or ""
+    local modeText = string.format("%s %s%s%s  Shift:%s Caps:%s Ctrl:%s Alt:%s Fn:%s", themeName, imeMode, composeText, pageText, self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0", self._overlayFn and "1" or "0")
     nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 255))
     nvgText(vg, panelX + panelW - 14, panelY + headerH / 2, modeText)
 
     local rowY = panelY + headerH + 4
+    if chipsH > 0 then
+        local chipX = panelX + 12
+        local chipY = rowY
+        local chipH = chipsH - 8
+        for index, item in ipairs(suggestions) do
+            local chipLabel = item.display or item.text
+            nvgFontSize(vg, 12)
+            local chipW = math.max(72, math.min(180, 22 + #tostring(chipLabel) * 14))
+            if chipX + chipW > panelX + panelW - 12 then
+                break
+            end
+
+            local chipPalette = _overlayChipPalette(index, item)
+            nvgBeginPath(vg)
+            nvgRect(vg, chipX, chipY, chipW, chipH)
+            nvgFillColor(vg, chipPalette.fill)
+            nvgFill(vg)
+
+            nvgBeginPath(vg)
+            nvgRect(vg, chipX + 0.5, chipY + 0.5, chipW - 1, chipH - 1)
+            nvgStrokeColor(vg, chipPalette.border)
+            nvgStrokeWidth(vg, 1.0)
+            nvgStroke(vg)
+
+            nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+            nvgFillColor(vg, chipPalette.text)
+            nvgText(vg, chipX + chipW / 2, chipY + chipH / 2, chipLabel)
+
+            table.insert(self._overlayTouchTargets, {
+                x = chipX,
+                y = chipY,
+                w = chipW,
+                h = chipH,
+                type = "suggestion",
+                item = item,
+            })
+
+            chipX = chipX + chipW + 4
+        end
+        rowY = rowY + chipsH
+    end
     local contentW = panelW - 24
     for rowIndex, row in ipairs(rows) do
         local units = 0
