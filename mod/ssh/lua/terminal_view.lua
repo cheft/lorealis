@@ -340,7 +340,7 @@ local ARROW_LEFT_LABEL = "\226\134\144"
 local ARROW_DOWN_LABEL = "\226\134\147"
 local ARROW_RIGHT_LABEL = "\226\134\146"
 
-local OVERLAY_LAYOUT = {
+local OVERLAY_LAYOUT_CLASSIC = {
     {
         _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1.25 }),
         _key("1", { action = "char", base = "1", shift = "!", fnLabel = "F1", fnAction = "send", fnValue = Platform.keyMap.F1 }),
@@ -417,6 +417,207 @@ local OVERLAY_LAYOUT = {
     },
 }
 
+local OVERLAY_LAYOUT_COMPACT = {
+    {
+        _key("q", { action = "char", base = "q", letter = true, width = 1, slot = "q" }),
+        _key("w", { action = "char", base = "w", letter = true, width = 1, slot = "w" }),
+        _key("e", { action = "char", base = "e", letter = true, width = 1, slot = "e" }),
+        _key("r", { action = "char", base = "r", letter = true, width = 1, slot = "r" }),
+        _key("t", { action = "char", base = "t", letter = true, width = 1, slot = "t" }),
+        _key("y", { action = "char", base = "y", letter = true, width = 1, slot = "y" }),
+        _key("u", { action = "char", base = "u", letter = true, width = 1, slot = "u" }),
+        _key("i", { action = "char", base = "i", letter = true, width = 1, slot = "i" }),
+        _key("o", { action = "char", base = "o", letter = true, width = 1, slot = "o" }),
+    },
+    {
+        _key("a", { action = "char", base = "a", letter = true, width = 1, slot = "a" }),
+        _key("s", { action = "char", base = "s", letter = true, width = 1, slot = "s" }),
+        _key("d", { action = "char", base = "d", letter = true, width = 1, slot = "d" }),
+        _key("f", { action = "char", base = "f", letter = true, width = 1, slot = "f" }),
+        _key("g", { action = "char", base = "g", letter = true, width = 1, slot = "g" }),
+        _key("h", { action = "char", base = "h", letter = true, width = 1, slot = "h" }),
+        _key("j", { action = "char", base = "j", letter = true, width = 1, slot = "j" }),
+        _key("k", { action = "char", base = "k", letter = true, width = 1, slot = "k" }),
+        _key("l", { action = "char", base = "l", letter = true, width = 1, slot = "l" }),
+    },
+    {
+        _key("z", { action = "char", base = "z", letter = true, width = 1, slot = "z" }),
+        _key("x", { action = "char", base = "x", letter = true, width = 1, slot = "x" }),
+        _key("c", { action = "char", base = "c", letter = true, width = 1, slot = "c" }),
+        _key("v", { action = "char", base = "v", letter = true, width = 1, slot = "v" }),
+        _key("b", { action = "char", base = "b", letter = true, width = 1, slot = "b" }),
+        _key("n", { action = "char", base = "n", letter = true, width = 1, slot = "n" }),
+        _key("m", { action = "char", base = "m", letter = true, width = 1, slot = "m" }),
+        _key("p", { action = "char", base = "p", letter = true, width = 1, slot = "p" }),
+    },
+    {
+        _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1.15 }),
+        _key("Tab", { action = "tab", width = 1.15 }),
+        _key("Caps", { action = "caps", width = 1.15 }),
+        _key("Shift", { action = "shift", width = 1.35 }),
+        _key("Del", { action = "send", value = Platform.keyMap.DEL, width = 1.15 }),
+        _key("Enter", { action = "enter", width = 1.55 }),
+    },
+    {
+        _key("\228\184\173/EN", { action = "cn", width = 1.15 }),
+        _key("Ctrl", { action = "ctrl", width = 1.05 }),
+        _key("Alt", { action = "alt", width = 1.05 }),
+        _key("Space", { action = "space", width = 4.25 }),
+        _key("Win", { action = "meta", width = 0.95 }),
+        _key("Fn", { action = "fn", width = 0.95 }),
+        _key("...", { action = "fn_page", width = 0.9 }),
+    },
+}
+
+local OVERLAY_COMPACT_FN_PAGES = {
+    {
+        name = "NUM",
+        normal = {
+            q = { label = "1", action = "char", base = "1", shift = "!" },
+            w = { label = "2", action = "char", base = "2", shift = "@" },
+            e = { label = "3", action = "char", base = "3", shift = "#" },
+            r = { label = "4", action = "char", base = "4", shift = "$" },
+            t = { label = "5", action = "char", base = "5", shift = "%" },
+            y = { label = "Home", action = "send", value = Platform.keyMap.HOME },
+            u = { label = ARROW_UP_LABEL, action = "send", value = Platform.keyMap.UP },
+            i = { label = "PgUp", action = "send", value = Platform.keyMap.PGUP },
+            o = { label = "Del", action = "send", value = Platform.keyMap.DEL },
+            a = { label = "6", action = "char", base = "6", shift = "^" },
+            s = { label = "7", action = "char", base = "7", shift = "&" },
+            d = { label = "8", action = "char", base = "8", shift = "*" },
+            f = { label = "9", action = "char", base = "9", shift = "(" },
+            g = { label = "0", action = "char", base = "0", shift = ")" },
+            h = { label = ARROW_LEFT_LABEL, action = "send", value = Platform.keyMap.LEFT },
+            j = { label = ARROW_DOWN_LABEL, action = "send", value = Platform.keyMap.DOWN },
+            k = { label = ARROW_RIGHT_LABEL, action = "send", value = Platform.keyMap.RIGHT },
+            l = { label = "End", action = "send", value = Platform.keyMap.END },
+            z = { label = "-", action = "char", base = "-", shift = "_" },
+            x = { label = "/", action = "char", base = "/", shift = "?" },
+            c = { label = ":", action = "char", base = ":", shift = ";" },
+            v = { label = "@", action = "char", base = "@" },
+            b = { label = "[", action = "char", base = "[", shift = "{" },
+            n = { label = "]", action = "char", base = "]", shift = "}" },
+            m = { label = "=", action = "char", base = "=", shift = "+" },
+            p = { label = ".", action = "char", base = ".", shift = "," },
+        },
+        shift = {
+            q = { label = "!", action = "char", base = "!" },
+            w = { label = "@", action = "char", base = "@" },
+            e = { label = "#", action = "char", base = "#" },
+            r = { label = "$", action = "char", base = "$" },
+            t = { label = "%", action = "char", base = "%" },
+            y = { label = "^", action = "char", base = "^" },
+            u = { label = "&", action = "char", base = "&" },
+            i = { label = "*", action = "char", base = "*" },
+            o = { label = "~", action = "char", base = "~" },
+            a = { label = "(", action = "char", base = "(" },
+            s = { label = ")", action = "char", base = ")" },
+            d = { label = "{", action = "char", base = "{" },
+            f = { label = "}", action = "char", base = "}" },
+            g = { label = "[", action = "char", base = "[" },
+            h = { label = "]", action = "char", base = "]" },
+            j = { label = "<", action = "char", base = "<" },
+            k = { label = ">", action = "char", base = ">" },
+            l = { label = "|", action = "char", base = "|" },
+            z = { label = "+", action = "char", base = "+" },
+            x = { label = "-", action = "char", base = "-" },
+            c = { label = "_", action = "char", base = "_" },
+            v = { label = "\\", action = "char", base = "\\" },
+            b = { label = "`", action = "char", base = "`" },
+            n = { label = ";", action = "char", base = ";" },
+            m = { label = "'", action = "char", base = "'" },
+            p = { label = "?", action = "char", base = "?" },
+        },
+    },
+    {
+        name = "SYS",
+        normal = {
+            q = { label = "F1", action = "send", value = Platform.keyMap.F1 },
+            w = { label = "F2", action = "send", value = Platform.keyMap.F2 },
+            e = { label = "F3", action = "send", value = Platform.keyMap.F3 },
+            r = { label = "F4", action = "send", value = Platform.keyMap.F4 },
+            t = { label = "F5", action = "send", value = Platform.keyMap.F5 },
+            y = { label = "F6", action = "send", value = Platform.keyMap.F6 },
+            u = { label = "F7", action = "send", value = Platform.keyMap.F7 },
+            i = { label = "F8", action = "send", value = Platform.keyMap.F8 },
+            o = { label = "F9", action = "send", value = Platform.keyMap.F9 },
+            a = { label = "F10", action = "send", value = Platform.keyMap.F10 },
+            s = { label = "F11", action = "send", value = Platform.keyMap.F11 },
+            d = { label = "F12", action = "send", value = Platform.keyMap.F12 },
+            f = { label = "Tab", action = "tab" },
+            g = { label = "Esc", action = "send", value = Platform.keyMap.ESC },
+            h = { label = "Home", action = "send", value = Platform.keyMap.HOME },
+            j = { label = "PgUp", action = "send", value = Platform.keyMap.PGUP },
+            k = { label = "PgDn", action = "send", value = Platform.keyMap.PGDN },
+            l = { label = "End", action = "send", value = Platform.keyMap.END },
+            z = { label = "Ins", action = "send", value = Platform.keyMap.INS },
+            x = { label = "Del", action = "send", value = Platform.keyMap.DEL },
+            c = { label = "`", action = "char", base = "`", shift = "~" },
+            v = { label = "$", action = "char", base = "$" },
+            b = { label = "%", action = "char", base = "%" },
+            n = { label = "^", action = "char", base = "^" },
+            m = { label = "&", action = "char", base = "&" },
+            p = { label = "*", action = "char", base = "*" },
+        },
+        shift = {
+            q = { label = "'", action = "char", base = "'" },
+            w = { label = '"', action = "char", base = '"' },
+            e = { label = "=", action = "char", base = "=" },
+            r = { label = "+", action = "char", base = "+" },
+            t = { label = "/", action = "char", base = "/" },
+            y = { label = "\\", action = "char", base = "\\" },
+            u = { label = "|", action = "char", base = "|" },
+            i = { label = "(", action = "char", base = "(" },
+            o = { label = ")", action = "char", base = ")" },
+            a = { label = "[", action = "char", base = "[" },
+            s = { label = "]", action = "char", base = "]" },
+            d = { label = "{", action = "char", base = "{" },
+            f = { label = "}", action = "char", base = "}" },
+            g = { label = "<", action = "char", base = "<" },
+            h = { label = ">", action = "char", base = ">" },
+            j = { label = ";", action = "char", base = ";" },
+            k = { label = ":", action = "char", base = ":" },
+            l = { label = ",", action = "char", base = "," },
+            z = { label = ".", action = "char", base = "." },
+            x = { label = "?", action = "char", base = "?" },
+            c = { label = "!", action = "char", base = "!" },
+            v = { label = "~", action = "char", base = "~" },
+            b = { label = "_", action = "char", base = "_" },
+            n = { label = "-", action = "char", base = "-" },
+            m = { label = "#", action = "char", base = "#" },
+            p = { label = "@", action = "char", base = "@" },
+        },
+    },
+}
+
+local function _getOverlayLayoutByMode(mode)
+    if mode == "compact" then
+        return OVERLAY_LAYOUT_COMPACT
+    end
+    return OVERLAY_LAYOUT_CLASSIC
+end
+
+local function _getDefaultOverlayKeyByMode(mode)
+    local layout = _getOverlayLayoutByMode(mode)
+    if mode == "compact" then
+        return layout[1][1]
+    end
+    return layout[2][2]
+end
+
+local function _resolveOverlayVariant(baseKey, variant)
+    return {
+        label = variant.label or baseKey.label,
+        action = variant.action or baseKey.action,
+        value = variant.value,
+        base = variant.base,
+        shift = variant.shift,
+        letter = variant.letter,
+        width = variant.width or baseKey.width,
+        slot = baseKey.slot,
+    }
+end
+
 local BG_R, BG_G, BG_B = 12, 12, 12
 
 ---@param sshManager SSHManager
@@ -459,14 +660,17 @@ function TerminalView.new(sshManager)
     self._overlayCtrl = false
     self._overlayAlt = false
     self._overlayFn = false
+    self._overlayMeta = false
     self._overlayCn = false
+    self._overlayLayoutMode = "classic"
+    self._overlayFnPage = 1
     self._overlayPinyin = ""
     self._overlayImeCandidates = {}
     self._overlayImePage = 1
     self._overlayImeLastCommit = nil
     self._overlayTouchTargets = {}
     self._overlayPanelRect = nil
-    self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
+    self._overlaySelectedKey = _getDefaultOverlayKeyByMode(self._overlayLayoutMode)
     self._overlayRecentCommands = {}
     self._overlayThemeIndex = OVERLAY_THEME_INDEX_DEFAULT
     OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
@@ -730,14 +934,17 @@ function TerminalView:reset()
     self._overlayCtrl = false
     self._overlayAlt = false
     self._overlayFn = false
+    self._overlayMeta = false
     self._overlayCn = false
+    self._overlayLayoutMode = self._overlayLayoutMode or "classic"
+    self._overlayFnPage = 1
     self._overlayPinyin = ""
     self._overlayImeCandidates = {}
     self._overlayImePage = 1
     self._overlayImeLastCommit = nil
     self._overlayTouchTargets = {}
     self._overlayPanelRect = nil
-    self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
+    self._overlaySelectedKey = _getDefaultOverlayKeyByMode(self._overlayLayoutMode)
     self._overlayRecentCommands = {}
     self._overlayThemeIndex = self._overlayThemeIndex or OVERLAY_THEME_INDEX_DEFAULT
     OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
@@ -878,9 +1085,48 @@ function TerminalView:_clearOverlayModifiers(clearCaps)
     self._overlayShift = false
     self._overlayCtrl = false
     self._overlayAlt = false
+    self._overlayMeta = false
     if clearCaps then
         self._overlayCaps = false
     end
+end
+
+function TerminalView:_getOverlayLayout()
+    return _getOverlayLayoutByMode(self._overlayLayoutMode)
+end
+
+function TerminalView:_isCompactOverlayLayout()
+    return self._overlayLayoutMode == "compact"
+end
+
+function TerminalView:_toggleOverlayLayout()
+    self._overlayLayoutMode = self:_isCompactOverlayLayout() and "classic" or "compact"
+    self._overlayFn = false
+    self._overlayMeta = false
+    self._overlayFnPage = 1
+    self._overlaySelectedKey = _getDefaultOverlayKeyByMode(self._overlayLayoutMode)
+    self:_refreshOverlayImeCandidates()
+    self:_invalidate()
+end
+
+function TerminalView:_cycleOverlayFnPage()
+    local pageCount = #OVERLAY_COMPACT_FN_PAGES
+    if pageCount <= 0 then
+        return
+    end
+
+    if not self._overlayFn then
+        self._overlayFn = true
+        self._overlayFnPage = math.min(2, pageCount)
+    else
+        self._overlayFnPage = (self._overlayFnPage or 1) + 1
+        if self._overlayFnPage > pageCount then
+            self._overlayFnPage = 1
+        end
+    end
+
+    self:_refreshOverlayImeCandidates()
+    self:_invalidate()
 end
 
 function TerminalView:_rememberCommand(command)
@@ -908,6 +1154,7 @@ end
 
 function TerminalView:_applyOverlayModifiers(text)
     local out = text or ""
+    local preserveShiftLayer = self:_isCompactOverlayLayout() and self._overlayFn and self._overlayShift
 
     if self._overlayCtrl and #out == 1 then
         local byte = string.byte(string.upper(out))
@@ -920,9 +1167,12 @@ function TerminalView:_applyOverlayModifiers(text)
         out = Platform.keyMap.ESC .. out
     end
 
-    self._overlayShift = false
+    if not preserveShiftLayer then
+        self._overlayShift = false
+    end
     self._overlayCtrl = false
     self._overlayAlt = false
+    self._overlayMeta = false
     return out
 end
 
@@ -937,6 +1187,15 @@ function TerminalView:_resolveOverlayKey(key)
             action = "cn",
             width = key.width,
         }
+    end
+
+    if self:_isCompactOverlayLayout() and self._overlayFn and key.slot then
+        local page = OVERLAY_COMPACT_FN_PAGES[self._overlayFnPage or 1]
+        local variants = page and ((self._overlayShift and page.shift) or page.normal)
+        local variant = variants and variants[key.slot]
+        if variant then
+            return _resolveOverlayVariant(key, variant)
+        end
     end
 
     if self._overlayFn and key.fnLabel then
@@ -974,6 +1233,7 @@ function TerminalView:_backspaceOverlayBuffer()
     self._overlayShift = false
     self._overlayCtrl = false
     self._overlayAlt = false
+    self._overlayMeta = false
     self:_invalidate()
 end
 
@@ -1060,13 +1320,25 @@ function TerminalView:_activateOverlayKey(key, source)
         self._overlayAlt = not self._overlayAlt
         self:_invalidate()
     elseif resolved.action == "meta" then
-        self:_cycleOverlayTheme()
-    elseif resolved.action == "fn" then
-        self._overlayFn = not self._overlayFn
-        if not self._overlayFn then
-            self:_refreshOverlayImeCandidates()
+        if self._overlayFn then
+            self:_toggleOverlayLayout()
+        else
+            self._overlayMeta = not self._overlayMeta
+            self:_invalidate()
         end
-        self:_invalidate()
+    elseif resolved.action == "fn" then
+        if self._overlayMeta then
+            self:_toggleOverlayLayout()
+        else
+            self._overlayFn = not self._overlayFn
+            if not self._overlayFn then
+                self._overlayFnPage = 1
+                self:_refreshOverlayImeCandidates()
+            end
+            self:_invalidate()
+        end
+    elseif resolved.action == "fn_page" then
+        self:_cycleOverlayFnPage()
     elseif resolved.action == "cn" then
         if self._overlayCn and #self._overlayPinyin > 0 then
             self:_flushOverlayIme(true)
@@ -1203,11 +1475,13 @@ function TerminalView:_applySuggestion(item, source)
 end
 
 function TerminalView:_findOverlayKeyPosition(target)
+    local layout = self:_getOverlayLayout()
     if not target then
-        return 2, 2
+        local defaultKey = _getDefaultOverlayKeyByMode(self._overlayLayoutMode)
+        return self:_findOverlayKeyPosition(defaultKey)
     end
 
-    for rowIndex, row in ipairs(OVERLAY_LAYOUT) do
+    for rowIndex, row in ipairs(layout) do
         for colIndex, key in ipairs(row) do
             if key == target then
                 return rowIndex, colIndex
@@ -1215,15 +1489,21 @@ function TerminalView:_findOverlayKeyPosition(target)
         end
     end
 
-    return 2, 2
+    local fallbackKey = _getDefaultOverlayKeyByMode(self._overlayLayoutMode)
+    if target ~= fallbackKey then
+        return self:_findOverlayKeyPosition(fallbackKey)
+    end
+
+    return 1, 1
 end
 
 function TerminalView:_moveOverlaySelection(dx, dy, source)
+    local layout = self:_getOverlayLayout()
     local previous = self._overlaySelectedKey
     local rowIndex, colIndex = self:_findOverlayKeyPosition(self._overlaySelectedKey)
-    local nextRow = math.max(1, math.min(#OVERLAY_LAYOUT, rowIndex + dy))
+    local nextRow = math.max(1, math.min(#layout, rowIndex + dy))
     local nextCol = colIndex + dx
-    local row = OVERLAY_LAYOUT[nextRow]
+    local row = layout[nextRow]
 
     if nextCol < 1 then nextCol = 1 end
     if nextCol > #row then nextCol = #row end
@@ -1619,19 +1899,24 @@ function TerminalView:_pollControllerShortcuts()
 end
 
 function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
-    local panelH = math.floor(h * 0.60)
+    local compactLayout = self:_isCompactOverlayLayout()
+    local panelInset = compactLayout and 0 or 12
+    local contentInset = compactLayout and 4 or 12
+    local modeLabel = compactLayout and "COMPACT" or "CLASSIC"
+    local fnPageName = (self._overlayFn and OVERLAY_COMPACT_FN_PAGES[self._overlayFnPage or 1] and OVERLAY_COMPACT_FN_PAGES[self._overlayFnPage or 1].name) or "-"
+    local panelH = math.floor(h * (compactLayout and 0.72 or 0.60))
     if panelH < 392 then panelH = 392 end
-    local panelY = y + h - panelH - 4
-    local panelX = x + 12
-    local panelW = w - 24
-    local headerH = 30
+    local panelY = y + h - panelH - (compactLayout and 0 or 4)
+    local panelX = x + panelInset
+    local panelW = w - panelInset * 2
+    local headerH = compactLayout and 26 or 30
     local suggestions = self:_collectOverlaySuggestions()
     local chipsH = (#suggestions > 0) and 52 or 0
     local chipsGap = (#suggestions > 0) and 8 or 0
     local footerH = 0
-    local rowGap = 2
-    local keyGap = 4
-    local rows = OVERLAY_LAYOUT
+    local rowGap = compactLayout and 1 or 2
+    local keyGap = compactLayout and 2 or 4
+    local rows = self:_getOverlayLayout()
     local rowAreaH = panelH - headerH - footerH - 6
     local keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
     if keyH < 54 then keyH = 54 end
@@ -1659,18 +1944,19 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgFontSize(vg, 12)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.title_text, 255))
-    nvgText(vg, panelX + 14, panelY + headerH / 2, "Touch Keyboard")
+    nvgText(vg, panelX + 10, panelY + headerH / 2, compactLayout and "Touch Keyboard Compact" or "Touch Keyboard")
 
+    local overlayHintText = compactLayout and "Touch/A Type  B BS  X Shift  Y Space  Win+Fn Layout  ... More" or OVERLAY_HINT_TEXT
     nvgFontSize(vg, 10)
     nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
-    nvgText(vg, panelX + panelW / 2, panelY + headerH / 2, OVERLAY_HINT_TEXT)
+    nvgText(vg, panelX + panelW / 2, panelY + headerH / 2, overlayHintText)
 
     local themeName = OVERLAY_THEME.name or "THEME"
     local imeMode = self._overlayCn and "\228\184\173" or "EN"
     local composeText = (#self._overlayPinyin > 0) and (" [" .. self._overlayPinyin .. "]") or ""
     local pageText = (#self._overlayImeCandidates > 0) and string.format(" %d/%d", self._overlayImePage or 1, self:_getOverlayImePageCount()) or ""
-    local modeText = string.format("%s %s%s%s  Shift:%s Caps:%s Ctrl:%s Alt:%s Fn:%s", themeName, imeMode, composeText, pageText, self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0", self._overlayFn and "1" or "0")
+    local modeText = string.format("%s %s %s%s%s  Shift:%s Caps:%s Ctrl:%s Alt:%s Win:%s Fn:%s Pg:%s", themeName, modeLabel, imeMode, composeText, pageText, self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0", self._overlayMeta and "1" or "0", self._overlayFn and "1" or "0", fnPageName)
     nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 255))
@@ -1680,7 +1966,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     if chipsH > 0 then
         local chipBandY = panelY - chipsH - chipsGap
         local chipBandH = chipsH
-        local chipInset = 10
+        local chipInset = compactLayout and 4 or 10
         local chipX = panelX + chipInset
         local chipY = chipBandY + 4
         local chipH = chipBandH - 8
@@ -1737,14 +2023,14 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
             chipX = chipX + chipW + 4
         end
     end
-    local contentW = panelW - 24
+    local contentW = panelW - contentInset * 2
     for rowIndex, row in ipairs(rows) do
         local units = 0
         for _, key in ipairs(row) do
             units = units + (key.width or 1)
         end
         local keyUnitW = (contentW - keyGap * (#row - 1)) / units
-        local keyX = panelX + 12
+        local keyX = panelX + contentInset
 
         for _, key in ipairs(row) do
             local keyW = keyUnitW * (key.width or 1)
@@ -1753,7 +2039,9 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
                 or (key.action == "caps" and self._overlayCaps)
                 or (key.action == "ctrl" and self._overlayCtrl)
                 or (key.action == "alt" and self._overlayAlt)
+                or (key.action == "meta" and self._overlayMeta)
                 or (key.action == "fn" and self._overlayFn)
+                or (key.action == "fn_page" and self._overlayFn and (self._overlayFnPage or 1) > 1)
             local palette = _overlayKeyPalette(key, rowIndex, selected, active)
 
             nvgBeginPath(vg)
