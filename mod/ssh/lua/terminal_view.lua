@@ -419,6 +419,7 @@ local OVERLAY_LAYOUT_CLASSIC = {
 
 local OVERLAY_LAYOUT_COMPACT = {
     {
+        _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1 }),
         _key("q", { action = "char", base = "q", letter = true, width = 1, slot = "q" }),
         _key("w", { action = "char", base = "w", letter = true, width = 1, slot = "w" }),
         _key("e", { action = "char", base = "e", letter = true, width = 1, slot = "e" }),
@@ -428,8 +429,12 @@ local OVERLAY_LAYOUT_COMPACT = {
         _key("u", { action = "char", base = "u", letter = true, width = 1, slot = "u" }),
         _key("i", { action = "char", base = "i", letter = true, width = 1, slot = "i" }),
         _key("o", { action = "char", base = "o", letter = true, width = 1, slot = "o" }),
-    },
+        _key("p", { action = "char", base = "p", letter = true, width = 1, slot = "p" }),
+        _key("BS", { action = "backspace", width = 1, fnLabel = "Del", fnAction = "send", fnValue = Platform.keyMap.DEL }),
+    },  
     {
+        _key("Tab", { action = "tab", width = 1 }),
+        _key("Caps", { action = "caps", width = 0.5}),
         _key("a", { action = "char", base = "a", letter = true, width = 1, slot = "a" }),
         _key("s", { action = "char", base = "s", letter = true, width = 1, slot = "s" }),
         _key("d", { action = "char", base = "d", letter = true, width = 1, slot = "d" }),
@@ -439,8 +444,11 @@ local OVERLAY_LAYOUT_COMPACT = {
         _key("j", { action = "char", base = "j", letter = true, width = 1, slot = "j" }),
         _key("k", { action = "char", base = "k", letter = true, width = 1, slot = "k" }),
         _key("l", { action = "char", base = "l", letter = true, width = 1, slot = "l" }),
+        _key("Enter", { action = "enter", width = 1.5 }),
     },
     {
+        _key("Shift", { action = "shift", width = 1}),
+        _key("Fn", { action = "fn", width = 1 }),
         _key("z", { action = "char", base = "z", letter = true, width = 1, slot = "z" }),
         _key("x", { action = "char", base = "x", letter = true, width = 1, slot = "x" }),
         _key("c", { action = "char", base = "c", letter = true, width = 1, slot = "c" }),
@@ -448,24 +456,31 @@ local OVERLAY_LAYOUT_COMPACT = {
         _key("b", { action = "char", base = "b", letter = true, width = 1, slot = "b" }),
         _key("n", { action = "char", base = "n", letter = true, width = 1, slot = "n" }),
         _key("m", { action = "char", base = "m", letter = true, width = 1, slot = "m" }),
-        _key("p", { action = "char", base = "p", letter = true, width = 1, slot = "p" }),
+        _key(",", { action = "char", base = ",", shift = "<", width = 1 }),
+         _key(ARROW_UP_LABEL, { action = "send", value = Platform.keyMap.UP, width = 1, fnLabel = "PgUp", fnValue = Platform.keyMap.PGUP }),
+        _key(".", { action = "char", base = ".", shift = ">", width = 1 }),
+        -- _key(";", { action = "char", base = ";", shift = ":", width = 1 }),
     },
+    -- {
+    --     _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1.15 }),
+    --     _key("Tab", { action = "tab", width = 1.15 }),
+    --     _key("Caps", { action = "caps", width = 1.15 }),
+    --     _key("Shift", { action = "shift", width = 1.35 }),
+    --     _key("Del", { action = "send", value = Platform.keyMap.DEL, width = 1.15 }),
+    --     _key("Enter", { action = "enter", width = 1.55 }),
+    -- },
     {
-        _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1.15 }),
-        _key("Tab", { action = "tab", width = 1.15 }),
-        _key("Caps", { action = "caps", width = 1.15 }),
-        _key("Shift", { action = "shift", width = 1.35 }),
-        _key("Del", { action = "send", value = Platform.keyMap.DEL, width = 1.15 }),
-        _key("Enter", { action = "enter", width = 1.55 }),
-    },
-    {
-        _key("\228\184\173/EN", { action = "cn", width = 1.15 }),
-        _key("Ctrl", { action = "ctrl", width = 1.05 }),
-        _key("Alt", { action = "alt", width = 1.05 }),
-        _key("Space", { action = "space", width = 4.25 }),
-        _key("Win", { action = "meta", width = 0.95 }),
-        _key("Fn", { action = "fn", width = 0.95 }),
-        _key("...", { action = "fn_page", width = 0.9 }),
+        _key("\228\184\173/EN", { action = "cn", width = 1 }),
+        _key("Ctrl", { action = "ctrl", width = 1 }),
+        _key("Win", { action = "meta", width = 1}),
+        _key("Alt", { action = "alt", width = 1}),
+        _key("Space", { action = "space", width = 5 }),
+        -- _key("...", { action = "fn_page", width = 0.9 }),
+        _key(ARROW_LEFT_LABEL, { action = "send", value = Platform.keyMap.LEFT, width = 1, fnLabel = "Home", fnValue = Platform.keyMap.HOME }),
+        _key(ARROW_DOWN_LABEL, { action = "send", value = Platform.keyMap.DOWN, width = 1, fnLabel = "PgDn", fnValue = Platform.keyMap.PGDN }),
+        _key(ARROW_RIGHT_LABEL, { action = "send", value = Platform.keyMap.RIGHT, width = 1, fnLabel = "End", fnValue = Platform.keyMap.END }),
+
+
     },
 }
 
