@@ -37,6 +37,10 @@ function onInit()
     print("main.lua: Loading monospace font (Consolas)...")
     brls.Application.loadFontFromFile("monospace", BRLS_RESOURCES .. "font/wqy-microhei_mono.ttf")
     brls.Application.addFontFallback("monospace", "zh-Hans")
+    brls.Application.addFontFallback("regular", "monospace")
+    brls.Application.addFontFallback("zh-Hans", "monospace")
+    brls.Application.addFontFallback("zh-Hant", "monospace")
+    brls.Application.addFontFallback("korean", "monospace")
     
     print("main.lua: [4/7] Configuring app settings...")
     brls.Application.setGlobalQuit(false)
@@ -70,4 +74,3 @@ end
 
 -- Re-setup things from old main.lua if needed
 print("BRLS: main.lua loaded.")
-
