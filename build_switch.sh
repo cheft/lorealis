@@ -6,6 +6,33 @@ cd /data
 
 BUILD_DIR=build_switch
 
+# ---- Build parallelism (avoid OOM on Docker Desktop / Apple Silicon) ----
+# Symptom when out-of-memory: `aarch64-none-elf-g++: fatal error: Killed signal terminated program cc1plus`
+#
+# You can override explicitly:
+#   BUILD_JOBS=2 docker run ...
+#
+# Otherwise we auto-pick a conservative job count based on container memory.
+if [ -z "${BUILD_JOBS}" ]; then
+    DEFAULT_JOBS="$(nproc)"
+
+    if [ -r /proc/meminfo ]; then
+        MEM_KB="$(awk '/MemTotal/ {print $2}' /proc/meminfo)"
+        MEM_GB=$((MEM_KB / 1024 / 1024))
+
+        # Conservative defaults (Docker Desktop often limits memory by default)
+        if [ "${MEM_GB}" -le 4 ]; then
+            BUILD_JOBS=1
+        elif [ "${MEM_GB}" -le 8 ]; then
+            BUILD_JOBS=2
+        else
+            BUILD_JOBS="${DEFAULT_JOBS}"
+        fi
+    else
+        BUILD_JOBS=2
+    fi
+fi
+
 # 1. 安装必要的 Switch 开发包
 echo "Installing Switch dependencies..."
 dkp-pacman -S --noconfirm \
@@ -40,7 +67,8 @@ cmake -G "Unix Makefiles" \
 
 # 4. 执行编译
 echo "Building ELF..."
-cmake --build ${BUILD_DIR} -j$(nproc)
+echo "Using BUILD_JOBS=${BUILD_JOBS}"
+cmake --build ${BUILD_DIR} --parallel ${BUILD_JOBS}
 
 # 5. 手动打包 NRO (使用修复后的 --romfsdir)
 echo "----------------------------------------------------"

@@ -93,13 +93,12 @@ cmake --build build --config Release
 ```powershell
 docker run --rm -v "${PWD}:/data" devkitpro/devkita64:20260219 bash -c "/data/build_switch.sh"
 
-docker run --rm -v "%cd%:/data" devkitpro/devkita64:20251117 bash -c "/data/build_switch.sh"
-
 # fast repack for lua or xml changed
 docker run --rm -v "${PWD}:/data" devkitpro/devkita64:20260219 bash -c "/data/scripts/repack_switch_romfs.sh"
 
 # copy to ns
-docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/devkita64:20260219 bash
+docker run --rm -it -v "${PWD}/build_switch":/work devkitpro/devkita64:20260219 bash
+
 /opt/devkitpro/tools/bin/nxlink -a 192.168.31.91 /work/lorealis.nro
 ```
 

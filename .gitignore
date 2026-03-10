@@ -3,7 +3,6 @@ build_windows
 build_switch
 build_pc
 data
-lib
 *.log
 *.tmp
 *.bak
