@@ -12,6 +12,7 @@
 #include <sstream>
 #ifdef __SWITCH__
 #include <switch.h>
+#include <borealis/platforms/switch/switch_input.hpp>
 #endif
 #ifdef _WIN32
 #include <direct.h>
@@ -238,6 +239,38 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
             "x", 0.0f,
             "y", 0.0f,
             "id", -1));
+#endif
+    };
+    app["pulseSwitchRumble"] = [](sol::optional<float> lowAmp,
+        sol::optional<float> highAmp,
+        sol::optional<int> durationMs) -> bool {
+#ifdef __SWITCH__
+        brls::InputManager* inputManager = brls::Application::getPlatform()->getInputManager();
+        auto* switchInput = dynamic_cast<brls::SwitchInputManager*>(inputManager);
+        if (!switchInput)
+            return false;
+
+        float low = lowAmp.value_or(0.35f);
+        float high = highAmp.value_or(0.65f);
+        int duration = durationMs.value_or(28);
+
+        if (low < 0.0f) low = 0.0f;
+        if (low > 1.0f) low = 1.0f;
+        if (high < 0.0f) high = 0.0f;
+        if (high > 1.0f) high = 1.0f;
+        if (duration < 8) duration = 8;
+        if (duration > 250) duration = 250;
+
+        switchInput->sendRumbleRaw(160.0f, 320.0f, low, high);
+        brls::delay(duration, [switchInput]() {
+            switchInput->sendRumbleRaw(160.0f, 320.0f, 0.0f, 0.0f);
+        });
+        return true;
+#else
+        (void)lowAmp;
+        (void)highAmp;
+        (void)durationMs;
+        return false;
 #endif
     };
     app["openTextIME"] = [](sol::protected_function cb,

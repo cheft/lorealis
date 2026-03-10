@@ -67,9 +67,10 @@ local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+C interrupt | PageUp/Dow
 local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter Submit  + IME  R3 Hide"
 local DPAD_REPEAT_DELAY_MS = 550
 local DPAD_REPEAT_INTERVAL_MS = 180
-local OVERLAY_RUMBLE_LOW = 180
-local OVERLAY_RUMBLE_HIGH = 280
+local OVERLAY_RUMBLE_LOW = 22000
+local OVERLAY_RUMBLE_HIGH = 42000
 local OVERLAY_RUMBLE_INTERVAL_MS = 45
+local OVERLAY_RUMBLE_PULSE_MS = 28
 
 local function _key(label, opts)
     opts = opts or {}
@@ -221,6 +222,8 @@ function TerminalView.new(sshManager)
     self._buttonRepeatState = {}
     self._touchState = { pressed = false, x = 0, y = 0, id = -1 }
     self._lastOverlayRumbleAt = 0
+    self._overlayRumbleSeq = 0
+    self._overlayRumbleCooling = false
 
     return self
 end
@@ -455,6 +458,8 @@ function TerminalView:reset()
     self._overlayRecentCommands = {}
     self._buttonRepeatState = {}
     self._touchState = { pressed = false, x = 0, y = 0, id = -1 }
+    self._overlayRumbleCooling = false
+    self._overlayRumbleSeq = 0
     self:_invalidate()
 end
 
@@ -599,10 +604,32 @@ end
 
 function TerminalView:_rumbleOverlayTap(kind)
     if not Platform.isSwitch then return end
+    if self._overlayRumbleCooling then return end
 
-    local now = math.floor(os.clock() * 1000)
-    if now - (self._lastOverlayRumbleAt or 0) < OVERLAY_RUMBLE_INTERVAL_MS then
-        return
+    self._overlayRumbleCooling = true
+    pcall(function()
+        brls.delay(OVERLAY_RUMBLE_INTERVAL_MS, function()
+            self._overlayRumbleCooling = false
+        end)
+    end)
+
+    local low = OVERLAY_RUMBLE_LOW
+    local high = OVERLAY_RUMBLE_HIGH
+    if kind == "nav" then
+        low = math.max(12000, math.floor(low * 0.55))
+        high = math.max(22000, math.floor(high * 0.55))
+    end
+
+    self._overlayRumbleSeq = (self._overlayRumbleSeq or 0) + 1
+    local seq = self._overlayRumbleSeq
+
+    if brls.Application.pulseSwitchRumble then
+        local okPulse, didPulse = pcall(function()
+            return brls.Application.pulseSwitchRumble(low / 65535.0, high / 65535.0, OVERLAY_RUMBLE_PULSE_MS)
+        end)
+        if okPulse and didPulse then
+            return
+        end
     end
 
     local ok, inputManager = pcall(function()
@@ -613,18 +640,23 @@ function TerminalView:_rumbleOverlayTap(kind)
         return
     end
 
-    local low = OVERLAY_RUMBLE_LOW
-    local high = OVERLAY_RUMBLE_HIGH
-    if kind == "nav" then
-        low = math.max(60, math.floor(low * 0.55))
-        high = math.max(90, math.floor(high * 0.55))
-    end
-
     pcall(function()
         inputManager:sendRumble(0, low, high)
     end)
 
-    self._lastOverlayRumbleAt = now
+    pcall(function()
+        brls.delay(OVERLAY_RUMBLE_PULSE_MS, function()
+            if self._overlayRumbleSeq ~= seq then
+                return
+            end
+
+            pcall(function()
+                inputManager:sendRumble(0, 0, 0)
+            end)
+        end)
+    end)
+
+    self._lastOverlayRumbleAt = 0
 end
 
 function TerminalView:_collectOverlaySuggestions()
