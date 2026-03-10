@@ -342,19 +342,19 @@ local ARROW_RIGHT_LABEL = "\226\134\146"
 local OVERLAY_LAYOUT = {
     {
         _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1.25 }),
-        _key("1", { action = "char", base = "1", shift = "!" }),
-        _key("2", { action = "char", base = "2", shift = "@" }),
-        _key("3", { action = "char", base = "3", shift = "#" }),
-        _key("4", { action = "char", base = "4", shift = "$" }),
-        _key("5", { action = "char", base = "5", shift = "%" }),
-        _key("6", { action = "char", base = "6", shift = "^" }),
-        _key("7", { action = "char", base = "7", shift = "&" }),
-        _key("8", { action = "char", base = "8", shift = "*" }),
-        _key("9", { action = "char", base = "9", shift = "(" }),
-        _key("0", { action = "char", base = "0", shift = ")" }),
-        _key("-", { action = "char", base = "-", shift = "_" }),
-        _key("=", { action = "char", base = "=", shift = "+" }),
-        _key("BS", { action = "backspace", width = 1.75 }),
+        _key("1", { action = "char", base = "1", shift = "!", fnLabel = "F1", fnAction = "send", fnValue = Platform.keyMap.F1 }),
+        _key("2", { action = "char", base = "2", shift = "@", fnLabel = "F2", fnAction = "send", fnValue = Platform.keyMap.F2 }),
+        _key("3", { action = "char", base = "3", shift = "#", fnLabel = "F3", fnAction = "send", fnValue = Platform.keyMap.F3 }),
+        _key("4", { action = "char", base = "4", shift = "$", fnLabel = "F4", fnAction = "send", fnValue = Platform.keyMap.F4 }),
+        _key("5", { action = "char", base = "5", shift = "%", fnLabel = "F5", fnAction = "send", fnValue = Platform.keyMap.F5 }),
+        _key("6", { action = "char", base = "6", shift = "^", fnLabel = "F6", fnAction = "send", fnValue = Platform.keyMap.F6 }),
+        _key("7", { action = "char", base = "7", shift = "&", fnLabel = "F7", fnAction = "send", fnValue = Platform.keyMap.F7 }),
+        _key("8", { action = "char", base = "8", shift = "*", fnLabel = "F8", fnAction = "send", fnValue = Platform.keyMap.F8 }),
+        _key("9", { action = "char", base = "9", shift = "(", fnLabel = "F9", fnAction = "send", fnValue = Platform.keyMap.F9 }),
+        _key("0", { action = "char", base = "0", shift = ")", fnLabel = "F10", fnAction = "send", fnValue = Platform.keyMap.F10 }),
+        _key("-", { action = "char", base = "-", shift = "_", fnLabel = "F11", fnAction = "send", fnValue = Platform.keyMap.F11 }),
+        _key("=", { action = "char", base = "=", shift = "+", fnLabel = "F12", fnAction = "send", fnValue = Platform.keyMap.F12 }),
+        _key("BS", { action = "backspace", width = 1.75, fnLabel = "Del", fnAction = "send", fnValue = Platform.keyMap.DEL }),
     },
     {
         _key("Tab", { action = "tab", width = 1.6 }),
@@ -399,7 +399,7 @@ local OVERLAY_LAYOUT = {
         _key(",", { action = "char", base = ",", shift = "<" }),
         _key(".", { action = "char", base = ".", shift = ">" }),
         _key("?", { action = "char", base = "?", shift = "/" }),
-        _key(ARROW_UP_LABEL, { action = "send", value = Platform.keyMap.UP, width = 1.15 }),
+        _key(ARROW_UP_LABEL, { action = "send", value = Platform.keyMap.UP, width = 1.15, fnLabel = "PgUp", fnValue = Platform.keyMap.PGUP }),
         _key("`", { action = "char", base = "~", shift = "`", width = 1.15 }),
     },
     {
@@ -410,9 +410,9 @@ local OVERLAY_LAYOUT = {
         _key("Space", { action = "space", width = 5.5 }),
         _key("Fn", { action = "fn", width = 1.15 }),
         
-        _key(ARROW_LEFT_LABEL, { action = "send", value = Platform.keyMap.LEFT, width = 1.15 }),
-        _key(ARROW_DOWN_LABEL, { action = "send", value = Platform.keyMap.DOWN, width = 1.15 }),
-        _key(ARROW_RIGHT_LABEL, { action = "send", value = Platform.keyMap.RIGHT, width = 1.15 }),
+        _key(ARROW_LEFT_LABEL, { action = "send", value = Platform.keyMap.LEFT, width = 1.15, fnLabel = "Home", fnValue = Platform.keyMap.HOME }),
+        _key(ARROW_DOWN_LABEL, { action = "send", value = Platform.keyMap.DOWN, width = 1.15, fnLabel = "PgDn", fnValue = Platform.keyMap.PGDN }),
+        _key(ARROW_RIGHT_LABEL, { action = "send", value = Platform.keyMap.RIGHT, width = 1.15, fnLabel = "End", fnValue = Platform.keyMap.END }),
     },
 }
 
@@ -457,6 +457,7 @@ function TerminalView.new(sshManager)
     self._overlayCaps = false
     self._overlayCtrl = false
     self._overlayAlt = false
+    self._overlayFn = false
     self._overlayTouchTargets = {}
     self._overlayPanelRect = nil
     self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
@@ -688,6 +689,7 @@ function TerminalView:reset()
     self._overlayCaps = false
     self._overlayCtrl = false
     self._overlayAlt = false
+    self._overlayFn = false
     self._overlayTouchTargets = {}
     self._overlayPanelRect = nil
     self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
@@ -757,6 +759,21 @@ function TerminalView:_applyOverlayModifiers(text)
     return out
 end
 
+function TerminalView:_resolveOverlayKey(key)
+    if self._overlayFn and key and key.fnLabel then
+        return {
+            label = key.fnLabel,
+            action = key.fnAction or key.action,
+            value = key.fnValue,
+            base = key.fnBase,
+            shift = key.fnShift,
+            letter = key.fnLetter,
+            width = key.width,
+        }
+    end
+    return key
+end
+
 function TerminalView:_resolveOverlayChar(key)
     if key.letter then
         local useUpper = (self._overlayCaps and not self._overlayShift) or (self._overlayShift and not self._overlayCaps)
@@ -808,38 +825,43 @@ function TerminalView:_activateOverlayKey(key)
     self._overlaySelectedKey = key
     self:_rumbleOverlayTap()
 
-    if key.action == "char" then
-        self:_appendOverlayText(self:_applyOverlayModifiers(self:_resolveOverlayChar(key)))
-    elseif key.action == "text" then
-        self:_appendOverlayText(self:_applyOverlayModifiers(key.value or key.label))
-    elseif key.action == "space" then
+    local resolved = self:_resolveOverlayKey(key)
+
+    if resolved.action == "char" then
+        self:_appendOverlayText(self:_applyOverlayModifiers(self:_resolveOverlayChar(resolved)))
+    elseif resolved.action == "text" then
+        self:_appendOverlayText(self:_applyOverlayModifiers(resolved.value or resolved.label))
+    elseif resolved.action == "space" then
         self:_appendOverlayText(self:_applyOverlayModifiers(" "))
-    elseif key.action == "send" then
-        self:_sendInput(self:_applyOverlayModifiers(key.value or ""))
+    elseif resolved.action == "send" then
+        self:_sendInput(self:_applyOverlayModifiers(resolved.value or ""))
         self:_invalidate()
-    elseif key.action == "tab" then
+    elseif resolved.action == "tab" then
         self:_sendInput(Platform.keyMap.TAB)
         self:_clearOverlayModifiers(false)
         self:_invalidate()
-    elseif key.action == "enter" then
+    elseif resolved.action == "enter" then
         self:_submitOverlayBuffer()
-    elseif key.action == "backspace" then
+    elseif resolved.action == "backspace" then
         self:_backspaceOverlayBuffer()
-    elseif key.action == "shift" then
+    elseif resolved.action == "shift" then
         self._overlayShift = not self._overlayShift
         self:_invalidate()
-    elseif key.action == "caps" then
+    elseif resolved.action == "caps" then
         self._overlayCaps = not self._overlayCaps
         self:_invalidate()
-    elseif key.action == "ctrl" then
+    elseif resolved.action == "ctrl" then
         self._overlayCtrl = not self._overlayCtrl
         self:_invalidate()
-    elseif key.action == "alt" then
+    elseif resolved.action == "alt" then
         self._overlayAlt = not self._overlayAlt
         self:_invalidate()
-    elseif key.action == "meta" then
+    elseif resolved.action == "meta" then
         self:_cycleOverlayTheme()
-    elseif key.action == "cn" or key.action == "fn" then
+    elseif resolved.action == "fn" then
+        self._overlayFn = not self._overlayFn
+        self:_invalidate()
+    elseif resolved.action == "cn" then
         self:_invalidate()
     end
 end
@@ -1381,7 +1403,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgText(vg, panelX + panelW / 2, panelY + headerH / 2, OVERLAY_HINT_TEXT)
 
     local themeName = OVERLAY_THEME.name or "THEME"
-    local modeText = string.format("%s  Shift:%s Caps:%s Ctrl:%s Alt:%s", themeName, self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0")
+    local modeText = string.format("%s  Shift:%s Caps:%s Ctrl:%s Alt:%s Fn:%s", themeName, self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0", self._overlayFn and "1" or "0")
     nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 255))
@@ -1404,6 +1426,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
                 or (key.action == "caps" and self._overlayCaps)
                 or (key.action == "ctrl" and self._overlayCtrl)
                 or (key.action == "alt" and self._overlayAlt)
+                or (key.action == "fn" and self._overlayFn)
             local palette = _overlayKeyPalette(key, rowIndex, selected, active)
 
             nvgBeginPath(vg)
@@ -1422,12 +1445,19 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
             nvgFillColor(vg, palette.top)
             nvgFill(vg)
 
-            local label = key.label
-            if key.action == "char" then
-                label = self:_resolveOverlayChar(key)
+            local resolved = self:_resolveOverlayKey(key)
+            local label = resolved.label
+            if resolved.action == "char" then
+                label = self:_resolveOverlayChar(resolved)
             end
 
-            nvgFontSize(vg, keyH >= 46 and 18 or 16)
+            local labelSize = (keyH >= 46 and 18 or 16)
+            if #tostring(label or "") >= 4 then
+                labelSize = labelSize - 3
+            elseif #tostring(label or "") >= 3 then
+                labelSize = labelSize - 2
+            end
+            nvgFontSize(vg, labelSize)
             nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
             nvgFillColor(vg, palette.text)
             nvgText(vg, keyX + keyW / 2, rowY + keyH / 2, label)
