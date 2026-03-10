@@ -1,4 +1,4 @@
--- =============================================================
+﻿-- =============================================================
 -- terminal_view.lua — 终端视图渲染层
 -- 基于 brls.CustomView（自定义 NanoVG 绘制）
 -- 将 TerminalBuffer 内容渲染为彩色终端输出
@@ -813,7 +813,7 @@ function TerminalView:_getOverlayImeVisibleCandidates()
     return out
 end
 
-function TerminalView:_changeOverlayImePage(delta)
+function TerminalView:_changeOverlayImePage(delta, source)
     local pageCount = self:_getOverlayImePageCount()
     if pageCount <= 1 then
         return false
@@ -823,7 +823,7 @@ function TerminalView:_changeOverlayImePage(delta)
         return false
     end
     self._overlayImePage = nextPage
-    self:_rumbleOverlayTap("nav")
+    self:_rumbleOverlayTap("nav", source)
     self:_invalidate()
     return true
 end
@@ -999,10 +999,10 @@ function TerminalView:_syncOverlayBuffer(text)
     self:_invalidate()
 end
 
-function TerminalView:_activateOverlayKey(key)
+function TerminalView:_activateOverlayKey(key, source)
     if not key then return end
     self._overlaySelectedKey = key
-    self:_rumbleOverlayTap()
+    self:_rumbleOverlayTap(nil, source)
 
     local resolved = self:_resolveOverlayKey(key)
     local composingCn = self._overlayCn and not self._overlayFn and #self._overlayPinyin > 0
@@ -1086,7 +1086,7 @@ function TerminalView:_cycleOverlayTheme()
     self:_invalidate()
 end
 
-function TerminalView:_rumbleOverlayTap(kind)
+function TerminalView:_rumbleOverlayTap(kind, source)
     if not Platform.isSwitch then return end
     if self._overlayRumbleCooling then return end
 
@@ -1103,6 +1103,16 @@ function TerminalView:_rumbleOverlayTap(kind)
         low = math.max(12000, math.floor(low * 0.55))
         high = math.max(22000, math.floor(high * 0.55))
     end
+
+    local sourceScale = 1.0
+    if source == "joycon" then
+        sourceScale = 0.2
+    elseif source == "touch" then
+        sourceScale = 2.0
+    end
+
+    low = math.max(0, math.min(65535, math.floor(low * sourceScale)))
+    high = math.max(0, math.min(65535, math.floor(high * sourceScale)))
 
     self._overlayRumbleSeq = (self._overlayRumbleSeq or 0) + 1
     local seq = self._overlayRumbleSeq
@@ -1176,15 +1186,15 @@ function TerminalView:_collectOverlaySuggestions()
     return items
 end
 
-function TerminalView:_applySuggestion(item)
+function TerminalView:_applySuggestion(item, source)
     if not item then return end
-    self:_rumbleOverlayTap()
+    self:_rumbleOverlayTap(nil, source)
     if item.mode == "ime" then
         self:_selectOverlayImeCandidate(item.candidate or { text = item.text }, true)
     elseif item.mode == "ime_prev" then
-        self:_changeOverlayImePage(-1)
+        self:_changeOverlayImePage(-1, source)
     elseif item.mode == "ime_next" then
-        self:_changeOverlayImePage(1)
+        self:_changeOverlayImePage(1, source)
     elseif item.mode == "replace" then
         self:_syncOverlayBuffer(item.text)
     else
@@ -1208,7 +1218,7 @@ function TerminalView:_findOverlayKeyPosition(target)
     return 2, 2
 end
 
-function TerminalView:_moveOverlaySelection(dx, dy)
+function TerminalView:_moveOverlaySelection(dx, dy, source)
     local previous = self._overlaySelectedKey
     local rowIndex, colIndex = self:_findOverlayKeyPosition(self._overlaySelectedKey)
     local nextRow = math.max(1, math.min(#OVERLAY_LAYOUT, rowIndex + dy))
@@ -1220,7 +1230,7 @@ function TerminalView:_moveOverlaySelection(dx, dy)
 
     self._overlaySelectedKey = row[nextCol]
     if previous ~= self._overlaySelectedKey then
-        self:_rumbleOverlayTap("nav")
+        self:_rumbleOverlayTap("nav", source)
     end
     self:_invalidate()
 end
@@ -1264,16 +1274,16 @@ function TerminalView:_handleOverlayActions(justPressed)
     end
 
     if triggered(B.BUTTON_UP) then
-        self:_moveOverlaySelection(0, -1)
+        self:_moveOverlaySelection(0, -1, "joycon")
     end
     if triggered(B.BUTTON_DOWN) then
-        self:_moveOverlaySelection(0, 1)
+        self:_moveOverlaySelection(0, 1, "joycon")
     end
     if triggered(B.BUTTON_LEFT) then
-        self:_moveOverlaySelection(-1, 0)
+        self:_moveOverlaySelection(-1, 0, "joycon")
     end
     if triggered(B.BUTTON_RIGHT) then
-        self:_moveOverlaySelection(1, 0)
+        self:_moveOverlaySelection(1, 0, "joycon")
     end
 
     local composingCn = self._overlayCn and (not self._overlayFn) and #self._overlayPinyin > 0
@@ -1282,7 +1292,7 @@ function TerminalView:_handleOverlayActions(justPressed)
         if composingCn then
             self:_commitOverlayIme(1, true)
         else
-            self:_activateOverlayKey(self._overlaySelectedKey)
+            self:_activateOverlayKey(self._overlaySelectedKey, "joycon")
         end
     end
     if justPressed(B.BUTTON_B) then
@@ -1302,14 +1312,14 @@ function TerminalView:_handleOverlayActions(justPressed)
         end
     end
     if justPressed(B.BUTTON_LB) then
-        if not (composingCn and self:_changeOverlayImePage(-1)) then
+        if not (composingCn and self:_changeOverlayImePage(-1, "joycon")) then
             self:_sendInput(Platform.keyMap.TAB)
             self:_clearOverlayModifiers(false)
         end
     end
     if justPressed(B.BUTTON_RB) then
         if composingCn then
-            self:_changeOverlayImePage(1)
+            self:_changeOverlayImePage(1, "joycon")
         end
     end
     if justPressed(B.BUTTON_START) then
@@ -1350,14 +1360,14 @@ function TerminalView:_handleOverlayPointer(absX, absY, activate)
     if target.type == "key" then
         self._overlaySelectedKey = target.key
         if activate then
-            self:_activateOverlayKey(target.key)
+            self:_activateOverlayKey(target.key, "touch")
         else
             self:_invalidate()
         end
         return true
     elseif target.type == "suggestion" then
         if activate then
-            self:_applySuggestion(target.item)
+            self:_applySuggestion(target.item, "touch")
         end
         return true
     end
@@ -1408,7 +1418,19 @@ function TerminalView:_pollOverlayTouch()
     }
 end
 
-local function _pollPressed(button)
+local function _pollPressed(button, controllerState)
+    if controllerState and controllerState.isButtonPressed then
+        local ok, pressed = pcall(function()
+            return controllerState:isButtonPressed(button)
+        end)
+
+        if not ok then
+            return false, tostring(pressed)
+        end
+
+        return pressed and true or false, nil
+    end
+
     local pollFn = nil
 
     if Platform.isSwitch and brls.Application.isSwitchControllerButtonPressed then
@@ -1440,7 +1462,7 @@ function TerminalView:_pollControllerShortcuts()
         return
     end
 
-    if not brls.Application.isSwitchControllerButtonPressed and not brls.Application.isControllerButtonPressed then
+    if not brls.Application.getControllerState and not brls.Application.isSwitchControllerButtonPressed and not brls.Application.isControllerButtonPressed then
         self._debugButtonsText = "DBG no-button-api"
         return
     end
@@ -1462,18 +1484,34 @@ function TerminalView:_pollControllerShortcuts()
         B.BUTTON_BACK,
     }
 
+    local controllerState = nil
     local current = {}
     local errors = {}
+    local pollMode = "state"
+
+    if brls.Application.getControllerState then
+        local ok, state = pcall(function()
+            return brls.Application.getControllerState()
+        end)
+
+        if ok and state and state.isButtonPressed then
+            controllerState = state
+        else
+            pollMode = (Platform.isSwitch and brls.Application.isSwitchControllerButtonPressed) and "raw" or "brls"
+        end
+    else
+        pollMode = (Platform.isSwitch and brls.Application.isSwitchControllerButtonPressed) and "raw" or "brls"
+    end
+
     for _, button in ipairs(watched) do
-        local pressed, err = _pollPressed(button)
+        local pressed, err = _pollPressed(button, controllerState)
         current[button] = pressed
         if err then
             table.insert(errors, err)
         end
     end
 
-    local pollMode = (Platform.isSwitch and brls.Application.isSwitchControllerButtonPressed) and "raw" or "brls"
-    local rawButtons = brls.Application.getSwitchButtonsDebug and brls.Application.getSwitchButtonsDebug() or "n/a"
+    local rawButtons = controllerState and "snapshot" or (brls.Application.getSwitchButtonsDebug and brls.Application.getSwitchButtonsDebug() or "n/a")
 
     self._debugButtonsText = string.format(
         "DBG[%s] A=%d B=%d X=%d Y=%d L=%d R=%d R3=%d +=%d -=%d F=%d RAW=%s",
@@ -1561,7 +1599,7 @@ function TerminalView:_pollControllerShortcuts()
     if justPressed(B.BUTTON_RSB) or justPressed(B.BUTTON_RB) then
         _trace("[TerminalView] Polled R3 -> Overlay Keyboard")
         self._overlayKeyboardVisible = not self._overlayKeyboardVisible
-        self:_rumbleOverlayTap("nav")
+        self:_rumbleOverlayTap("nav", "joycon")
         self:_invalidate()
     end
     if justPressed(B.BUTTON_START) then
@@ -1768,7 +1806,6 @@ end
 
 function TerminalView:_onFrame(dt)
     self:_pollControllerShortcuts()
-    self:_pollOverlayTouch()
 
     self._blinkTimer = self._blinkTimer + dt
     if self._blinkTimer >= CURSOR_BLINK_INTERVAL then

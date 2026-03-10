@@ -277,6 +277,7 @@ end
 
 local ALL_KEYS = {}
 local INITIALS_INDEX = {}
+local READING_SEGMENTS = {}
 local buildSegmentations
 
 local function rebuildAllKeys()
@@ -288,7 +289,7 @@ local function rebuildAllKeys()
     end)
 end
 
-local function pickInitialsSegments(reading)
+local function pickBestSegments(reading)
     local segmentations = buildSegmentations(reading)
     local best = nil
     for _, segments in ipairs(segmentations) do
@@ -298,20 +299,36 @@ local function pickInitialsSegments(reading)
             end
         end
     end
-    if not best then
-        return (#reading > 0) and string.sub(reading, 1, 1) or nil
+    if best then
+        return best
     end
+    return (#reading > 0) and { reading } or nil
+end
+
+local function segmentsToInitials(segments)
+    if not segments or #segments == 0 then return nil end
     local parts = {}
-    for _, segment in ipairs(best) do
+    for _, segment in ipairs(segments) do
         parts[#parts + 1] = string.sub(segment, 1, 1)
     end
     return table.concat(parts)
 end
 
+local function rebuildReadingSegments()
+    READING_SEGMENTS = {}
+    for reading in pairs(LEXICON) do
+        local segments = pickBestSegments(reading)
+        if segments and #segments > 0 then
+            READING_SEGMENTS[reading] = segments
+        end
+    end
+end
+
 local function rebuildInitialsIndex()
     INITIALS_INDEX = {}
     for reading, bucket in pairs(LEXICON) do
-        local initials = pickInitialsSegments(reading)
+        local segments = READING_SEGMENTS[reading] or pickBestSegments(reading)
+        local initials = segmentsToInitials(segments)
         if initials and initials ~= "" then
             local out = INITIALS_INDEX[initials]
             if not out then
@@ -327,7 +344,13 @@ local function rebuildInitialsIndex()
                 local dedupeKey = tostring(entry.text or "") .. "|" .. tostring(reading)
                 if entry.text and not seen[dedupeKey] then
                     seen[dedupeKey] = true
-                    table.insert(out, { text = entry.text, reading = reading, freq = entry.freq or 1000 })
+                    table.insert(out, {
+                        text = entry.text,
+                        reading = reading,
+                        freq = entry.freq or 1000,
+                        segments = segments,
+                        initials = initials,
+                    })
                 end
             end
         end
@@ -353,6 +376,7 @@ local function loadExternalLexicons()
         end
     end
     rebuildAllKeys()
+    rebuildReadingSegments()
     rebuildInitialsIndex()
     LOAD_STATS.total_keys, LOAD_STATS.total_entries = countLexiconEntries(LEXICON)
     print(string.format(
@@ -545,6 +569,89 @@ local function collectInitialsCandidates(raw, opts, acc, seen)
     end
 end
 
+local function matchMixedReading(raw, segments)
+    if not segments or #segments < 2 or #raw < 2 then return nil end
+    local memo = {}
+    local rawLen = #raw
+    local segmentCount = #segments
+
+    local function solve(rawPos, segPos)
+        local memoKey = tostring(rawPos) .. ":" .. tostring(segPos)
+        if memo[memoKey] ~= nil then
+            return memo[memoKey] or nil
+        end
+        if rawPos > rawLen then
+            local result = { score = 0, usedSegments = segPos - 1 }
+            memo[memoKey] = result
+            return result
+        end
+        if segPos > segmentCount then
+            memo[memoKey] = false
+            return nil
+        end
+
+        local segment = segments[segPos]
+        local remain = rawLen - rawPos + 1
+        local best = nil
+        for take = 1, math.min(#segment, remain) do
+            local chunk = string.sub(raw, rawPos, rawPos + take - 1)
+            if string.sub(segment, 1, take) == chunk then
+                local tail = solve(rawPos + take, segPos + 1)
+                if tail then
+                    local piece = 24 + take * 18
+                    if take == 1 then
+                        piece = piece + 8
+                    elseif take == #segment then
+                        piece = piece + 22
+                    else
+                        piece = piece + 12
+                    end
+                    local score = tail.score + piece
+                    local candidate = {
+                        score = score,
+                        usedSegments = math.max(segPos, tail.usedSegments or segPos),
+                    }
+                    if not best or candidate.score > best.score or (candidate.score == best.score and candidate.usedSegments > best.usedSegments) then
+                        best = candidate
+                    end
+                end
+            end
+        end
+
+        memo[memoKey] = best or false
+        return best
+    end
+
+    return solve(1, 1)
+end
+
+local function collectMixedCandidates(raw, opts, acc, seen)
+    if #raw < 2 then return end
+    local leading = string.sub(raw, 1, 1)
+    for reading, segments in pairs(READING_SEGMENTS) do
+        if segments and #segments >= 2 and string.sub(segments[1], 1, 1) == leading then
+            local match = matchMixedReading(raw, segments)
+            if match then
+                local entries = LEXICON[reading]
+                for idx = 1, math.min(#entries, 3) do
+                    local entry = entries[idx]
+                    local score = (entry.freq or 1000)
+                        + getReadingRecent(reading, entry.text) * 180
+                        + (RECENT_TEXT[entry.text] or 0) * 35
+                        + getBigramRecent(opts.prev_text, entry.text) * 120
+                        + 620
+                        + match.score
+                    addCandidate(acc, seen, makeCandidate(entry.text, raw, score, {
+                        source = "mixed",
+                        remaining = "",
+                        reading = reading,
+                    }))
+                end
+            end
+        end
+    end
+end
+
 local function collectSegmentationCandidates(raw, opts, acc, seen)
     local segmentations = buildSegmentations(raw)
     for _, segments in ipairs(segmentations) do
@@ -582,6 +689,7 @@ function PinyinIme.getCandidates(raw, opts)
     collectExactCandidates(raw, opts, acc, seen)
     collectSegmentationCandidates(raw, opts, acc, seen)
     collectInitialsCandidates(raw, opts, acc, seen)
+    collectMixedCandidates(raw, opts, acc, seen)
     collectPrefixCandidates(raw, opts, acc, seen)
 
     table.sort(acc, function(a, b)
