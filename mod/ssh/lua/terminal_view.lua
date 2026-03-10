@@ -66,10 +66,10 @@ local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+K keyboard | Ctrl+C inte
 local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter Submit  + IME  R3 Hide"
 local DPAD_REPEAT_DELAY_MS = 550
 local DPAD_REPEAT_INTERVAL_MS = 180
-local OVERLAY_RUMBLE_LOW = 2600
-local OVERLAY_RUMBLE_HIGH = 4800
-local OVERLAY_RUMBLE_INTERVAL_MS = 45
-local OVERLAY_RUMBLE_PULSE_MS = 28
+local OVERLAY_RUMBLE_LOW = 300 -- ms, 震动持续时间
+local OVERLAY_RUMBLE_HIGH = 200 -- 震动强度
+local OVERLAY_RUMBLE_INTERVAL_MS = 1 -- 按键延迟
+local OVERLAY_RUMBLE_PULSE_MS = 28 -- ms, 震动脉冲持续时间
 
 local function _key(label, opts)
     opts = opts or {}
@@ -1487,7 +1487,7 @@ function TerminalView:_handleOverlayActions(justPressed)
             self:_activateOverlayKey(self._overlaySelectedKey, "joycon")
         end
     end
-    if justPressed(B.BUTTON_B) then
+    if justPressed(B.BUTTON_B, true) then
         if not self:_backspaceOverlayIme() then
             self:_backspaceOverlayBuffer()
         end
@@ -1570,6 +1570,7 @@ end
 function TerminalView:_pollOverlayTouch()
     if not self._overlayKeyboardVisible then
         self._touchState.pressed = false
+        self._overlayTouchRepeatKey = nil
         return
     end
 
@@ -1588,18 +1589,47 @@ function TerminalView:_pollOverlayTouch()
     local wasPressed = self._touchState.pressed and true or false
     local isPressed = touch.pressed and true or false
 
+    -- Handle repeat for backspace key
+    local nowMs = _nowMs()
+    if self._overlayTouchRepeatKey and isPressed then
+        local target = self:_hitOverlayTarget(touch.x, touch.y)
+        if target and target.type == "key" and target.key == self._overlayTouchRepeatKey then
+            local repeatState = self._overlayTouchRepeatState
+            if repeatState and repeatState.nextAt > 0 and nowMs >= repeatState.nextAt then
+                repeatState.nextAt = nowMs + DPAD_REPEAT_INTERVAL_MS
+                self._overlayTouchRepeatState = repeatState
+                -- Trigger backspace again
+                self:_backspaceOverlayBuffer()
+            end
+        else
+            -- Finger moved off the repeat key
+            self._overlayTouchRepeatKey = nil
+            self._overlayTouchRepeatState = nil
+        end
+    end
+
     if isPressed then
         local target = self:_hitOverlayTarget(touch.x, touch.y)
         if target and target.type == "key" then
             self._overlaySelectedKey = target.key
             if not wasPressed or self._touchState.id ~= touch.id then
-                self:_activateOverlayKey(target.key)
+                self:_activateOverlayKey(target.key, "touch")
+                -- Start repeat for backspace key
+                local resolved = self:_resolveOverlayKey(target.key)
+                if resolved and resolved.action == "backspace" then
+                    self._overlayTouchRepeatKey = target.key
+                    self._overlayTouchRepeatState = { nextAt = nowMs + DPAD_REPEAT_DELAY_MS }
+                end
             end
         elseif target and target.type == "suggestion" then
             if not wasPressed or self._touchState.id ~= touch.id then
-                self:_applySuggestion(target.item)
+                self:_applySuggestion(target.item, "touch")
             end
         end
+    else
+        -- Release - stop repeat
+        self._overlayTouchRepeatKey = nil
+        self._overlayTouchRepeatState = nil
     end
 
     self._touchState = {
