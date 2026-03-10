@@ -62,13 +62,13 @@ local CURSOR_BLINK_RATE = 0.5 -- 秒
 local CURSOR_BLINK_INTERVAL = 500  -- ms
 
 local SWITCH_HINT_TEXT = "DPad Arrows  A Enter  B BS  L Tab  + IME  R3 Keyboard  - Close"
-local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+C interrupt | PageUp/Down history"
+local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+K keyboard | Ctrl+C interrupt | PageUp/Down history"
 
 local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter Submit  + IME  R3 Hide"
 local DPAD_REPEAT_DELAY_MS = 550
 local DPAD_REPEAT_INTERVAL_MS = 180
-local OVERLAY_RUMBLE_LOW = 22000
-local OVERLAY_RUMBLE_HIGH = 42000
+local OVERLAY_RUMBLE_LOW = 2600
+local OVERLAY_RUMBLE_HIGH = 4800
 local OVERLAY_RUMBLE_INTERVAL_MS = 45
 local OVERLAY_RUMBLE_PULSE_MS = 28
 
@@ -77,6 +77,80 @@ local function _key(label, opts)
     opts.label = label
     opts.width = opts.width or 1
     return opts
+end
+
+local OVERLAY_ROW_COLORS = {
+    { 114, 74, 222 },
+    { 64, 124, 255 },
+    { 34, 182, 165 },
+    { 72, 166, 88 },
+    { 214, 146, 52 },
+}
+
+local function _withAlpha(color, alpha)
+    return nvgRGBA(color[1], color[2], color[3], alpha or 255)
+end
+
+local function _overlayKeyPalette(key, rowIndex, selected, active)
+    local base = OVERLAY_ROW_COLORS[rowIndex] or OVERLAY_ROW_COLORS[#OVERLAY_ROW_COLORS]
+
+    if key.action == "enter" then
+        base = { 255, 120, 64 }
+    elseif key.action == "backspace" then
+        base = { 232, 88, 102 }
+    elseif key.action == "shift" or key.action == "caps" then
+        base = { 160, 92, 235 }
+    elseif key.action == "ctrl" or key.action == "alt" then
+        base = { 76, 164, 255 }
+    elseif key.action == "tab" then
+        base = { 72, 192, 150 }
+    elseif key.action == "space" then
+        base = { 72, 156, 224 }
+    elseif key.action == "send" then
+        base = { 92, 104, 122 }
+    elseif key.action == "text" then
+        base = { 230, 134, 74 }
+    end
+
+    local fill = { base[1], base[2], base[3] }
+    local border = { math.min(255, base[1] + 26), math.min(255, base[2] + 26), math.min(255, base[3] + 26) }
+    local top = { math.min(255, base[1] + 46), math.min(255, base[2] + 46), math.min(255, base[3] + 46) }
+
+    if active then
+        fill = { math.min(255, fill[1] + 34), math.min(255, fill[2] + 34), math.min(255, fill[3] + 34) }
+        border = { 255, 255, 255 }
+    elseif selected then
+        fill = { math.min(255, fill[1] + 22), math.min(255, fill[2] + 22), math.min(255, fill[3] + 22) }
+        border = { 255, 244, 190 }
+    end
+
+    return {
+        fill = _withAlpha(fill, 232),
+        border = _withAlpha(border, 248),
+        top = _withAlpha(top, 208),
+        text = nvgRGBA(255, 255, 255, 255),
+    }
+end
+
+local function _overlayChipPalette(index, item)
+    local palettes = {
+        { 66, 132, 245 },
+        { 46, 184, 146 },
+        { 214, 132, 70 },
+        { 166, 96, 232 },
+        { 224, 92, 122 },
+    }
+
+    local base = palettes[((index - 1) % #palettes) + 1]
+    if item and item.mode == "replace" then
+        base = { math.min(255, base[1] + 16), math.min(255, base[2] + 16), math.min(255, base[3] + 16) }
+    end
+
+    return {
+        fill = _withAlpha(base, 224),
+        border = _withAlpha({ math.min(255, base[1] + 28), math.min(255, base[2] + 28), math.min(255, base[3] + 28) }, 244),
+        text = nvgRGBA(255, 255, 255, 255),
+    }
 end
 
 local OVERLAY_QUICK_COMMANDS = { "ls", "cd", "pwd", "clear" }
@@ -333,6 +407,8 @@ end
 local function initGlobalKeyboardListeners()
     local inputManager = brls.Application.getPlatform():getInputManager()
     if not inputManager or not inputManager.getCharInputEvent then return end
+    local KEY_K = 75
+    local MOD_CTRL = 0x02
     
     -- 防止重复初始化
     if _G.__SSH_TERMINAL_INPUT_INITED then return end
@@ -380,6 +456,13 @@ local function initGlobalKeyboardListeners()
                 end
 
                 if terminal then
+                    local ctrl = (state.mods % 4) >= 2
+                    if ctrl and state.key == KEY_K then
+                        terminal._overlayKeyboardVisible = not terminal._overlayKeyboardVisible
+                        terminal:_invalidate()
+                        return
+                    end
+
                     terminal._keyboard:handleKey(state.key, state.mods)
                 end
             end
@@ -1100,21 +1183,29 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     local suggestions = self:_collectOverlaySuggestions()
     local chipX = panelX + 12
     local chipY = panelY + headerH + 6
-    for _, item in ipairs(suggestions) do
+    for index, item in ipairs(suggestions) do
         local label = item.text
         local chipW = math.min(panelW * 0.26, math.max(70, 30 + #label * 10))
         if chipX + chipW > panelX + panelW - 12 then
             break
         end
 
+        local chipPalette = _overlayChipPalette(index, item)
+
         nvgBeginPath(vg)
         nvgRoundedRect(vg, chipX, chipY, chipW, chipsH - 6, 10)
-        nvgFillColor(vg, nvgRGBA(48, 58, 76, 230))
+        nvgFillColor(vg, chipPalette.fill)
         nvgFill(vg)
 
-        nvgFontSize(vg, 14)
+        nvgBeginPath(vg)
+        nvgRoundedRect(vg, chipX + 0.5, chipY + 0.5, chipW - 1, chipsH - 7, 10)
+        nvgStrokeColor(vg, chipPalette.border)
+        nvgStrokeWidth(vg, 1.2)
+        nvgStroke(vg)
+
+        nvgFontSize(vg, 15)
         nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-        nvgFillColor(vg, nvgRGBA(235, 235, 235, 255))
+        nvgFillColor(vg, chipPalette.text)
         nvgText(vg, chipX + chipW / 2, chipY + (chipsH - 6) / 2, label)
 
         table.insert(self._overlayTouchTargets, {
@@ -1129,7 +1220,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
 
     local rowY = panelY + headerH + chipsH + 6
     local contentW = panelW - 24
-    for _, row in ipairs(rows) do
+    for rowIndex, row in ipairs(rows) do
         local units = 0
         for _, key in ipairs(row) do
             units = units + (key.width or 1)
@@ -1144,16 +1235,22 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
                 or (key.action == "caps" and self._overlayCaps)
                 or (key.action == "ctrl" and self._overlayCtrl)
                 or (key.action == "alt" and self._overlayAlt)
+            local palette = _overlayKeyPalette(key, rowIndex, selected, active)
 
             nvgBeginPath(vg)
             nvgRoundedRect(vg, keyX, rowY, keyW, keyH, 7)
-            if active then
-                nvgFillColor(vg, nvgRGBA(76, 120, 235, 240))
-            elseif selected then
-                nvgFillColor(vg, nvgRGBA(88, 100, 125, 235))
-            else
-                nvgFillColor(vg, nvgRGBA(54, 54, 62, 228))
-            end
+            nvgFillColor(vg, palette.fill)
+            nvgFill(vg)
+
+            nvgBeginPath(vg)
+            nvgRoundedRect(vg, keyX + 0.6, rowY + 0.6, keyW - 1.2, keyH - 1.2, 7)
+            nvgStrokeColor(vg, palette.border)
+            nvgStrokeWidth(vg, (selected or active) and 2.0 or 1.2)
+            nvgStroke(vg)
+
+            nvgBeginPath(vg)
+            nvgRoundedRect(vg, keyX + 2, rowY + 2, keyW - 4, math.max(6, keyH * 0.22), 5)
+            nvgFillColor(vg, palette.top)
             nvgFill(vg)
 
             local label = key.label
@@ -1161,9 +1258,9 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
                 label = self:_resolveOverlayChar(key)
             end
 
-            nvgFontSize(vg, keyH >= 46 and 16 or 14)
+            nvgFontSize(vg, keyH >= 46 and 18 or 16)
             nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-            nvgFillColor(vg, nvgRGBA(255, 255, 255, 255))
+            nvgFillColor(vg, palette.text)
             nvgText(vg, keyX + keyW / 2, rowY + keyH / 2, label)
 
             table.insert(self._overlayTouchTargets, {
