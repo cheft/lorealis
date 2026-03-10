@@ -77,79 +77,126 @@ local function _key(label, opts)
     return opts
 end
 
-local OVERLAY_ROW_COLORS = {
-    { 114, 74, 222 },
-    { 64, 124, 255 },
-    { 34, 182, 165 },
-    { 72, 166, 88 },
-    { 214, 146, 52 },
+-- OVERLAY_THEME.panel_*：面板底色、边框、阴影
+-- OVERLAY_THEME.row_colors：每一排普通键的底色
+-- OVERLAY_THEME.special.*：Enter、Backspace、方向键、Space 这些功能键颜色
+-- OVERLAY_THEME.state.*：选中框、激活态、提亮强度
+-- OVERLAY_THEME.chip_colors：候选/标签色，后续恢复候选栏时直接可用
+local OVERLAY_THEME = {
+    panel_fill = { 248, 250, 253 },
+    panel_border = { 217, 224, 235 },
+    panel_shadow = { 120, 138, 168 },
+    title_text = { 86, 97, 118 },
+    hint_text = { 128, 137, 154 },
+    mode_text = { 88, 146, 228 },
+    key_text = { 72, 80, 96 },
+    key_text_active = { 54, 62, 78 },
+    row_colors = {
+        { 255, 255, 255 },
+        { 244, 249, 255 },
+        { 245, 252, 248 },
+        { 255, 248, 244 },
+        { 247, 245, 255 },
+    },
+    special = {
+        enter = { 183, 225, 255 },
+        backspace = { 255, 212, 216 },
+        shift_caps = { 226, 215, 255 },
+        ctrl_alt = { 214, 233, 255 },
+        system = { 228, 233, 241 },
+        tab = { 210, 241, 228 },
+        space = { 207, 232, 255 },
+        arrows = { 220, 228, 239 },
+        symbol = { 255, 229, 204 },
+    },
+    state = {
+        fill_lift = 8,
+        top_lift = 20,
+        border_lift = 10,
+        selected_border = { 118, 176, 255 },
+        active_border = { 92, 156, 244 },
+        selected_fill_lift = 4,
+        active_fill_lift = 10,
+    },
+    chip_colors = {
+        { 219, 235, 255 },
+        { 217, 243, 232 },
+        { 255, 233, 214 },
+        { 234, 225, 255 },
+        { 255, 221, 229 },
+    },
 }
 
 local function _withAlpha(color, alpha)
     return nvgRGBA(color[1], color[2], color[3], alpha or 255)
 end
 
+local function _liftColor(color, amount)
+    return {
+        math.min(255, color[1] + amount),
+        math.min(255, color[2] + amount),
+        math.min(255, color[3] + amount),
+    }
+end
+
 local function _overlayKeyPalette(key, rowIndex, selected, active)
-    local base = OVERLAY_ROW_COLORS[rowIndex] or OVERLAY_ROW_COLORS[#OVERLAY_ROW_COLORS]
+    local theme = OVERLAY_THEME
+    local base = theme.row_colors[rowIndex] or theme.row_colors[#theme.row_colors]
 
     if key.action == "enter" then
-        base = { 255, 120, 64 }
+        base = theme.special.enter
     elseif key.action == "backspace" then
-        base = { 232, 88, 102 }
+        base = theme.special.backspace
     elseif key.action == "shift" or key.action == "caps" then
-        base = { 160, 92, 235 }
+        base = theme.special.shift_caps
     elseif key.action == "ctrl" or key.action == "alt" then
-        base = { 76, 164, 255 }
+        base = theme.special.ctrl_alt
     elseif key.action == "cn" or key.action == "meta" or key.action == "fn" then
-        base = { 110, 126, 160 }
+        base = theme.special.system
     elseif key.action == "tab" then
-        base = { 72, 192, 150 }
+        base = theme.special.tab
     elseif key.action == "space" then
-        base = { 72, 156, 224 }
+        base = theme.special.space
     elseif key.action == "send" then
-        base = { 92, 104, 122 }
+        base = theme.special.arrows
     elseif key.action == "text" then
-        base = { 230, 134, 74 }
+        base = theme.special.symbol
     end
 
-    local fill = { base[1], base[2], base[3] }
-    local border = { math.min(255, base[1] + 26), math.min(255, base[2] + 26), math.min(255, base[3] + 26) }
-    local top = { math.min(255, base[1] + 46), math.min(255, base[2] + 46), math.min(255, base[3] + 46) }
+    local fill = _liftColor(base, theme.state.fill_lift)
+    local border = _liftColor(base, theme.state.border_lift)
+    local top = _liftColor(base, theme.state.top_lift)
+    local text_color = theme.key_text
 
     if active then
-        fill = { math.min(255, fill[1] + 34), math.min(255, fill[2] + 34), math.min(255, fill[3] + 34) }
-        border = { 255, 255, 255 }
+        fill = _liftColor(fill, theme.state.active_fill_lift)
+        border = theme.state.active_border
+        text_color = theme.key_text_active
     elseif selected then
-        fill = { math.min(255, fill[1] + 22), math.min(255, fill[2] + 22), math.min(255, fill[3] + 22) }
-        border = { 255, 244, 190 }
+        fill = _liftColor(fill, theme.state.selected_fill_lift)
+        border = theme.state.selected_border
+        text_color = theme.key_text_active
     end
 
     return {
-        fill = _withAlpha(fill, 232),
-        border = _withAlpha(border, 248),
-        top = _withAlpha(top, 208),
-        text = nvgRGBA(255, 255, 255, 255),
+        fill = _withAlpha(fill, 244),
+        border = _withAlpha(border, 252),
+        top = _withAlpha(top, 230),
+        text = _withAlpha(text_color, 255),
     }
 end
 
 local function _overlayChipPalette(index, item)
-    local palettes = {
-        { 66, 132, 245 },
-        { 46, 184, 146 },
-        { 214, 132, 70 },
-        { 166, 96, 232 },
-        { 224, 92, 122 },
-    }
-
-    local base = palettes[((index - 1) % #palettes) + 1]
+    local theme = OVERLAY_THEME
+    local base = theme.chip_colors[((index - 1) % #theme.chip_colors) + 1]
     if item and item.mode == "replace" then
-        base = { math.min(255, base[1] + 16), math.min(255, base[2] + 16), math.min(255, base[3] + 16) }
+        base = _liftColor(base, 8)
     end
 
     return {
-        fill = _withAlpha(base, 224),
-        border = _withAlpha({ math.min(255, base[1] + 28), math.min(255, base[2] + 28), math.min(255, base[3] + 28) }, 244),
-        text = nvgRGBA(255, 255, 255, 255),
+        fill = _withAlpha(base, 238),
+        border = _withAlpha(_liftColor(base, 10), 248),
+        text = _withAlpha(theme.key_text, 255),
     }
 end
 
@@ -229,7 +276,7 @@ local OVERLAY_LAYOUT = {
         _key("`", { action = "char", base = "~", shift = "`", width = 1.15 }),
     },
     {
-        _key("CN", { action = "cn", width = 1.15 }),
+        _key("中/EN", { action = "cn", width = 1.15 }),
         _key("Ctrl", { action = "ctrl", width = 1.15 }),
         _key("Win", { action = "meta", width = 1.15 }),
         _key("Alt", { action = "alt", width = 1.15 }),
@@ -1137,25 +1184,36 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
 
     nvgBeginPath(vg)
-    nvgRoundedRect(vg, panelX, panelY, panelW, panelH, 14)
-    nvgFillColor(vg, nvgRGBA(18, 18, 22, 242))
+    nvgRoundedRect(vg, panelX + 1, panelY + 2, panelW, panelH, 14)
+    nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_shadow, 32))
     nvgFill(vg)
+
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, panelX, panelY, panelW, panelH, 14)
+    nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_fill, 245))
+    nvgFill(vg)
+
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, panelX + 0.5, panelY + 0.5, panelW - 1, panelH - 1, 14)
+    nvgStrokeColor(vg, _withAlpha(OVERLAY_THEME.panel_border, 255))
+    nvgStrokeWidth(vg, 1.2)
+    nvgStroke(vg)
 
     nvgFontFace(vg, "regular")
     nvgFontSize(vg, 12)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
-    nvgFillColor(vg, nvgRGBA(200, 200, 200, 255))
+    nvgFillColor(vg, _withAlpha(OVERLAY_THEME.title_text, 255))
     nvgText(vg, panelX + 14, panelY + headerH / 2, "Touch Keyboard")
 
     nvgFontSize(vg, 10)
     nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
-    nvgFillColor(vg, nvgRGBA(185, 185, 185, 255))
+    nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
     nvgText(vg, panelX + panelW / 2, panelY + headerH / 2, OVERLAY_HINT_TEXT)
 
     local modeText = string.format("Shift:%s Caps:%s Ctrl:%s Alt:%s", self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0")
     nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
-    nvgFillColor(vg, nvgRGBA(120, 180, 255, 255))
+    nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 255))
     nvgText(vg, panelX + panelW - 14, panelY + headerH / 2, modeText)
 
     local rowY = panelY + headerH + 4
