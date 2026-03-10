@@ -423,8 +423,8 @@ local OVERLAY_LAYOUT_COMPACT = {
         _key("Tab", { action = "tab", width = 1 }),
         _key("Caps", { action = "caps", width = 0.75}),
         _key("`", { action = "char", base = "~", shift = "`", width = 0.75 }),
-        _key("[", { action = "char", base = "[", width = 0.75, shift = "{", fnLabel = "F11", fnAction = "send", fnValue = Platform.keyMap.F11 }),
-        _key("]", { action = "char", base = "]", width = 0.75, shift = "}", fnLabel = "F12", fnAction = "send", fnValue = Platform.keyMap.F12 }),
+        _key("[", { action = "char", base = "[", width = 0.75, shift = "{"  }),
+        _key("]", { action = "char", base = "]", width = 0.75, shift = "}" }),
         _key("-", { action = "char", base = "-", width = 0.75, shift = "_" }),
         _key("=", { action = "char", base = "=", width = 0.75, shift = "+" }),
         _key("BS", { action = "backspace", width = 1.5, fnLabel = "Del", fnAction = "send", fnValue = Platform.keyMap.DEL }),
@@ -492,17 +492,14 @@ local OVERLAY_COMPACT_FN_PAGES = {
             y = { label = "F6", action = "send", value = Platform.keyMap.F6 },
             u = { label = "F7", action = "send", value = Platform.keyMap.F7 },
             i = { label = ARROW_UP_LABEL, action = "send", value = Platform.keyMap.UP },
-            o = { label = ARROW_RIGHT_LABEL, action = "send", value = Platform.keyMap.RIGHT },
-            p = { label = "Del", action = "send", value = Platform.keyMap.DEL },
             a = { label = "F8", action = "send", value = Platform.keyMap.F8 },
             s = { label = "F9", action = "send", value = Platform.keyMap.F9 },
             d = { label = "F10", action = "send", value = Platform.keyMap.F10 },
             f = { label = "F11", action = "send", value = Platform.keyMap.F11 },
             g = { label = "F12", action = "send", value = Platform.keyMap.F12 },
-            h = { label = "End", action = "send", value = Platform.keyMap.END },
             j = { label = ARROW_LEFT_LABEL, action = "send", value = Platform.keyMap.LEFT },
             k = { label = ARROW_DOWN_LABEL, action = "send", value = Platform.keyMap.DOWN },
-            l = { label = "Home", action = "send", value = Platform.keyMap.HOME },
+            l = { label = ARROW_RIGHT_LABEL, action = "send", value = Platform.keyMap.RIGHT },
             z = { label = "1", action = "char", base = "1", shift = "!" },
             x = { label = "2", action = "char", base = "2", shift = "@" },
             c = { label = "3", action = "char", base = "3", shift = "#" },
@@ -510,94 +507,6 @@ local OVERLAY_COMPACT_FN_PAGES = {
             b = { label = "5", action = "char", base = "5", shift = "%" },
             n = { label = "6", action = "char", base = "6", shift = "^" },
             m = { label = "7", action = "char", base = "7", shift = "&" },
-            p = { label = "8", action = "char", base = "8", shift = "*" },
-        },
-        shift = {
-            q = { label = "!", action = "char", base = "!" },
-            w = { label = "@", action = "char", base = "@" },
-            e = { label = "#", action = "char", base = "#" },
-            r = { label = "$", action = "char", base = "$" },
-            t = { label = "%", action = "char", base = "%" },
-            y = { label = "^", action = "char", base = "^" },
-            u = { label = "&", action = "char", base = "&" },
-            i = { label = "^", action = "char", base = "^" },
-            o = { label = "*", action = "char", base = "*" },
-            a = { label = "(", action = "char", base = "(" },
-            s = { label = ")", action = "char", base = ")" },
-            d = { label = "{", action = "char", base = "{" },
-            f = { label = "}", action = "char", base = "}" },
-            g = { label = "[", action = "char", base = "[" },
-            h = { label = "]", action = "char", base = "]" },
-            j = { label = "<", action = "char", base = "<" },
-            k = { label = ">", action = "char", base = ">" },
-            l = { label = "|", action = "char", base = "|" },
-            z = { label = "+", action = "char", base = "+" },
-            x = { label = "-", action = "char", base = "-" },
-            c = { label = "_", action = "char", base = "_" },
-            v = { label = "\\", action = "char", base = "\\" },
-            b = { label = "`", action = "char", base = "`" },
-            n = { label = ";", action = "char", base = ";" },
-            m = { label = "'", action = "char", base = "'" },
-            p = { label = "?", action = "char", base = "?" },
-        },
-    },
-    {
-        name = "SYS",
-        normal = {
-            q = { label = "F1", action = "send", value = Platform.keyMap.F1 },
-            w = { label = "F2", action = "send", value = Platform.keyMap.F2 },
-            e = { label = "F3", action = "send", value = Platform.keyMap.F3 },
-            r = { label = "F4", action = "send", value = Platform.keyMap.F4 },
-            t = { label = "F5", action = "send", value = Platform.keyMap.F5 },
-            y = { label = "F6", action = "send", value = Platform.keyMap.F6 },
-            u = { label = "F7", action = "send", value = Platform.keyMap.F7 },
-            i = { label = "F8", action = "send", value = Platform.keyMap.F8 },
-            o = { label = "F9", action = "send", value = Platform.keyMap.F9 },
-            a = { label = "F10", action = "send", value = Platform.keyMap.F10 },
-            s = { label = "F11", action = "send", value = Platform.keyMap.F11 },
-            d = { label = "F12", action = "send", value = Platform.keyMap.F12 },
-            f = { label = "Tab", action = "tab" },
-            g = { label = "Esc", action = "send", value = Platform.keyMap.ESC },
-            h = { label = "Home", action = "send", value = Platform.keyMap.HOME },
-            j = { label = "PgUp", action = "send", value = Platform.keyMap.PGUP },
-            k = { label = "PgDn", action = "send", value = Platform.keyMap.PGDN },
-            l = { label = "End", action = "send", value = Platform.keyMap.END },
-            z = { label = "Ins", action = "send", value = Platform.keyMap.INS },
-            x = { label = "Del", action = "send", value = Platform.keyMap.DEL },
-            c = { label = "`", action = "char", base = "`", shift = "~" },
-            v = { label = "$", action = "char", base = "$" },
-            b = { label = "%", action = "char", base = "%" },
-            n = { label = "^", action = "char", base = "^" },
-            m = { label = "&", action = "char", base = "&" },
-            p = { label = "*", action = "char", base = "*" },
-        },
-        shift = {
-            q = { label = "'", action = "char", base = "'" },
-            w = { label = '"', action = "char", base = '"' },
-            e = { label = "=", action = "char", base = "=" },
-            r = { label = "+", action = "char", base = "+" },
-            t = { label = "/", action = "char", base = "/" },
-            y = { label = "\\", action = "char", base = "\\" },
-            u = { label = "|", action = "char", base = "|" },
-            i = { label = "(", action = "char", base = "(" },
-            o = { label = ")", action = "char", base = ")" },
-            a = { label = "[", action = "char", base = "[" },
-            s = { label = "]", action = "char", base = "]" },
-            d = { label = "{", action = "char", base = "{" },
-            f = { label = "}", action = "char", base = "}" },
-            g = { label = "<", action = "char", base = "<" },
-            h = { label = ">", action = "char", base = ">" },
-            j = { label = ";", action = "char", base = ";" },
-            k = { label = ":", action = "char", base = ":" },
-            l = { label = ",", action = "char", base = "," },
-            z = { label = ".", action = "char", base = "." },
-            x = { label = "?", action = "char", base = "?" },
-            c = { label = "!", action = "char", base = "!" },
-            v = { label = "~", action = "char", base = "~" },
-            b = { label = "_", action = "char", base = "_" },
-            n = { label = "-", action = "char", base = "-" },
-            m = { label = "#", action = "char", base = "#" },
-            p = { label = "@", action = "char", base = "@" },
         },
     },
 }
@@ -1332,23 +1241,14 @@ function TerminalView:_activateOverlayKey(key, source)
         self._overlayAlt = not self._overlayAlt
         self:_invalidate()
     elseif resolved.action == "meta" then
-        if self._overlayFn then
-            self:_toggleOverlayLayout()
-        else
-            self._overlayMeta = not self._overlayMeta
-            self:_invalidate()
-        end
+        self:_toggleOverlayLayout()
     elseif resolved.action == "fn" then
-        if self._overlayMeta then
-            self:_toggleOverlayLayout()
-        else
-            self._overlayFn = not self._overlayFn
-            if not self._overlayFn then
-                self._overlayFnPage = 1
-                self:_refreshOverlayImeCandidates()
-            end
-            self:_invalidate()
+        self._overlayFn = not self._overlayFn
+        if not self._overlayFn then
+            self._overlayFnPage = 1
+            self:_refreshOverlayImeCandidates()
         end
+        self:_invalidate()
     elseif resolved.action == "fn_page" then
         self:_cycleOverlayFnPage()
     elseif resolved.action == "cn" then
