@@ -83,47 +83,47 @@ end
 -- OVERLAY_THEME.state.*：选中框、激活态、提亮强度
 -- OVERLAY_THEME.chip_colors：候选/标签色，后续恢复候选栏时直接可用
 local OVERLAY_THEME = {
-    panel_fill = { 248, 250, 253 },
-    panel_border = { 217, 224, 235 },
-    panel_shadow = { 120, 138, 168 },
-    title_text = { 86, 97, 118 },
-    hint_text = { 128, 137, 154 },
-    mode_text = { 88, 146, 228 },
-    key_text = { 72, 80, 96 },
-    key_text_active = { 54, 62, 78 },
+    panel_fill = { 44, 48, 56 },
+    panel_border = { 96, 104, 120 },
+    panel_shadow = { 10, 12, 18 },
+    title_text = { 240, 244, 250 },
+    hint_text = { 186, 194, 208 },
+    mode_text = { 255, 198, 92 },
+    key_text = { 245, 247, 250 },
+    key_text_active = { 255, 255, 255 },
     row_colors = {
-        { 255, 255, 255 },
-        { 244, 249, 255 },
-        { 245, 252, 248 },
-        { 255, 248, 244 },
-        { 247, 245, 255 },
+        { 96, 123, 248 },
+        { 66, 192, 170 },
+        { 255, 172, 76 },
+        { 186, 102, 255 },
+        { 255, 104, 146 },
     },
     special = {
-        enter = { 183, 225, 255 },
-        backspace = { 255, 212, 216 },
-        shift_caps = { 226, 215, 255 },
-        ctrl_alt = { 214, 233, 255 },
-        system = { 228, 233, 241 },
-        tab = { 210, 241, 228 },
-        space = { 207, 232, 255 },
-        arrows = { 220, 228, 239 },
-        symbol = { 255, 229, 204 },
+        enter = { 78, 206, 120 },
+        backspace = { 234, 92, 92 },
+        shift_caps = { 178, 110, 255 },
+        ctrl_alt = { 76, 156, 255 },
+        system = { 110, 120, 146 },
+        tab = { 58, 178, 156 },
+        space = { 244, 188, 72 },
+        arrows = { 84, 94, 116 },
+        symbol = { 255, 136, 84 },
     },
     state = {
-        fill_lift = 8,
-        top_lift = 20,
-        border_lift = 10,
-        selected_border = { 118, 176, 255 },
-        active_border = { 92, 156, 244 },
-        selected_fill_lift = 4,
-        active_fill_lift = 10,
+        fill_lift = 10,
+        top_lift = 24,
+        border_lift = 18,
+        selected_border = { 255, 238, 168 },
+        active_border = { 255, 255, 255 },
+        selected_fill_lift = 8,
+        active_fill_lift = 14,
     },
     chip_colors = {
-        { 219, 235, 255 },
-        { 217, 243, 232 },
-        { 255, 233, 214 },
-        { 234, 225, 255 },
-        { 255, 221, 229 },
+        { 96, 123, 248 },
+        { 66, 192, 170 },
+        { 255, 172, 76 },
+        { 186, 102, 255 },
+        { 255, 104, 146 },
     },
 }
 
@@ -1184,17 +1184,17 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
 
     nvgBeginPath(vg)
-    nvgRoundedRect(vg, panelX + 1, panelY + 2, panelW, panelH, 14)
+    nvgRect(vg, panelX + 1, panelY + 2, panelW, panelH)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_shadow, 32))
     nvgFill(vg)
 
     nvgBeginPath(vg)
-    nvgRoundedRect(vg, panelX, panelY, panelW, panelH, 14)
+    nvgRect(vg, panelX, panelY, panelW, panelH)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_fill, 245))
     nvgFill(vg)
 
     nvgBeginPath(vg)
-    nvgRoundedRect(vg, panelX + 0.5, panelY + 0.5, panelW - 1, panelH - 1, 14)
+    nvgRect(vg, panelX + 0.5, panelY + 0.5, panelW - 1, panelH - 1)
     nvgStrokeColor(vg, _withAlpha(OVERLAY_THEME.panel_border, 255))
     nvgStrokeWidth(vg, 1.2)
     nvgStroke(vg)
@@ -1236,18 +1236,18 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
             local palette = _overlayKeyPalette(key, rowIndex, selected, active)
 
             nvgBeginPath(vg)
-            nvgRoundedRect(vg, keyX, rowY, keyW, keyH, 7)
+            nvgRect(vg, keyX, rowY, keyW, keyH)
             nvgFillColor(vg, palette.fill)
             nvgFill(vg)
 
             nvgBeginPath(vg)
-            nvgRoundedRect(vg, keyX + 0.6, rowY + 0.6, keyW - 1.2, keyH - 1.2, 7)
+            nvgRect(vg, keyX + 0.6, rowY + 0.6, keyW - 1.2, keyH - 1.2)
             nvgStrokeColor(vg, palette.border)
             nvgStrokeWidth(vg, (selected or active) and 2.0 or 1.2)
             nvgStroke(vg)
 
             nvgBeginPath(vg)
-            nvgRoundedRect(vg, keyX + 2, rowY + 2, keyW - 4, math.max(6, keyH * 0.22), 5)
+            nvgRect(vg, keyX + 2, rowY + 2, keyW - 4, math.max(6, keyH * 0.22))
             nvgFillColor(vg, palette.top)
             nvgFill(vg)
 
