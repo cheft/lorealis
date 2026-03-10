@@ -77,56 +77,154 @@ local function _key(label, opts)
     return opts
 end
 
--- OVERLAY_THEME.panel_*：面板底色、边框、阴影
--- OVERLAY_THEME.row_colors：每一排普通键的底色
--- OVERLAY_THEME.special.*：Enter、Backspace、方向键、Space 这些功能键颜色
--- OVERLAY_THEME.state.*：选中框、激活态、提亮强度
--- OVERLAY_THEME.chip_colors：候选/标签色，后续恢复候选栏时直接可用
-local OVERLAY_THEME = {
-    panel_fill = { 44, 48, 56 },
-    panel_border = { 96, 104, 120 },
-    panel_shadow = { 10, 12, 18 },
-    title_text = { 240, 244, 250 },
-    hint_text = { 186, 194, 208 },
-    mode_text = { 255, 198, 92 },
-    key_text = { 245, 247, 250 },
-    key_text_active = { 255, 255, 255 },
-    row_colors = {
-        { 96, 123, 248 },
-        { 66, 192, 170 },
-        { 255, 172, 76 },
-        { 186, 102, 255 },
-        { 255, 104, 146 },
+-- ???????
+-- 1) mech_rgb    ???????????
+-- 2) gmk_rgb     GMK ??????
+-- 3) light_mod   ???? + ?????
+-- ??????????????????????
+local OVERLAY_THEMES = {
+    {
+        key = "mech_rgb",
+        name = "MECH",
+        panel_fill = { 44, 48, 56 },
+        panel_border = { 96, 104, 120 },
+        panel_shadow = { 10, 12, 18 },
+        title_text = { 240, 244, 250 },
+        hint_text = { 186, 194, 208 },
+        mode_text = { 255, 198, 92 },
+        key_text = { 245, 247, 250 },
+        key_text_active = { 255, 255, 255 },
+        row_colors = {
+            { 96, 123, 248 },
+            { 66, 192, 170 },
+            { 255, 172, 76 },
+            { 186, 102, 255 },
+            { 255, 104, 146 },
+        },
+        special = {
+            enter = { 78, 206, 120 },
+            backspace = { 234, 92, 92 },
+            shift_caps = { 178, 110, 255 },
+            ctrl_alt = { 76, 156, 255 },
+            system = { 110, 120, 146 },
+            tab = { 58, 178, 156 },
+            space = { 244, 188, 72 },
+            arrows = { 84, 94, 116 },
+            symbol = { 255, 136, 84 },
+        },
+        state = {
+            fill_lift = 10,
+            top_lift = 24,
+            border_lift = 18,
+            selected_border = { 255, 238, 168 },
+            active_border = { 255, 255, 255 },
+            selected_fill_lift = 8,
+            active_fill_lift = 14,
+        },
+        chip_colors = {
+            { 96, 123, 248 },
+            { 66, 192, 170 },
+            { 255, 172, 76 },
+            { 186, 102, 255 },
+            { 255, 104, 146 },
+        },
     },
-    special = {
-        enter = { 78, 206, 120 },
-        backspace = { 234, 92, 92 },
-        shift_caps = { 178, 110, 255 },
-        ctrl_alt = { 76, 156, 255 },
-        system = { 110, 120, 146 },
-        tab = { 58, 178, 156 },
-        space = { 244, 188, 72 },
-        arrows = { 84, 94, 116 },
-        symbol = { 255, 136, 84 },
+    {
+        key = "gmk_rgb",
+        name = "GMK",
+        panel_fill = { 34, 36, 42 },
+        panel_border = { 80, 84, 96 },
+        panel_shadow = { 8, 10, 14 },
+        title_text = { 245, 244, 240 },
+        hint_text = { 188, 190, 197 },
+        mode_text = { 255, 205, 104 },
+        key_text = { 246, 243, 236 },
+        key_text_active = { 255, 255, 255 },
+        row_colors = {
+            { 232, 86, 83 },
+            { 255, 190, 61 },
+            { 77, 185, 124 },
+            { 70, 141, 255 },
+            { 180, 113, 255 },
+        },
+        special = {
+            enter = { 63, 170, 120 },
+            backspace = { 214, 78, 90 },
+            shift_caps = { 150, 98, 230 },
+            ctrl_alt = { 67, 126, 228 },
+            system = { 108, 112, 126 },
+            tab = { 62, 150, 120 },
+            space = { 214, 160, 63 },
+            arrows = { 90, 95, 112 },
+            symbol = { 226, 118, 68 },
+        },
+        state = {
+            fill_lift = 8,
+            top_lift = 18,
+            border_lift = 14,
+            selected_border = { 255, 242, 180 },
+            active_border = { 255, 255, 255 },
+            selected_fill_lift = 6,
+            active_fill_lift = 12,
+        },
+        chip_colors = {
+            { 232, 86, 83 },
+            { 255, 190, 61 },
+            { 77, 185, 124 },
+            { 70, 141, 255 },
+            { 180, 113, 255 },
+        },
     },
-    state = {
-        fill_lift = 10,
-        top_lift = 24,
-        border_lift = 18,
-        selected_border = { 255, 238, 168 },
-        active_border = { 255, 255, 255 },
-        selected_fill_lift = 8,
-        active_fill_lift = 14,
-    },
-    chip_colors = {
-        { 96, 123, 248 },
-        { 66, 192, 170 },
-        { 255, 172, 76 },
-        { 186, 102, 255 },
-        { 255, 104, 146 },
+    {
+        key = "light_mod",
+        name = "LIGHT",
+        panel_fill = { 238, 240, 244 },
+        panel_border = { 186, 193, 206 },
+        panel_shadow = { 110, 120, 138 },
+        title_text = { 60, 68, 82 },
+        hint_text = { 110, 118, 132 },
+        mode_text = { 86, 126, 224 },
+        key_text = { 58, 64, 76 },
+        key_text_active = { 34, 38, 46 },
+        row_colors = {
+            { 230, 232, 236 },
+            { 230, 232, 236 },
+            { 230, 232, 236 },
+            { 230, 232, 236 },
+            { 230, 232, 236 },
+        },
+        special = {
+            enter = { 107, 195, 130 },
+            backspace = { 232, 112, 122 },
+            shift_caps = { 181, 136, 255 },
+            ctrl_alt = { 106, 164, 255 },
+            system = { 255, 181, 96 },
+            tab = { 104, 200, 176 },
+            space = { 114, 178, 255 },
+            arrows = { 168, 174, 188 },
+            symbol = { 255, 164, 118 },
+        },
+        state = {
+            fill_lift = 6,
+            top_lift = 16,
+            border_lift = 12,
+            selected_border = { 112, 168, 255 },
+            active_border = { 84, 128, 235 },
+            selected_fill_lift = 4,
+            active_fill_lift = 8,
+        },
+        chip_colors = {
+            { 106, 164, 255 },
+            { 104, 200, 176 },
+            { 255, 181, 96 },
+            { 181, 136, 255 },
+            { 232, 112, 122 },
+        },
     },
 }
 
+local OVERLAY_THEME_INDEX_DEFAULT = 1
+local OVERLAY_THEME = OVERLAY_THEMES[OVERLAY_THEME_INDEX_DEFAULT]
 local function _withAlpha(color, alpha)
     return nvgRGBA(color[1], color[2], color[3], alpha or 255)
 end
@@ -334,6 +432,8 @@ function TerminalView.new(sshManager)
     self._overlayPanelRect = nil
     self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
     self._overlayRecentCommands = {}
+    self._overlayThemeIndex = OVERLAY_THEME_INDEX_DEFAULT
+    OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
     self._drawX = 0
     self._drawY = 0
     self._drawW = 0
@@ -563,6 +663,8 @@ function TerminalView:reset()
     self._overlayPanelRect = nil
     self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
     self._overlayRecentCommands = {}
+    self._overlayThemeIndex = self._overlayThemeIndex or OVERLAY_THEME_INDEX_DEFAULT
+    OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
     self._buttonRepeatState = {}
     self._touchState = { pressed = false, x = 0, y = 0, id = -1 }
     self._overlayRumbleCooling = false
@@ -706,9 +808,20 @@ function TerminalView:_activateOverlayKey(key)
     elseif key.action == "alt" then
         self._overlayAlt = not self._overlayAlt
         self:_invalidate()
-    elseif key.action == "cn" or key.action == "meta" or key.action == "fn" then
+    elseif key.action == "meta" then
+        self:_cycleOverlayTheme()
+    elseif key.action == "cn" or key.action == "fn" then
         self:_invalidate()
     end
+end
+
+function TerminalView:_cycleOverlayTheme()
+    self._overlayThemeIndex = (self._overlayThemeIndex or OVERLAY_THEME_INDEX_DEFAULT) + 1
+    if self._overlayThemeIndex > #OVERLAY_THEMES then
+        self._overlayThemeIndex = 1
+    end
+    OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
+    self:_invalidate()
 end
 
 function TerminalView:_rumbleOverlayTap(kind)
@@ -1210,7 +1323,8 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
     nvgText(vg, panelX + panelW / 2, panelY + headerH / 2, OVERLAY_HINT_TEXT)
 
-    local modeText = string.format("Shift:%s Caps:%s Ctrl:%s Alt:%s", self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0")
+    local themeName = OVERLAY_THEME.name or "THEME"
+    local modeText = string.format("%s  Shift:%s Caps:%s Ctrl:%s Alt:%s", themeName, self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0")
     nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 255))
