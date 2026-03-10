@@ -101,6 +101,20 @@ local OVERLAY_THEMES = {
             { 186, 102, 255 },
             { 255, 104, 146 },
         },
+        rainbow_key_colors = {
+            { 255, 92, 92 },
+            { 255, 136, 74 },
+            { 255, 188, 74 },
+            { 218, 220, 78 },
+            { 132, 214, 90 },
+            { 74, 208, 160 },
+            { 68, 186, 255 },
+            { 92, 144, 255 },
+            { 132, 116, 255 },
+            { 188, 108, 255 },
+            { 255, 104, 200 },
+            { 255, 114, 154 },
+        },
         special = {
             enter = { 78, 206, 120 },
             backspace = { 234, 92, 92 },
@@ -237,9 +251,24 @@ local function _liftColor(color, amount)
     }
 end
 
+local function _pickThemeKeyColor(theme, key, rowIndex)
+    if not theme.rainbow_key_colors or #theme.rainbow_key_colors == 0 then
+        return theme.row_colors[rowIndex] or theme.row_colors[#theme.row_colors]
+    end
+
+    local token = tostring((key and key.label) or '') .. ':' .. tostring((key and key.action) or '')
+    local hash = 0
+    for i = 1, #token do
+        hash = (hash + string.byte(token, i) * (i + 3)) % 9973
+    end
+
+    local index = (hash % #theme.rainbow_key_colors) + 1
+    return theme.rainbow_key_colors[index]
+end
+
 local function _overlayKeyPalette(key, rowIndex, selected, active)
     local theme = OVERLAY_THEME
-    local base = theme.row_colors[rowIndex] or theme.row_colors[#theme.row_colors]
+    local base = _pickThemeKeyColor(theme, key, rowIndex)
 
     if key.action == "enter" then
         base = theme.special.enter
