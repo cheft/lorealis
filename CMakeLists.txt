@@ -438,6 +438,22 @@ if(PLATFORM_SWITCH)
     target_compile_definitions(lorealis PRIVATE SOL_NO_CHECK_NUMBER_PRECISION=1)
     
     target_compile_options(lorealis PRIVATE -Wno-error=template-body)
+
+    if(WIN32)
+        set(SWITCH_REPACK_ROMFS_COMMAND
+            powershell.exe -ExecutionPolicy Bypass -File "${CMAKE_SOURCE_DIR}/scripts/repack_switch_romfs.ps1" -BuildDir "${CMAKE_BINARY_DIR}")
+    else()
+        set(SWITCH_REPACK_ROMFS_COMMAND
+            /bin/bash "${CMAKE_SOURCE_DIR}/scripts/repack_switch_romfs.sh" "${CMAKE_BINARY_DIR}")
+    endif()
+
+    add_custom_target(switch_repack_romfs
+        COMMAND ${CMAKE_COMMAND} -E echo "Repacking romfs into existing Lorealis.nro"
+        COMMAND ${SWITCH_REPACK_ROMFS_COMMAND}
+        DEPENDS lorealis
+        WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+        COMMENT "Repack Switch romfs without rebuilding code"
+        VERBATIM)
 else()
     target_compile_definitions(lorealis PRIVATE SOL_LUA_VERSION=501)
     target_compile_definitions(lorealis PRIVATE SOL_ALL_SAFETIES_ON=1)
