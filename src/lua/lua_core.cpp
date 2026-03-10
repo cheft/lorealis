@@ -499,6 +499,9 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     auto input_manager_ut = brls_ns.new_usertype<brls::InputManager>("InputManager", sol::no_construction());
     input_manager_ut["getKeyboardKeyStateChanged"] = &brls::InputManager::getKeyboardKeyStateChanged;
     input_manager_ut["getCharInputEvent"] = &brls::InputManager::getCharInputEvent;
+    input_manager_ut["sendRumble"] = [](brls::InputManager& self, unsigned short controller, unsigned short lowFreqMotor, unsigned short highFreqMotor) {
+        self.sendRumble(controller, lowFreqMotor, highFreqMotor);
+    };
 
     auto controller_state_ut = brls_ns.new_usertype<brls::ControllerState>("ControllerState", sol::no_construction());
     controller_state_ut["isButtonPressed"] = [](const brls::ControllerState& self, int button) {

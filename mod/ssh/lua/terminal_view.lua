@@ -64,9 +64,12 @@ local CURSOR_BLINK_INTERVAL = 500  -- ms
 local SWITCH_HINT_TEXT = "DPad Arrows  A Enter  B BS  L Tab  + IME  R3 Keyboard  - Close"
 local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+C interrupt | PageUp/Down history"
 
-local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter key submit  + IME  R3 Hide"
+local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter Submit  + IME  R3 Hide"
 local DPAD_REPEAT_DELAY_MS = 550
 local DPAD_REPEAT_INTERVAL_MS = 180
+local OVERLAY_RUMBLE_LOW = 180
+local OVERLAY_RUMBLE_HIGH = 280
+local OVERLAY_RUMBLE_INTERVAL_MS = 45
 
 local function _key(label, opts)
     opts = opts or {}
@@ -217,6 +220,7 @@ function TerminalView.new(sshManager)
     self._drawH = 0
     self._buttonRepeatState = {}
     self._touchState = { pressed = false, x = 0, y = 0, id = -1 }
+    self._lastOverlayRumbleAt = 0
 
     return self
 end
@@ -430,6 +434,30 @@ function TerminalView:resize(width, height)
     end
 end
 
+function TerminalView:reset()
+    self._parser = AnsiParser.new()
+    self._buf = TerminalBuffer.new(self._cols, self._rows)
+    self._scrollOffset = 0
+    self._maxScroll = 0
+    self._selection = nil
+    self._selecting = false
+    self._statusText = "未连接"
+    self._statusColor = { r = 150, g = 150, b = 150 }
+    self._overlayKeyboardVisible = false
+    self._overlayBuffer = ""
+    self._overlayShift = false
+    self._overlayCaps = false
+    self._overlayCtrl = false
+    self._overlayAlt = false
+    self._overlayTouchTargets = {}
+    self._overlayPanelRect = nil
+    self._overlaySelectedKey = OVERLAY_LAYOUT[2][2]
+    self._overlayRecentCommands = {}
+    self._buttonRepeatState = {}
+    self._touchState = { pressed = false, x = 0, y = 0, id = -1 }
+    self:_invalidate()
+end
+
 local function _overlayTrim(text)
     return (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
@@ -535,6 +563,7 @@ end
 function TerminalView:_activateOverlayKey(key)
     if not key then return end
     self._overlaySelectedKey = key
+    self:_rumbleOverlayTap()
 
     if key.action == "char" then
         self:_appendOverlayText(self:_applyOverlayModifiers(self:_resolveOverlayChar(key)))
@@ -566,6 +595,36 @@ function TerminalView:_activateOverlayKey(key)
         self._overlayAlt = not self._overlayAlt
         self:_invalidate()
     end
+end
+
+function TerminalView:_rumbleOverlayTap(kind)
+    if not Platform.isSwitch then return end
+
+    local now = math.floor(os.clock() * 1000)
+    if now - (self._lastOverlayRumbleAt or 0) < OVERLAY_RUMBLE_INTERVAL_MS then
+        return
+    end
+
+    local ok, inputManager = pcall(function()
+        return brls.Application.getPlatform():getInputManager()
+    end)
+
+    if not ok or not inputManager or not inputManager.sendRumble then
+        return
+    end
+
+    local low = OVERLAY_RUMBLE_LOW
+    local high = OVERLAY_RUMBLE_HIGH
+    if kind == "nav" then
+        low = math.max(60, math.floor(low * 0.55))
+        high = math.max(90, math.floor(high * 0.55))
+    end
+
+    pcall(function()
+        inputManager:sendRumble(0, low, high)
+    end)
+
+    self._lastOverlayRumbleAt = now
 end
 
 function TerminalView:_collectOverlaySuggestions()
@@ -615,6 +674,7 @@ end
 
 function TerminalView:_applySuggestion(item)
     if not item then return end
+    self:_rumbleOverlayTap()
     if item.mode == "replace" then
         self:_syncOverlayBuffer(item.text)
     else
@@ -639,6 +699,7 @@ function TerminalView:_findOverlayKeyPosition(target)
 end
 
 function TerminalView:_moveOverlaySelection(dx, dy)
+    local previous = self._overlaySelectedKey
     local rowIndex, colIndex = self:_findOverlayKeyPosition(self._overlaySelectedKey)
     local nextRow = math.max(1, math.min(#OVERLAY_LAYOUT, rowIndex + dy))
     local nextCol = colIndex + dx
@@ -648,6 +709,9 @@ function TerminalView:_moveOverlaySelection(dx, dy)
     if nextCol > #row then nextCol = #row end
 
     self._overlaySelectedKey = row[nextCol]
+    if previous ~= self._overlaySelectedKey then
+        self:_rumbleOverlayTap("nav")
+    end
     self:_invalidate()
 end
 
@@ -941,6 +1005,7 @@ function TerminalView:_pollControllerShortcuts()
     if justPressed(B.BUTTON_RSB) or justPressed(B.BUTTON_RB) then
         _trace("[TerminalView] Polled R3 -> Overlay Keyboard")
         self._overlayKeyboardVisible = not self._overlayKeyboardVisible
+        self:_rumbleOverlayTap("nav")
         self:_invalidate()
     end
     if justPressed(B.BUTTON_START) then
@@ -960,20 +1025,20 @@ function TerminalView:_pollControllerShortcuts()
 end
 
 function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
-    local panelH = math.floor(h * 0.5)
-    if panelH < 320 then panelH = 320 end
-    local panelY = y + h - 20 - panelH - 2
+    local panelH = math.floor(h * 0.54)
+    if panelH < 344 then panelH = 344 end
+    local panelY = y + h - panelH - 4
     local panelX = x + 12
     local panelW = w - 24
-    local headerH = 18
-    local chipsH = 28
-    local footerH = 16
-    local rowGap = 4
+    local headerH = 30
+    local chipsH = 56
+    local footerH = 0
+    local rowGap = 2
     local keyGap = 4
     local rows = OVERLAY_LAYOUT
-    local rowAreaH = panelH - headerH - chipsH - footerH - 18
+    local rowAreaH = panelH - headerH - chipsH - footerH - 8
     local keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
-    if keyH < 34 then keyH = 34 end
+    if keyH < 46 then keyH = 46 end
 
     self._overlayTouchTargets = {}
     self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
@@ -984,32 +1049,38 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgFill(vg)
 
     nvgFontFace(vg, "regular")
-    nvgFontSize(vg, 11)
+    nvgFontSize(vg, 12)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, nvgRGBA(200, 200, 200, 255))
     nvgText(vg, panelX + 14, panelY + headerH / 2, "Touch Keyboard")
 
+    nvgFontSize(vg, 10)
+    nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+    nvgFillColor(vg, nvgRGBA(185, 185, 185, 255))
+    nvgText(vg, panelX + panelW / 2, panelY + headerH / 2, OVERLAY_HINT_TEXT)
+
     local modeText = string.format("Shift:%s Caps:%s Ctrl:%s Alt:%s", self._overlayShift and "1" or "0", self._overlayCaps and "1" or "0", self._overlayCtrl and "1" or "0", self._overlayAlt and "1" or "0")
+    nvgFontSize(vg, 11)
     nvgTextAlign(vg, NVG_ALIGN_RIGHT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, nvgRGBA(120, 180, 255, 255))
     nvgText(vg, panelX + panelW - 14, panelY + headerH / 2, modeText)
 
     local suggestions = self:_collectOverlaySuggestions()
     local chipX = panelX + 12
-    local chipY = panelY + headerH + 4
+    local chipY = panelY + headerH + 6
     for _, item in ipairs(suggestions) do
         local label = item.text
-        local chipW = math.min(panelW * 0.22, math.max(42, 18 + #label * 8))
+        local chipW = math.min(panelW * 0.26, math.max(70, 30 + #label * 10))
         if chipX + chipW > panelX + panelW - 12 then
             break
         end
 
         nvgBeginPath(vg)
-        nvgRoundedRect(vg, chipX, chipY, chipW, chipsH - 6, 8)
+        nvgRoundedRect(vg, chipX, chipY, chipW, chipsH - 6, 10)
         nvgFillColor(vg, nvgRGBA(48, 58, 76, 230))
         nvgFill(vg)
 
-        nvgFontSize(vg, 11)
+        nvgFontSize(vg, 14)
         nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
         nvgFillColor(vg, nvgRGBA(235, 235, 235, 255))
         nvgText(vg, chipX + chipW / 2, chipY + (chipsH - 6) / 2, label)
@@ -1024,7 +1095,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
         chipX = chipX + chipW + 6
     end
 
-    local rowY = panelY + headerH + chipsH + 8
+    local rowY = panelY + headerH + chipsH + 6
     local contentW = panelW - 24
     for _, row in ipairs(rows) do
         local units = 0
@@ -1058,7 +1129,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
                 label = self:_resolveOverlayChar(key)
             end
 
-            nvgFontSize(vg, keyH >= 34 and 13 or 11)
+            nvgFontSize(vg, keyH >= 46 and 16 or 14)
             nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
             nvgFillColor(vg, nvgRGBA(255, 255, 255, 255))
             nvgText(vg, keyX + keyW / 2, rowY + keyH / 2, label)
@@ -1076,10 +1147,6 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
         rowY = rowY + keyH + rowGap
     end
 
-    nvgFontSize(vg, 10)
-    nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_BOTTOM)
-    nvgFillColor(vg, nvgRGBA(170, 170, 170, 230))
-    nvgText(vg, panelX + panelW / 2, panelY + panelH - 4, OVERLAY_HINT_TEXT)
 end
 
 function TerminalView:_onFrame(dt)
