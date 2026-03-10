@@ -1588,12 +1588,13 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     local panelW = w - 24
     local headerH = 30
     local suggestions = self:_collectOverlaySuggestions()
-    local chipsH = (#suggestions > 0) and 46 or 0
+    local chipsH = (#suggestions > 0) and 52 or 0
+    local chipsGap = (#suggestions > 0) and 8 or 0
     local footerH = 0
     local rowGap = 2
     local keyGap = 4
     local rows = OVERLAY_LAYOUT
-    local rowAreaH = panelH - headerH - chipsH - footerH - 6
+    local rowAreaH = panelH - headerH - footerH - 6
     local keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
     if keyH < 54 then keyH = 54 end
 
@@ -1639,14 +1640,34 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
 
     local rowY = panelY + headerH + 4
     if chipsH > 0 then
-        local chipX = panelX + 12
-        local chipY = rowY
-        local chipH = chipsH - 8
+        local chipBandY = panelY - chipsH - chipsGap
+        local chipBandH = chipsH
+        local chipInset = 10
+        local chipX = panelX + chipInset
+        local chipY = chipBandY + 4
+        local chipH = chipBandH - 8
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX + 1, chipBandY + 2, panelW, chipBandH)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_shadow, 26))
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX, chipBandY, panelW, chipBandH)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_fill, 238))
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX + 0.5, chipBandY + 0.5, panelW - 1, chipBandH - 1)
+        nvgStrokeColor(vg, _withAlpha(OVERLAY_THEME.panel_border, 255))
+        nvgStrokeWidth(vg, 1.0)
+        nvgStroke(vg)
+
         for index, item in ipairs(suggestions) do
             local chipLabel = item.display or item.text
-            nvgFontSize(vg, 12)
-            local chipW = math.max(72, math.min(180, 22 + #tostring(chipLabel) * 14))
-            if chipX + chipW > panelX + panelW - 12 then
+            nvgFontSize(vg, 13)
+            local chipW = math.max(82, math.min(196, 26 + #tostring(chipLabel) * 15))
+            if chipX + chipW > panelX + panelW - chipInset then
                 break
             end
 
@@ -1677,7 +1698,6 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
 
             chipX = chipX + chipW + 4
         end
-        rowY = rowY + chipsH
     end
     local contentW = panelW - 24
     for rowIndex, row in ipairs(rows) do

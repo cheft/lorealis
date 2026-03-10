@@ -141,12 +141,234 @@ local RECENT_READING = {}
 local RECENT_TEXT = {}
 local RECENT_BIGRAM = {}
 
+local EXTERNAL_LEXICON_MODULES = {
+    "pinyin_lexicon_extra",
+    "pinyin_lexicon_user",
+}
+
+local LOAD_STATS = {
+    base_keys = 0,
+    base_entries = 0,
+    merged_keys = 0,
+    merged_entries = 0,
+    total_keys = 0,
+    total_entries = 0,
+    merged_modules = 0,
+    modules = {},
+}
+
+local function normalizeReadingKey(raw)
+    return tostring(raw or ""):lower():gsub("[^a-zv]", "")
+end
+
+local function countLexiconEntries(lexicon)
+    local keys, entries = 0, 0
+    for _, bucket in pairs(lexicon or {}) do
+        if type(bucket) == "table" then
+            keys = keys + 1
+            for _, entry in ipairs(bucket) do
+                if type(entry) == "table" and entry.text and entry.text ~= "" then
+                    entries = entries + 1
+                end
+            end
+        end
+    end
+    return keys, entries
+end
+
+local function ensureBucket(reading)
+    LEXICON[reading] = LEXICON[reading] or {}
+    return LEXICON[reading]
+end
+
+local function appendEntry(reading, entry, source)
+    reading = normalizeReadingKey(reading)
+    if reading == "" then return false end
+    local text = nil
+    local freq = 1000
+    if type(entry) == "string" then
+        text = entry
+    elseif type(entry) == "table" then
+        text = entry.text or entry[1]
+        freq = tonumber(entry.freq or entry.score or entry.weight or entry[2]) or 1000
+    end
+    if not text or text == "" then return false end
+    local bucket = ensureBucket(reading)
+    for _, existing in ipairs(bucket) do
+        if existing.text == text then
+            if freq > (existing.freq or 0) then
+                existing.freq = freq
+            end
+            return false
+        end
+    end
+    table.insert(bucket, { text = text, freq = freq, source = source })
+    return true
+end
+
+local function mergeLexiconMap(map, source)
+    local mergedKeys = {}
+    local mergedEntries = 0
+    for reading, bucket in pairs(map or {}) do
+        local normalized = normalizeReadingKey(reading)
+        if normalized ~= "" then
+            if type(bucket) == "table" and bucket.text then
+                if appendEntry(normalized, bucket, source) then
+                    mergedEntries = mergedEntries + 1
+                    mergedKeys[normalized] = true
+                end
+            elseif type(bucket) == "table" then
+                for _, entry in ipairs(bucket) do
+                    if appendEntry(normalized, entry, source) then
+                        mergedEntries = mergedEntries + 1
+                        mergedKeys[normalized] = true
+                    end
+                end
+            elseif type(bucket) == "string" then
+                if appendEntry(normalized, bucket, source) then
+                    mergedEntries = mergedEntries + 1
+                    mergedKeys[normalized] = true
+                end
+            end
+        end
+    end
+    local mergedKeyCount = 0
+    for _ in pairs(mergedKeys) do mergedKeyCount = mergedKeyCount + 1 end
+    return mergedKeyCount, mergedEntries
+end
+
+local function mergeLexiconEntries(entries, source)
+    local mergedKeys = {}
+    local mergedEntries = 0
+    for _, item in ipairs(entries or {}) do
+        if type(item) == "table" then
+            local reading = normalizeReadingKey(item.reading or item.pinyin or item.key)
+            if reading ~= "" and appendEntry(reading, item, source) then
+                mergedEntries = mergedEntries + 1
+                mergedKeys[reading] = true
+            end
+        end
+    end
+    local mergedKeyCount = 0
+    for _ in pairs(mergedKeys) do mergedKeyCount = mergedKeyCount + 1 end
+    return mergedKeyCount, mergedEntries
+end
+
+local function mergeLexiconChunk(name, chunk)
+    if type(chunk) ~= "table" then return 0, 0 end
+    local source = chunk.name or name
+    local keysA, entriesA = 0, 0
+    local keysB, entriesB = 0, 0
+    if chunk.lexicon or chunk.dict then
+        keysA, entriesA = mergeLexiconMap(chunk.lexicon or chunk.dict, source)
+    else
+        keysA, entriesA = mergeLexiconMap(chunk, source)
+    end
+    if chunk.entries then
+        keysB, entriesB = mergeLexiconEntries(chunk.entries, source)
+    end
+    return keysA + keysB, entriesA + entriesB
+end
+
+local function isModuleMissing(name, err)
+    err = tostring(err or "")
+    return err:find("module '" .. name .. "' not found", 1, true) ~= nil
+end
+
 local ALL_KEYS = {}
-for key in pairs(LEXICON) do table.insert(ALL_KEYS, key) end
-table.sort(ALL_KEYS, function(a, b)
-    if #a == #b then return a < b end
-    return #a > #b
-end)
+local INITIALS_INDEX = {}
+local buildSegmentations
+
+local function rebuildAllKeys()
+    ALL_KEYS = {}
+    for key in pairs(LEXICON) do table.insert(ALL_KEYS, key) end
+    table.sort(ALL_KEYS, function(a, b)
+        if #a == #b then return a < b end
+        return #a > #b
+    end)
+end
+
+local function pickInitialsSegments(reading)
+    local segmentations = buildSegmentations(reading)
+    local best = nil
+    for _, segments in ipairs(segmentations) do
+        if #segments > 1 then
+            if not best or #segments > #best then
+                best = segments
+            end
+        end
+    end
+    if not best then
+        return (#reading > 0) and string.sub(reading, 1, 1) or nil
+    end
+    local parts = {}
+    for _, segment in ipairs(best) do
+        parts[#parts + 1] = string.sub(segment, 1, 1)
+    end
+    return table.concat(parts)
+end
+
+local function rebuildInitialsIndex()
+    INITIALS_INDEX = {}
+    for reading, bucket in pairs(LEXICON) do
+        local initials = pickInitialsSegments(reading)
+        if initials and initials ~= "" then
+            local out = INITIALS_INDEX[initials]
+            if not out then
+                out = {}
+                INITIALS_INDEX[initials] = out
+            end
+            local seen = {}
+            for _, existing in ipairs(out) do
+                seen[existing.text .. "|" .. existing.reading] = true
+            end
+            for idx = 1, math.min(#bucket, 3) do
+                local entry = bucket[idx]
+                local dedupeKey = tostring(entry.text or "") .. "|" .. tostring(reading)
+                if entry.text and not seen[dedupeKey] then
+                    seen[dedupeKey] = true
+                    table.insert(out, { text = entry.text, reading = reading, freq = entry.freq or 1000 })
+                end
+            end
+        end
+    end
+end
+
+local function loadExternalLexicons()
+    LOAD_STATS.base_keys, LOAD_STATS.base_entries = countLexiconEntries(LEXICON)
+    for _, moduleName in ipairs(EXTERNAL_LEXICON_MODULES) do
+        local ok, chunk = pcall(require, moduleName)
+        if ok then
+            local mergedKeys, mergedEntries = mergeLexiconChunk(moduleName, chunk)
+            if mergedEntries > 0 then
+                LOAD_STATS.merged_modules = LOAD_STATS.merged_modules + 1
+                LOAD_STATS.merged_keys = LOAD_STATS.merged_keys + mergedKeys
+                LOAD_STATS.merged_entries = LOAD_STATS.merged_entries + mergedEntries
+                table.insert(LOAD_STATS.modules, string.format("%s(+%d/%d)", moduleName, mergedKeys, mergedEntries))
+            else
+                table.insert(LOAD_STATS.modules, string.format("%s(+0/0)", moduleName))
+            end
+        elseif not isModuleMissing(moduleName, chunk) then
+            print(string.format("[PinyinIme] Failed to load %s: %s", moduleName, tostring(chunk)))
+        end
+    end
+    rebuildAllKeys()
+    rebuildInitialsIndex()
+    LOAD_STATS.total_keys, LOAD_STATS.total_entries = countLexiconEntries(LEXICON)
+    print(string.format(
+        "[PinyinIme] Lexicon ready: base=%d/%d merged=%d/%d modules=%d total=%d/%d",
+        LOAD_STATS.base_keys,
+        LOAD_STATS.base_entries,
+        LOAD_STATS.merged_keys,
+        LOAD_STATS.merged_entries,
+        LOAD_STATS.merged_modules,
+        LOAD_STATS.total_keys,
+        LOAD_STATS.total_entries
+    ))
+    if #LOAD_STATS.modules > 0 then
+        print("[PinyinIme] Modules: " .. table.concat(LOAD_STATS.modules, ", "))
+    end
+end
 
 local FUZZY_RULES = {
     { "zh", "z", 18 }, { "z", "zh", 20 },
@@ -239,7 +461,7 @@ local function matchingKeys(raw, pos)
     return out
 end
 
-local function buildSegmentations(raw)
+buildSegmentations = function(raw)
     local results = {}
     local function dfs(pos, segments)
         if #results >= 18 then return end
@@ -295,6 +517,34 @@ local function collectPrefixCandidates(raw, opts, acc, seen)
     end
 end
 
+local function collectInitialsCandidates(raw, opts, acc, seen)
+    if #raw < 2 then return end
+    local function addFromBucket(initials, entries, exact)
+        if not entries then return end
+        for idx = 1, math.min(#entries, exact and 4 or 2) do
+            local entry = entries[idx]
+            local score = (entry.freq or 1000)
+                + getReadingRecent(entry.reading, entry.text) * 180
+                + (RECENT_TEXT[entry.text] or 0) * 35
+                + getBigramRecent(opts.prev_text, entry.text) * 120
+                + (exact and 760 or 540)
+                - math.max(0, #initials - #raw) * 42
+            addCandidate(acc, seen, makeCandidate(entry.text, raw, score, {
+                source = exact and "initials" or "initials-prefix",
+                remaining = "",
+                reading = entry.reading,
+            }))
+        end
+    end
+
+    addFromBucket(raw, INITIALS_INDEX[raw], true)
+    for initials, entries in pairs(INITIALS_INDEX) do
+        if initials ~= raw and string.sub(initials, 1, #raw) == raw then
+            addFromBucket(initials, entries, false)
+        end
+    end
+end
+
 local function collectSegmentationCandidates(raw, opts, acc, seen)
     local segmentations = buildSegmentations(raw)
     for _, segments in ipairs(segmentations) do
@@ -331,6 +581,7 @@ function PinyinIme.getCandidates(raw, opts)
     local acc, seen = {}, {}
     collectExactCandidates(raw, opts, acc, seen)
     collectSegmentationCandidates(raw, opts, acc, seen)
+    collectInitialsCandidates(raw, opts, acc, seen)
     collectPrefixCandidates(raw, opts, acc, seen)
 
     table.sort(acc, function(a, b)
@@ -348,6 +599,20 @@ function PinyinIme.getCandidates(raw, opts)
     return out
 end
 
+function PinyinIme.stats()
+    return {
+        page_size = PinyinIme.PAGE_SIZE,
+        base_keys = LOAD_STATS.base_keys,
+        base_entries = LOAD_STATS.base_entries,
+        merged_keys = LOAD_STATS.merged_keys,
+        merged_entries = LOAD_STATS.merged_entries,
+        total_keys = LOAD_STATS.total_keys,
+        total_entries = LOAD_STATS.total_entries,
+        merged_modules = LOAD_STATS.merged_modules,
+        modules = LOAD_STATS.modules,
+    }
+end
+
 function PinyinIme.rememberSelection(reading, text, prevText)
     reading = normalize(reading)
     if reading == "" or not text or text == "" then return end
@@ -359,5 +624,7 @@ function PinyinIme.rememberSelection(reading, text, prevText)
         RECENT_BIGRAM[prevText][text] = (RECENT_BIGRAM[prevText][text] or 0) + 1
     end
 end
+
+loadExternalLexicons()
 
 return PinyinIme
