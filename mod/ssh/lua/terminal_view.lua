@@ -1091,6 +1091,34 @@ function TerminalView:_hitOverlayTarget(absX, absY)
     return nil
 end
 
+function TerminalView:_handleOverlayPointer(absX, absY, activate)
+    if not self._overlayKeyboardVisible then
+        return false
+    end
+
+    local target = self:_hitOverlayTarget(absX, absY)
+    if not target then
+        return self:_isPointInOverlay(absX, absY)
+    end
+
+    if target.type == "key" then
+        self._overlaySelectedKey = target.key
+        if activate then
+            self:_activateOverlayKey(target.key)
+        else
+            self:_invalidate()
+        end
+        return true
+    elseif target.type == "suggestion" then
+        if activate then
+            self:_applySuggestion(target.item)
+        end
+        return true
+    end
+
+    return self:_isPointInOverlay(absX, absY)
+end
+
 function TerminalView:_pollOverlayTouch()
     if not self._overlayKeyboardVisible then
         self._touchState.pressed = false
@@ -1645,7 +1673,7 @@ function TerminalView:_onPointerDown(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
     if self._overlayKeyboardVisible then
-        return true
+        return self:_handleOverlayPointer(event.x, event.y, true)
     end
 
     local histLen = #self._buf.history
@@ -1670,7 +1698,7 @@ function TerminalView:_onPointerMove(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
     if self._overlayKeyboardVisible then
-        return true
+        return self:_handleOverlayPointer(event.x, event.y, false)
     end
 
     if not self._selecting then return false end
@@ -1697,7 +1725,7 @@ function TerminalView:_onPointerUp(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
     if self._overlayKeyboardVisible then
-        return true
+        return self:_handleOverlayPointer(event.x, event.y, false)
     end
 
     if not self._selecting then return false end
