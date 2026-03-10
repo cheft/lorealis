@@ -430,7 +430,8 @@ local OVERLAY_LAYOUT_COMPACT = {
         _key("i", { action = "char", base = "i", letter = true, width = 1, slot = "i" }),
         _key("o", { action = "char", base = "o", letter = true, width = 1, slot = "o" }),
         _key("p", { action = "char", base = "p", letter = true, width = 1, slot = "p" }),
-        _key("BS", { action = "backspace", width = 1, fnLabel = "Del", fnAction = "send", fnValue = Platform.keyMap.DEL }),
+        _key("-", { action = "char", base = "-", width = 1, shift = "_", fnLabel = "F11", fnAction = "send", fnValue = Platform.keyMap.F11 }),
+        _key("BS", { action = "backspace", width = 1.5, fnLabel = "Del", fnAction = "send", fnValue = Platform.keyMap.DEL }),
     },  
     {
         _key("Tab", { action = "tab", width = 1 }),
@@ -444,7 +445,8 @@ local OVERLAY_LAYOUT_COMPACT = {
         _key("j", { action = "char", base = "j", letter = true, width = 1, slot = "j" }),
         _key("k", { action = "char", base = "k", letter = true, width = 1, slot = "k" }),
         _key("l", { action = "char", base = "l", letter = true, width = 1, slot = "l" }),
-        _key("Enter", { action = "enter", width = 1.5 }),
+        _key(";", { action = "char", base = ";", shift = ":", width = 1 }),
+        _key("Enter", { action = "enter", width = 2 }),
     },
     {
         _key("Shift", { action = "shift", width = 1}),
@@ -457,9 +459,9 @@ local OVERLAY_LAYOUT_COMPACT = {
         _key("n", { action = "char", base = "n", letter = true, width = 1, slot = "n" }),
         _key("m", { action = "char", base = "m", letter = true, width = 1, slot = "m" }),
         _key(",", { action = "char", base = ",", shift = "<", width = 1 }),
-         _key(ARROW_UP_LABEL, { action = "send", value = Platform.keyMap.UP, width = 1, fnLabel = "PgUp", fnValue = Platform.keyMap.PGUP }),
         _key(".", { action = "char", base = ".", shift = ">", width = 1 }),
-        -- _key(";", { action = "char", base = ";", shift = ":", width = 1 }),
+        _key(ARROW_UP_LABEL, { action = "send", value = Platform.keyMap.UP, width = 1, fnLabel = "PgUp", fnValue = Platform.keyMap.PGUP }),
+        _key("/", { action = "char", base = "/", shift = "?", width = 1 }),
     },
     -- {
     --     _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1.15 }),
@@ -479,8 +481,6 @@ local OVERLAY_LAYOUT_COMPACT = {
         _key(ARROW_LEFT_LABEL, { action = "send", value = Platform.keyMap.LEFT, width = 1, fnLabel = "Home", fnValue = Platform.keyMap.HOME }),
         _key(ARROW_DOWN_LABEL, { action = "send", value = Platform.keyMap.DOWN, width = 1, fnLabel = "PgDn", fnValue = Platform.keyMap.PGDN }),
         _key(ARROW_RIGHT_LABEL, { action = "send", value = Platform.keyMap.RIGHT, width = 1, fnLabel = "End", fnValue = Platform.keyMap.END }),
-
-
     },
 }
 
@@ -655,7 +655,7 @@ function TerminalView.new(sshManager)
     self._scrollOffset   = 0
     self._maxScroll      = 0
 
-    self._statusText     = "æœªè¿žæŽ¥"
+    self._statusText     = "未连接"
     self._statusColor    = {r=150, g=150, b=150}
 
     self._selection      = nil
@@ -1919,12 +1919,9 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     local contentInset = compactLayout and 4 or 12
     local modeLabel = compactLayout and "COMPACT" or "CLASSIC"
     local fnPageName = (self._overlayFn and OVERLAY_COMPACT_FN_PAGES[self._overlayFnPage or 1] and OVERLAY_COMPACT_FN_PAGES[self._overlayFnPage or 1].name) or "-"
-    local panelH = math.floor(h * (compactLayout and 0.72 or 0.60))
-    if panelH < 392 then panelH = 392 end
-    local panelY = y + h - panelH - (compactLayout and 0 or 4)
     local panelX = x + panelInset
     local panelW = w - panelInset * 2
-    local headerH = compactLayout and 26 or 30
+    local headerH = compactLayout and 20 or 30
     local suggestions = self:_collectOverlaySuggestions()
     local chipsH = (#suggestions > 0) and 52 or 0
     local chipsGap = (#suggestions > 0) and 8 or 0
@@ -1932,9 +1929,35 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     local rowGap = compactLayout and 1 or 2
     local keyGap = compactLayout and 2 or 4
     local rows = self:_getOverlayLayout()
-    local rowAreaH = panelH - headerH - footerH - 6
-    local keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
-    if keyH < 54 then keyH = 54 end
+    local contentW = panelW - contentInset * 2
+    local keyH = 0
+    local panelH = 0
+
+    if compactLayout then
+        local squareKeySize = nil
+        for _, row in ipairs(rows) do
+            local units = 0
+            for _, key in ipairs(row) do
+                units = units + (key.width or 1)
+            end
+
+            local keyUnitW = (contentW - keyGap * (#row - 1)) / units
+            if not squareKeySize or keyUnitW < squareKeySize then
+                squareKeySize = keyUnitW
+            end
+        end
+
+        keyH = math.max(32, math.floor((squareKeySize or 0) + 0.5))
+        panelH = headerH + 6 + keyH * #rows + rowGap * (#rows - 1)
+    else
+        panelH = math.floor(h * 0.60)
+        if panelH < 392 then panelH = 392 end
+        local rowAreaH = panelH - headerH - footerH - 6
+        keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
+        if keyH < 54 then keyH = 54 end
+    end
+
+    local panelY = y + h - panelH - (compactLayout and 0 or 4)
 
     self._overlayTouchTargets = {}
     self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
@@ -2038,7 +2061,6 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
             chipX = chipX + chipW + 4
         end
     end
-    local contentW = panelW - contentInset * 2
     for rowIndex, row in ipairs(rows) do
         local units = 0
         for _, key in ipairs(row) do
