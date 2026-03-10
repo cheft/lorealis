@@ -105,6 +105,10 @@ docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/d
 
 
 ## TODO
+- [x] Lua integration is being gradually refined
+- [x] Markdown & HTML renderer is not perfect
+- [x] RSS reader (first version) is completed
+- [x] SSH remote tool (first version) is completed
 - [ ] Theme Compatibility
 - [ ] I18n Bundle Lazy Loading
 - [ ] Luajit Tests
@@ -114,6 +118,8 @@ docker run --rm -it -v E:\Works\Projects\lorealis\build_switch:/work devkitpro/d
 <p align="center">
   <!-- 纯内联样式实现两列瀑布流，适配GitHub渲染规则 -->
   <div style="column-count: 2; column-gap: 10px; max-width: 900px; margin: 0 auto;">
+     <img src="./demo_screens/keyboard1.jpg" alt="游戏截图1" style="width: 100%; height: auto; margin-bottom: 10px; break-inside: avoid; border-radius: 4px;">
+    <img src="./demo_screens/keyboard2.jpg" alt="游戏截图2" style="width: 100%; height: auto; margin-bottom: 10px; break-inside: avoid; border-radius: 4px;">
     <img src="./demo_screens/2051030715381500-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图1" style="width: 100%; height: auto; margin-bottom: 10px; break-inside: avoid; border-radius: 4px;">
     <img src="./demo_screens/2051030715383600-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图2" style="width: 100%; height: auto; margin-bottom: 10px; break-inside: avoid; border-radius: 4px;">
     <img src="./demo_screens/2051030715385100-724B210A3FADE4CB2EC3B689F6D30AA5.jpg" alt="游戏截图3" style="width: 100%; height: auto; margin-bottom: 10px; break-inside: avoid; border-radius: 4px;">
