@@ -160,6 +160,11 @@ local OVERLAY_COMMON_COMMANDS = {
     "touch", "grep", "find", "git", "top", "htop", "vim", "nano", "ssh", "scp",
 }
 
+local ARROW_UP_LABEL = "\226\134\145"
+local ARROW_LEFT_LABEL = "\226\134\144"
+local ARROW_DOWN_LABEL = "\226\134\147"
+local ARROW_RIGHT_LABEL = "\226\134\146"
+
 local OVERLAY_LAYOUT = {
     {
         _key("Esc", { action = "send", value = Platform.keyMap.ESC, width = 1.25 }),
@@ -219,8 +224,9 @@ local OVERLAY_LAYOUT = {
         _key("m", { action = "char", base = "m", letter = true }),
         _key(",", { action = "char", base = ",", shift = "<" }),
         _key(".", { action = "char", base = ".", shift = ">" }),
-        _key("↑", { action = "send", value = Platform.keyMap.UP, width = 1.15 }),
-        _key("?", { action = "text", value = "?", width = 1.15 }),
+        _key("?", { action = "char", base = "?", shift = "/" }),
+        _key(ARROW_UP_LABEL, { action = "send", value = Platform.keyMap.UP, width = 1.15 }),
+        _key("`", { action = "char", base = "~", shift = "`", width = 1.15 }),
     },
     {
         _key("CN", { action = "cn", width = 1.15 }),
@@ -229,10 +235,10 @@ local OVERLAY_LAYOUT = {
         _key("Alt", { action = "alt", width = 1.15 }),
         _key("Space", { action = "space", width = 5.5 }),
         _key("Fn", { action = "fn", width = 1.15 }),
-        _key("`", { action = "char", base = "`", shift = "~" }),
-        _key("←", { action = "send", value = Platform.keyMap.LEFT, width = 1.15 }),
-        _key("↓", { action = "send", value = Platform.keyMap.DOWN, width = 1.15 }),
-        _key("→", { action = "send", value = Platform.keyMap.RIGHT, width = 1.15 }),
+        
+        _key(ARROW_LEFT_LABEL, { action = "send", value = Platform.keyMap.LEFT, width = 1.15 }),
+        _key(ARROW_DOWN_LABEL, { action = "send", value = Platform.keyMap.DOWN, width = 1.15 }),
+        _key(ARROW_RIGHT_LABEL, { action = "send", value = Platform.keyMap.RIGHT, width = 1.15 }),
     },
 }
 
