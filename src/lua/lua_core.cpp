@@ -576,29 +576,23 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     );
 
     // Static factory: brls.ZipPackage.open(path) -> ZipPackage or nil
-    zip_ut["open"] = [](const std::string& path) -> std::shared_ptr<ZipLoader> {
+    zip_ut.set_function("open", [](const std::string& path) -> std::shared_ptr<ZipLoader> {
         auto loader = std::make_shared<ZipLoader>(path);
         if (!loader->isOpen()) return nullptr;
         return loader;
-    };
+    });
 
     // Check if a file exists inside the ZIP
-    zip_ut["hasFile"] = [](ZipLoader& self, const std::string& name) {
-        return self.hasFile(name);
-    };
+    zip_ut.set_function("hasFile", &ZipLoader::hasFile);
 
     // List all entries in the ZIP
-    zip_ut["listFiles"] = [](ZipLoader& self) {
-        return self.listFiles();
-    };
+    zip_ut.set_function("listFiles", &ZipLoader::listFiles);
 
     // Get raw content of a file as a string
-    zip_ut["readFile"] = [](ZipLoader& self, const std::string& name) {
-        return self.readFile(name);
-    };
+    zip_ut.set_function("readFile", &ZipLoader::readFile);
 
     // Load an XML file from the ZIP and return the created brls::View
-    zip_ut["loadXMLView"] = [this](ZipLoader& self, const std::string& xmlName) -> sol::object {
+    zip_ut.set_function("loadXMLView", [this](ZipLoader& self, const std::string& xmlName) -> sol::object {
         std::string content = self.readFile(xmlName);
         if (content.empty()) {
             brls::Logger::error("ZipPackage.loadXMLView: '{}' is empty or not found", xmlName);
@@ -618,10 +612,10 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
         };
         reg(view);
         return this->pushView(view);
-    };
+    });
 
     // Load and execute a Lua file from the ZIP; returns the module table
-    zip_ut["requireLua"] = [this](ZipLoader& self, const std::string& luaName) -> sol::object {
+    zip_ut.set_function("requireLua", [this](ZipLoader& self, const std::string& luaName) -> sol::object {
         std::string code = self.readFile(luaName);
         if (code.empty()) {
             brls::Logger::error("ZipPackage.requireLua: '{}' is empty or not found", luaName);
@@ -642,5 +636,5 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
             return sol::make_object(lua, sol::nil);
         }
         return result;
-    };
+    });
 }

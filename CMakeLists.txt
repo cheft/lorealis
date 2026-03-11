@@ -7,6 +7,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(FetchContent)
 
+# Set BRLS_DEPS_PATH to a local directory if you want to use pre-downloaded dependencies
+# For example: cmake -DBRLS_DEPS_PATH=E:/deps ..
+if(NOT BRLS_DEPS_PATH)
+    set(BRLS_DEPS_PATH "${CMAKE_CURRENT_BINARY_DIR}/_deps_local")
+endif()
+
+# Force FetchContent to use a project-local writable cache instead of CMake's
+# default `_deps` directory. This avoids permission issues in shared/container
+# build roots where `${CMAKE_CURRENT_BINARY_DIR}/_deps` may already exist with
+# incompatible ownership.
+file(MAKE_DIRECTORY "${BRLS_DEPS_PATH}")
+set(FETCHCONTENT_BASE_DIR "${BRLS_DEPS_PATH}" CACHE PATH "FetchContent base directory" FORCE)
+message(STATUS "--- FetchContent base dir: ${FETCHCONTENT_BASE_DIR} ---")
+
 # --- Build Optimization: Compiler Caching ---
 find_program(SCCACHE_PROGRAM sccache)
 find_program(CCACHE_PROGRAM ccache)
@@ -91,24 +105,10 @@ endif()
 
 FetchContent_Declare(
     sol2
-    URL "https://github.com/ThePhD/sol2/archive/refs/tags/v3.3.0.zip"
+    URL "https://github.com/ThePhD/sol2/archive/refs/tags/v3.2.0.zip"
     DOWNLOAD_EXTRACT_TIMESTAMP true
 )
 # --- HTML/Markdown/XML Dependencies ---
-# Set BRLS_DEPS_PATH to a local directory if you want to use pre-downloaded dependencies
-# For example: cmake -DBRLS_DEPS_PATH=E:/deps ..
-if(NOT BRLS_DEPS_PATH)
-    set(BRLS_DEPS_PATH "${CMAKE_CURRENT_BINARY_DIR}/_deps_local")
-endif()
-
-# Force FetchContent to use a project-local writable cache instead of CMake's
-# default `_deps` directory. This avoids permission issues in shared/container
-# build roots where `${CMAKE_CURRENT_BINARY_DIR}/_deps` may already exist with
-# incompatible ownership.
-file(MAKE_DIRECTORY "${BRLS_DEPS_PATH}")
-set(FETCHCONTENT_BASE_DIR "${BRLS_DEPS_PATH}" CACHE PATH "FetchContent base directory" FORCE)
-message(STATUS "--- FetchContent base dir: ${FETCHCONTENT_BASE_DIR} ---")
-
 FetchContent_Declare(
     pugixml
     URL https://github.com/zeux/pugixml/archive/refs/tags/v1.14.zip
@@ -132,7 +132,36 @@ set(WEBP_BUILD_WEBPINFO OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_WEBPMUX OFF CACHE BOOL "" FORCE)
 set(WEBP_BUILD_EXTRAS OFF CACHE BOOL "" FORCE)
 
-FetchContent_MakeAvailable(sol2 pugixml libwebp)
+set(sol2_SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/sol2-src")
+set(sol2_BINARY_DIR "${FETCHCONTENT_BASE_DIR}/sol2-build")
+if(EXISTS "${sol2_SOURCE_DIR}/include/sol/sol.hpp")
+    set(sol2_POPULATED TRUE)
+else()
+    FetchContent_GetProperties(sol2)
+endif()
+if(NOT sol2_POPULATED)
+    FetchContent_Populate(sol2)
+
+    # sol2's bundled optional implementation has a broken optional<T&>::emplace
+    # on Apple clang/libc++, which causes desktop builds to fail when bindings
+    # instantiate reference optionals.
+endif()
+
+# sol2's bundled optional implementation has a broken optional<T&>::emplace
+# on Apple clang/libc++, which causes desktop builds to fail when bindings
+# instantiate reference optionals.
+set(SOL2_OPTIONAL_IMPL "${sol2_SOURCE_DIR}/include/sol/optional_implementation.hpp")
+if(EXISTS "${SOL2_OPTIONAL_IMPL}")
+    file(READ "${SOL2_OPTIONAL_IMPL}" SOL2_OPTIONAL_IMPL_CONTENT)
+    set(SOL2_OPTIONAL_IMPL_OLD "template <class... Args>\n\t\tT& emplace(Args&&... args) noexcept {\n\t\t\tstatic_assert(std::is_constructible<T, Args&&...>::value, \"T must be constructible with Args\");\n\n\t\t\t*this = nullopt;\n\t\t\tthis->construct(std::forward<Args>(args)...);\n\t\t}")
+    set(SOL2_OPTIONAL_IMPL_NEW "template <class U = T, detail::enable_if_t<!detail::is_optional<detail::decay_t<U>>::value>* = nullptr>\n\t\tT& emplace(U&& u) noexcept {\n\t\t\tstatic_assert(std::is_lvalue_reference<U>::value, \"U must be an lvalue\");\n\t\t\tm_value = std::addressof(u);\n\t\t\treturn *m_value;\n\t\t}")
+    string(REPLACE "${SOL2_OPTIONAL_IMPL_OLD}" "${SOL2_OPTIONAL_IMPL_NEW}" SOL2_OPTIONAL_IMPL_CONTENT "${SOL2_OPTIONAL_IMPL_CONTENT}")
+    file(WRITE "${SOL2_OPTIONAL_IMPL}" "${SOL2_OPTIONAL_IMPL_CONTENT}")
+endif()
+
+add_subdirectory(${sol2_SOURCE_DIR} ${sol2_BINARY_DIR})
+
+FetchContent_MakeAvailable(pugixml libwebp)
 
 # Get libwebp source dir explicitly
 FetchContent_GetProperties(libwebp)
@@ -211,18 +240,40 @@ target_link_libraries(lorealis PRIVATE borealis sol2::sol2 ${LUA_LIBS} pugixml w
 
 # zlib for ZipLoader (DEFLATE decompression)
 if(NOT PLATFORM_SWITCH)
-    # Fetch zlib automatically (so it works on all desktop platforms)
-    FetchContent_Declare(
-        zlib_src
-        URL "https://github.com/madler/zlib/releases/download/v1.3.1/zlib-1.3.1.tar.gz"
-    )
-    set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
-    set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
-    FetchContent_MakeAvailable(zlib_src)
-    # FetchContent creates zlibstatic target
-    target_include_directories(lorealis PRIVATE ${zlib_src_SOURCE_DIR} ${zlib_src_BINARY_DIR})
-    target_link_libraries(lorealis PRIVATE zlibstatic)
-    message(STATUS "--- ZipLoader: Using fetched zlib (zlibstatic) ---")
+    # Prefer the system zlib on desktop platforms. This avoids configure
+    # failures with newer CMake versions when older zlib releases are fetched.
+    find_package(ZLIB QUIET)
+    if(ZLIB_FOUND)
+        target_link_libraries(lorealis PRIVATE ZLIB::ZLIB)
+        message(STATUS "--- ZipLoader: Using system zlib ---")
+    else()
+        # Fetch zlib automatically when a system package is unavailable
+        FetchContent_Declare(
+            zlib_src
+            URL "https://github.com/madler/zlib/releases/download/v1.2.13/zlib-1.2.13.tar.gz"
+        )
+        set(ZLIB_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+        set(SKIP_INSTALL_ALL ON CACHE BOOL "" FORCE)
+
+        if(DEFINED CMAKE_POLICY_VERSION_MINIMUM)
+            set(LOREALIS_SAVED_CMAKE_POLICY_VERSION_MINIMUM "${CMAKE_POLICY_VERSION_MINIMUM}")
+            set(LOREALIS_RESTORE_CMAKE_POLICY_VERSION_MINIMUM TRUE)
+        endif()
+        set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
+        FetchContent_MakeAvailable(zlib_src)
+        if(LOREALIS_RESTORE_CMAKE_POLICY_VERSION_MINIMUM)
+            set(CMAKE_POLICY_VERSION_MINIMUM "${LOREALIS_SAVED_CMAKE_POLICY_VERSION_MINIMUM}")
+        else()
+            unset(CMAKE_POLICY_VERSION_MINIMUM)
+        endif()
+        unset(LOREALIS_SAVED_CMAKE_POLICY_VERSION_MINIMUM)
+        unset(LOREALIS_RESTORE_CMAKE_POLICY_VERSION_MINIMUM)
+
+        # FetchContent creates zlibstatic target
+        target_include_directories(lorealis PRIVATE ${zlib_src_SOURCE_DIR} ${zlib_src_BINARY_DIR})
+        target_link_libraries(lorealis PRIVATE zlibstatic)
+        message(STATUS "--- ZipLoader: Using fetched zlib (zlibstatic) ---")
+    endif()
 endif()
 
 message(STATUS "--- Adding Borealis subproject ---")
@@ -290,6 +341,28 @@ else()
     if(PkgConfig_FOUND)
         pkg_check_modules(LIBSSH2 QUIET libssh2)
     endif()
+    if(NOT LIBSSH2_FOUND)
+        find_path(
+            LIBSSH2_INCLUDE_DIR
+            NAMES libssh2.h
+            HINTS
+                /opt/homebrew/opt/libssh2/include
+                /usr/local/opt/libssh2/include
+        )
+        find_library(
+            LIBSSH2_LIBRARY
+            NAMES ssh2 libssh2
+            HINTS
+                /opt/homebrew/opt/libssh2/lib
+                /usr/local/opt/libssh2/lib
+        )
+        if(LIBSSH2_INCLUDE_DIR AND LIBSSH2_LIBRARY)
+            set(LIBSSH2_FOUND TRUE)
+            set(LIBSSH2_INCLUDE_DIRS "${LIBSSH2_INCLUDE_DIR}")
+            set(LIBSSH2_LIBRARIES "${LIBSSH2_LIBRARY}")
+            set(LIBSSH2_VERSION "local")
+        endif()
+    endif()
     if(LIBSSH2_FOUND)
         target_include_directories(lorealis PRIVATE ${LIBSSH2_INCLUDE_DIRS})
         target_link_libraries(lorealis PRIVATE ${LIBSSH2_LIBRARIES})
@@ -344,7 +417,7 @@ else()
         # 禁用 pkgconfig 生成
         set(LIBSSH2_ENABLE_PKGCONFIG OFF CACHE BOOL "" FORCE)
         # 强制使用 mbedTLS 后端（比 WinCNG 兼容性好）
-        set(CRYPTO_BACKEND "mbedTLS" CACHE STRING "Crypto backend for libssh2" FORCE)
+        set(WITH_MBEDTLS ON CACHE BOOL "" FORCE)
         # 在 FetchContent_MakeAvailable 之前创建缺失的 libssh2.pc.in 文件
         # 这样可以避免 configure_file 错误
         FetchContent_GetProperties(libssh2_src)

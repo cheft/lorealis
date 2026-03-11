@@ -1518,7 +1518,7 @@ function TerminalView:_handleOverlayActions(justPressed)
         self:_openSystemIme()
     end
     if justPressed(B.BUTTON_RSB) then
-        self._overlayKeyboardVisible = false
+        self._overlayKeyboardVisible = not self._overlayKeyboardVisible
         self:_invalidate()
     end
 end
@@ -1589,20 +1589,28 @@ function TerminalView:_pollOverlayTouch()
     local wasPressed = self._touchState.pressed and true or false
     local isPressed = touch.pressed and true or false
 
-    -- Handle repeat for backspace key
+    -- Handle repeat for backspace key (hold down to continuously delete)
     local nowMs = _nowMs()
     if self._overlayTouchRepeatKey and isPressed then
         local target = self:_hitOverlayTarget(touch.x, touch.y)
-        if target and target.type == "key" and target.key == self._overlayTouchRepeatKey then
-            local repeatState = self._overlayTouchRepeatState
-            if repeatState and repeatState.nextAt > 0 and nowMs >= repeatState.nextAt then
-                repeatState.nextAt = nowMs + DPAD_REPEAT_INTERVAL_MS
-                self._overlayTouchRepeatState = repeatState
-                -- Trigger backspace again
-                self:_backspaceOverlayBuffer()
+        if target and target.type == "key" then
+            local targetKey = target.key
+            local resolved = self:_resolveOverlayKey(targetKey)
+            if resolved and resolved.action == "backspace" then
+                local repeatState = self._overlayTouchRepeatState
+                if repeatState and repeatState.nextAt > 0 and nowMs >= repeatState.nextAt then
+                    repeatState.nextAt = nowMs + DPAD_REPEAT_INTERVAL_MS
+                    self._overlayTouchRepeatState = repeatState
+                    -- Trigger backspace again without activating (no rumble, no repeat setup)
+                    self:_backspaceOverlayBuffer()
+                end
+            else
+                -- Finger moved off backspace key or key changed
+                self._overlayTouchRepeatKey = nil
+                self._overlayTouchRepeatState = nil
             end
         else
-            -- Finger moved off the repeat key
+            -- No target under finger
             self._overlayTouchRepeatKey = nil
             self._overlayTouchRepeatState = nil
         end
@@ -1830,10 +1838,15 @@ function TerminalView:_pollControllerShortcuts()
     end
     if justPressed(B.BUTTON_BACK) then
         _trace("[TerminalView] Polled - -> Close")
-        if self._onCloseRequest then
-            self._onCloseRequest()
-        elseif self._ssh:isConnected() then
-            self._ssh:disconnect()
+        if self._overlayKeyboardVisible then
+            self._overlayKeyboardVisible = false
+            self:_invalidate()
+        else
+            if self._onCloseRequest then
+                self._onCloseRequest()
+            elseif self._ssh:isConnected() then
+                self._ssh:disconnect()
+            end
         end
     end
 
