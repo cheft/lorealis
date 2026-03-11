@@ -1,6 +1,14 @@
 -- main_activity.lua
 local main_activity = {}
 
+local sshModPath = "mod/ssh/lua/?.lua;mod/ssh/lua/?/init.lua"
+if BRLS_RESOURCES and BRLS_RESOURCES == "romfs:/" then
+    sshModPath = "romfs:/mod/ssh/lua/?.lua;romfs:/mod/ssh/lua/?/init.lua"
+end
+if not package.path:find("mod/ssh/lua/%?%.lua", 1, false) then
+    package.path = package.path .. ";" .. sshModPath
+end
+
 local components_tab = require("tab/components_tab")
 local settings_tab = require("tab/settings_tab")
 local recycling_list_tab = require("tab/recycling_list_tab")
@@ -8,6 +16,7 @@ local transform_tab = require("tab/transform_tab")
 local text_test_tab = require("tab/text_test_tab")
 local game_list_tab = require("tab/game_list_tab")
 local rss_list_tab = require("tab/rss_list_tab")
+local ssh_client_tab = require("tab/ssh_client_tab")
 local layout_theme_settings_tab = require("tab/layout_theme_settings_tab")
 local hello_tab = require("tab/hello_tab")
 
@@ -149,6 +158,8 @@ function main_activity.show()
     print("MainActivity: Registered GameListTab")
     registerTab("RSSListTab", "xml/tabs/rss_list.xml", rss_list_tab.init)
     print("MainActivity: Registered RSSListTab")
+    registerTab("SSHClientTab", "xml/tabs/ssh_client.xml", ssh_client_tab.init)
+    print("MainActivity: Registered SSHClientTab")
     registerTab("SettingsTab", "xml/tabs/settings.xml", settings_tab.init)
     print("MainActivity: Registered SettingsTab")
     registerTab("LayoutThemeSettingsTab", "xml/tabs/layout_theme_settings.xml", layout_theme_settings_tab.init)

@@ -1,0 +1,23 @@
+<brls:Box
+    width="auto"
+    height="auto"
+    axis="row"
+    alignItems="center"
+    marginBottom="10">
+
+    <brls:Button
+        id="ssh_row_connect_button"
+        width="auto"
+        height="auto"
+        grow="1.0"
+        text="user@host:22"
+        style="bordered"/>
+
+    <brls:Button
+        id="ssh_row_delete_button"
+        width="110"
+        height="auto"
+        text="删除"
+        marginLeft="12"/>
+
+</brls:Box>
