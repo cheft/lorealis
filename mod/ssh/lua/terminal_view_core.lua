@@ -604,8 +604,28 @@ function TerminalView.new(sshManager)
     self._lastOverlayRumbleAt = 0
     self._overlayRumbleSeq = 0
     self._overlayRumbleCooling = false
+    self._frameLoopActive = false
 
     return self
+end
+
+function TerminalView:_startFrameLoop()
+    if self._frameLoopActive then
+        return
+    end
+
+    self._frameLoopActive = true
+
+    local function tick()
+        if not self._frameLoopActive or not self._view then
+            return
+        end
+
+        self:_onFrame(16)
+        brls.delay(16, tick)
+    end
+
+    brls.delay(16, tick)
 end
 
 function TerminalView:bindView(view)
@@ -670,10 +690,13 @@ function TerminalView:bindView(view)
             view:registerFrameCallback(function(dt)
                 self:_onFrame(dt)
             end)
+        else
+            self:_startFrameLoop()
         end
 
         if view.onWillDisappear then
             view:onWillDisappear(function()
+                self._frameLoopActive = false
                 if _G.__SSH_TERMINALS then
                     _G.__SSH_TERMINALS[view:get_address()] = nil
                 end

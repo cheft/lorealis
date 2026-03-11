@@ -16,6 +16,7 @@ function Session.new()
     self._ssh = nil
     self._terminal = nil
     self._canvas = nil
+    self._root = nil
     self._frame = nil
     self._activityOpen = false
     self._closing = false
@@ -31,6 +32,11 @@ function Session:_createCanvas()
     return canvas
 end
 
+function Session:_createRoot()
+    local root = brls.Application.loadXMLRes("xml/views/ssh_terminal_screen.xml")
+    return root
+end
+
 function Session:_teardownSession()
     if self._ssh then
         pcall(function()
@@ -40,6 +46,7 @@ function Session:_teardownSession()
     self._ssh = nil
     self._terminal = nil
     self._canvas = nil
+    self._root = nil
     self._frame = nil
     self._activityOpen = false
     self._closing = false
@@ -69,7 +76,16 @@ function Session:_bindCallbacks()
     self._ssh.onConnect = function()
         if self._terminal then
             self._terminal:setStatus("Connected: " .. self._ssh:getInfo(), 80, 220, 80)
+            self._terminal:_invalidate()
         end
+        pcall(function()
+            self._ssh:send("\r")
+        end)
+        brls.delay(30, function()
+            pcall(function()
+                brls.Application.giveFocus(self._canvas)
+            end)
+        end)
         notify("SSH 已连接: " .. tostring(self._endpoint))
     end
 
@@ -101,11 +117,17 @@ function Session:open(conn, password)
     self._endpoint = conn.endpoint or string.format("%s@%s:%d", conn.user, conn.host, conn.port or 22)
     self._ssh = SSHManager.new()
     self._terminal = TerminalView.new(self._ssh)
+    self._root = self:_createRoot()
     self._canvas = self:_createCanvas()
     self._frame = brls.AppletFrame.new()
     self._frame:setHeaderVisibility(brls.Visibility.GONE)
     self._frame:setFooterVisibility(brls.Visibility.GONE)
-    self._frame:pushContentView(self._canvas)
+    if self._root and self._root.addView then
+        self._root:addView(self._canvas)
+        self._frame:pushContentView(self._root)
+    else
+        self._frame:pushContentView(self._canvas)
+    end
     self._terminal:bindView(self._canvas)
     self._terminal:setOnCloseRequest(function()
         self._closing = true
@@ -121,6 +143,11 @@ function Session:open(conn, password)
     self._activityOpen = true
     pcall(function()
         brls.Application.giveFocus(self._canvas)
+    end)
+    brls.delay(30, function()
+        pcall(function()
+            brls.Application.giveFocus(self._canvas)
+        end)
     end)
 
     self._terminal:resize(brls.Application.windowWidth(), brls.Application.windowHeight())

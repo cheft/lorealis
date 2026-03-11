@@ -47,18 +47,26 @@
     </brls:Box>
 
     <brls:ScrollingFrame
-        id="ssh_host_list"
+        id="ssh_host_scroll"
         width="auto"
         height="auto"
         grow="1.0">
 
-        <brls:Label
-            id="ssh_empty_label"
+        <brls:Box
+            id="ssh_host_list"
             width="auto"
             height="auto"
-            text="当前还没有主机。点击右上角“新增主机”后，录入类似 jax@192.168.31.43:22 的地址即可。"
-            fontSize="14"
-            marginTop="10"/>
+            axis="column">
+
+            <brls:Label
+                id="ssh_empty_label"
+                width="auto"
+                height="auto"
+                text="当前还没有主机。点击右上角“新增主机”后，录入类似 jax@192.168.31.43:22 的地址即可。"
+                fontSize="14"
+                marginTop="10"/>
+
+        </brls:Box>
 
     </brls:ScrollingFrame>
 

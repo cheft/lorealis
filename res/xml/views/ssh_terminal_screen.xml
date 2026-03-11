@@ -1,0 +1,6 @@
+<brls:Box
+    id="ssh_terminal_root"
+    width="auto"
+    height="auto"
+    axis="column"
+    backgroundColor="#000000"/>

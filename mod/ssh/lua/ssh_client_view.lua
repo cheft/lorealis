@@ -17,6 +17,7 @@ function Controller.new(view)
     local self = setmetatable({}, Controller)
     self._view = view
     self._hostList = view:getView("ssh_host_list")
+    self._hostScroll = view:getView("ssh_host_scroll")
     self._emptyLabel = view:getView("ssh_empty_label")
     self._addButton = view:getView("ssh_add_host_button")
     self._rows = {}
@@ -84,6 +85,12 @@ function Controller:_setEmptyState(isEmpty)
 end
 
 function Controller:reload()
+    if self._addButton then
+        pcall(function()
+            brls.Application.giveFocus(self._addButton)
+        end)
+    end
+
     self:_clearRows()
 
     local list = SavedConnections.load()
