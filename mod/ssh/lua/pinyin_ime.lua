@@ -278,7 +278,17 @@ end
 local ALL_KEYS = {}
 local INITIALS_INDEX = {}
 local READING_SEGMENTS = {}
+local PREFIX_INDEX = {}
+local SEGMENTS_LEADING_INDEX = {}
+local CANDIDATE_CACHE = {}
+local CANDIDATE_CACHE_ORDER = {}
+local CANDIDATE_CACHE_MAX = 128
 local buildSegmentations
+
+local function clearCandidateCache()
+    CANDIDATE_CACHE = {}
+    CANDIDATE_CACHE_ORDER = {}
+end
 
 local function rebuildAllKeys()
     ALL_KEYS = {}
@@ -287,6 +297,21 @@ local function rebuildAllKeys()
         if #a == #b then return a < b end
         return #a > #b
     end)
+end
+
+local function rebuildPrefixIndex()
+    PREFIX_INDEX = {}
+    for _, key in ipairs(ALL_KEYS) do
+        for len = 1, math.min(#key, 8) do
+            local prefix = string.sub(key, 1, len)
+            local bucket = PREFIX_INDEX[prefix]
+            if not bucket then
+                bucket = {}
+                PREFIX_INDEX[prefix] = bucket
+            end
+            bucket[#bucket + 1] = key
+        end
+    end
 end
 
 local function pickBestSegments(reading)
@@ -320,6 +345,21 @@ local function rebuildReadingSegments()
         local segments = pickBestSegments(reading)
         if segments and #segments > 0 then
             READING_SEGMENTS[reading] = segments
+        end
+    end
+end
+
+local function rebuildSegmentsLeadingIndex()
+    SEGMENTS_LEADING_INDEX = {}
+    for reading, segments in pairs(READING_SEGMENTS) do
+        local leading = segments and segments[1] and string.sub(segments[1], 1, 1)
+        if leading and leading ~= "" then
+            local bucket = SEGMENTS_LEADING_INDEX[leading]
+            if not bucket then
+                bucket = {}
+                SEGMENTS_LEADING_INDEX[leading] = bucket
+            end
+            bucket[#bucket + 1] = { reading = reading, segments = segments }
         end
     end
 end
@@ -376,8 +416,11 @@ local function loadExternalLexicons()
         end
     end
     rebuildAllKeys()
+    rebuildPrefixIndex()
     rebuildReadingSegments()
     rebuildInitialsIndex()
+    rebuildSegmentsLeadingIndex()
+    clearCandidateCache()
     LOAD_STATS.total_keys, LOAD_STATS.total_entries = countLexiconEntries(LEXICON)
     print(string.format(
         "[PinyinIme] Lexicon ready: base=%d/%d merged=%d/%d modules=%d total=%d/%d",
@@ -442,13 +485,18 @@ local function addCandidate(acc, seen, candidate)
 end
 
 local function collectFuzzyVariants(raw)
+    if #raw <= 2 then
+        return { { text = raw, penalty = 0 } }
+    end
+
     local variants = { [raw] = 0 }
     local frontier = { { text = raw, penalty = 0, depth = 0 } }
     local index = 1
     while index <= #frontier do
         local current = frontier[index]
         index = index + 1
-        if current.depth < 2 then
+        local maxDepth = (#raw <= 4) and 1 or 2
+        if current.depth < maxDepth then
             for _, rule in ipairs(FUZZY_RULES) do
                 local from, to, penalty = rule[1], rule[2], rule[3]
                 local searchStart = 1
@@ -528,7 +576,7 @@ end
 
 local function collectPrefixCandidates(raw, opts, acc, seen)
     for _, variant in ipairs(collectFuzzyVariants(raw)) do
-        for _, key in ipairs(ALL_KEYS) do
+        for _, key in ipairs(PREFIX_INDEX[variant.text] or {}) do
             if key ~= variant.text and string.sub(key, 1, #variant.text) == variant.text then
                 local entries = LEXICON[key]
                 for idx = 1, math.min(#entries, 2) do
@@ -628,8 +676,10 @@ end
 local function collectMixedCandidates(raw, opts, acc, seen)
     if #raw < 2 then return end
     local leading = string.sub(raw, 1, 1)
-    for reading, segments in pairs(READING_SEGMENTS) do
-        if segments and #segments >= 2 and string.sub(segments[1], 1, 1) == leading then
+    for _, item in ipairs(SEGMENTS_LEADING_INDEX[leading] or {}) do
+        local reading = item.reading
+        local segments = item.segments
+        if segments and #segments >= 2 then
             local match = matchMixedReading(raw, segments)
             if match then
                 local entries = LEXICON[reading]
@@ -685,6 +735,27 @@ function PinyinIme.getCandidates(raw, opts)
     local limit = opts.limit or 48
     if raw == "" then return {} end
 
+    local cacheKey = table.concat({
+        raw,
+        tostring(opts.prev_text or ""),
+        tostring(limit),
+    }, "\1")
+    local cached = CANDIDATE_CACHE[cacheKey]
+    if cached then
+        local out = {}
+        for i = 1, #cached do
+            local item = cached[i]
+            out[i] = {
+                text = item.text,
+                reading = item.reading,
+                score = item.score,
+                source = item.source,
+                remaining = item.remaining,
+            }
+        end
+        return out
+    end
+
     local acc, seen = {}, {}
     collectExactCandidates(raw, opts, acc, seen)
     collectSegmentationCandidates(raw, opts, acc, seen)
@@ -704,6 +775,27 @@ function PinyinIme.getCandidates(raw, opts)
     for i = 1, math.min(#acc, limit) do
         out[i] = acc[i]
     end
+
+    local stored = {}
+    for i = 1, #out do
+        local item = out[i]
+        stored[i] = {
+            text = item.text,
+            reading = item.reading,
+            score = item.score,
+            source = item.source,
+            remaining = item.remaining,
+        }
+    end
+    CANDIDATE_CACHE[cacheKey] = stored
+    CANDIDATE_CACHE_ORDER[#CANDIDATE_CACHE_ORDER + 1] = cacheKey
+    if #CANDIDATE_CACHE_ORDER > CANDIDATE_CACHE_MAX then
+        local stale = table.remove(CANDIDATE_CACHE_ORDER, 1)
+        if stale then
+            CANDIDATE_CACHE[stale] = nil
+        end
+    end
+
     return out
 end
 
@@ -731,6 +823,7 @@ function PinyinIme.rememberSelection(reading, text, prevText)
         RECENT_BIGRAM[prevText] = RECENT_BIGRAM[prevText] or {}
         RECENT_BIGRAM[prevText][text] = (RECENT_BIGRAM[prevText][text] or 0) + 1
     end
+    clearCandidateCache()
 end
 
 loadExternalLexicons()

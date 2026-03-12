@@ -1,4 +1,5 @@
 #pragma once
+#include <limits>
 #include <borealis.hpp>
 #include <sol/sol.hpp>
 #include <functional>

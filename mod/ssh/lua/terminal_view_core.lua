@@ -23,6 +23,13 @@ local function _trace(msg)
     end
 end
 
+local TERMINAL_DEBUG = false
+local function _debug(msg)
+    if TERMINAL_DEBUG then
+        _trace(msg)
+    end
+end
+
 local nvgBeginPath    = brls.nvgBeginPath
 local nvgFill         = brls.nvgFill
 local nvgRect         = brls.nvgRect
@@ -665,7 +672,7 @@ end
 
 function TerminalView:bindView(view)
     local okInit, initResult = pcall(initGlobalKeyboardListeners)
-    print("[TerminalView] bindView input init: ok=" .. tostring(okInit) .. " result=" .. tostring(initResult))
+    _debug("[TerminalView] bindView input init: ok=" .. tostring(okInit) .. " result=" .. tostring(initResult))
     self._view = view
     if view then
         _G.__SSH_ACTIVE_TERMINAL = self
@@ -714,13 +721,13 @@ function TerminalView:bindView(view)
         _G.__SSH_TERMINALS = _G.__SSH_TERMINALS or {}
         local addr = tostring(view:get_address())
         _G.__SSH_TERMINALS[addr] = self
-        print("[TerminalView] Registered mapping for address: " .. addr)
+        _debug("[TerminalView] Registered mapping for address: " .. addr)
 
         local curr = view:getParent()
         while curr do
             local paddr = tostring(curr:get_address())
             _G.__SSH_TERMINALS[paddr] = self
-            print("[TerminalView] Registered mapping for parent/ancestor address: " .. paddr)
+            _debug("[TerminalView] Registered mapping for parent/ancestor address: " .. paddr)
             curr = curr:getParent()
         end
 
@@ -776,11 +783,11 @@ end
 local function initGlobalKeyboardListeners()
     local inputManager = brls.Application.getPlatform():getInputManager()
     if not inputManager then
-        print("[TerminalView] initGlobalKeyboardListeners: no input manager")
+        _debug("[TerminalView] initGlobalKeyboardListeners: no input manager")
         return false
     end
     if not inputManager.getCharInputEvent or not inputManager.getKeyboardKeyStateChanged then
-        print("[TerminalView] initGlobalKeyboardListeners: keyboard APIs unavailable")
+        _debug("[TerminalView] initGlobalKeyboardListeners: keyboard APIs unavailable")
         return false
     end
     local KEY_K = 75
@@ -807,11 +814,11 @@ local function initGlobalKeyboardListeners()
     end
     
     if _G.__SSH_TERMINAL_INPUT_INITED then
-        print("[TerminalView] initGlobalKeyboardListeners: already initialized")
+        _debug("[TerminalView] initGlobalKeyboardListeners: already initialized")
         return true
     end
     _G.__SSH_TERMINAL_INPUT_INITED = true
-    print("[TerminalView] initGlobalKeyboardListeners: registering listeners")
+    _debug("[TerminalView] initGlobalKeyboardListeners: registering listeners")
 
     local function resolveTerminalFromFocus()
         local focus = brls.Application.getCurrentFocus()
@@ -833,7 +840,7 @@ local function initGlobalKeyboardListeners()
     inputManager:getCharInputEvent():subscribe(function(codepoint)
         local terminal = resolveTerminalFromFocus()
         if terminal then
-            print("[TerminalView] Character input: " .. tostring(codepoint))
+            _debug("[TerminalView] Character input: " .. tostring(codepoint))
             if codepoint == 11 then -- Ctrl+K
                 terminal:_toggleOverlayKeyboardVisible()
                 return
@@ -868,7 +875,7 @@ local function initGlobalKeyboardListeners()
 
         if state.pressed then
             local focus = brls.Application.getCurrentFocus()
-            print(string.format("[TerminalView] Global Key: key=%d mods=%d focus=%s",
+            _debug(string.format("[TerminalView] Global Key: key=%d mods=%d focus=%s",
                 state.key, state.mods, focus and tostring(focus:get_address()) or "nil"))
 
             if terminal then
@@ -907,12 +914,12 @@ end
 
 function TerminalView:feedData(data)
     if not data or #data == 0 then return end
-    print("[TerminalView] feedData: " .. #data .. " bytes")
+    _debug("[TerminalView] feedData: " .. #data .. " bytes")
     local ops = self._parser:feed(data)
     for _, op in ipairs(ops) do
         if op.type == "dsr_report" then
             local resp = string.format("\27[%d;%dR", self._buf.curRow, self._buf.curCol)
-            print("[TerminalView] Responding to DSR with: " .. resp)
+            _debug("[TerminalView] Responding to DSR with: " .. resp)
             self:_sendInput(resp)
         else
             self._buf:_applyOp(op)
@@ -1009,7 +1016,7 @@ end
 
 function TerminalView:ensureInputListeners()
     local okInit, initResult = pcall(initGlobalKeyboardListeners)
-    print("[TerminalView] ensureInputListeners: ok=" .. tostring(okInit) .. " result=" .. tostring(initResult))
+    _debug("[TerminalView] ensureInputListeners: ok=" .. tostring(okInit) .. " result=" .. tostring(initResult))
 end
 
 local function _overlayTrim(text)
@@ -1685,10 +1692,11 @@ function TerminalView:_handleOverlayPointer(absX, absY, activate)
     end
 
     if target.type == "key" then
+        local changed = self._overlaySelectedKey ~= target.key
         self._overlaySelectedKey = target.key
         if activate then
             self:_activateOverlayKey(target.key, "touch")
-        else
+        elseif changed then
             self:_invalidate()
         end
         return true
@@ -2070,7 +2078,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     local nowMs = math.floor((os.clock() or 0) * 1000)
     if (not self._overlayDrawLogAt) or (nowMs - self._overlayDrawLogAt >= 800) then
         self._overlayDrawLogAt = nowMs
-        print(string.format(
+        _debug(string.format(
             "[TerminalView] Overlay draw: raw=%dx%d logical=%dx%d panelX=%d panelY=%d panelW=%d panelH=%d mode=%s",
             math.floor(rawW or 0),
             math.floor(rawH or 0),
@@ -2272,7 +2280,7 @@ function TerminalView:_draw(vg, x, y, w, h)
         if self._lastDrawWidth ~= w or self._lastDrawHeight ~= h then
             self._lastDrawWidth = w
             self._lastDrawHeight = h
-            print(string.format("[TerminalView] Draw area changed: x=%d y=%d w=%d h=%d",
+            _debug(string.format("[TerminalView] Draw area changed: x=%d y=%d w=%d h=%d",
                 math.floor(x or 0), math.floor(y or 0), math.floor(w or 0), math.floor(h or 0)))
             self:resize(w, h)
         end
@@ -2454,7 +2462,7 @@ end
 
 function TerminalView:_sendInput(data)
     if self._ssh and self._ssh.send then
-        print("[TerminalView] Sending input: '" .. data:gsub("\r", "\\r"):gsub("\n", "\\n") .. "' (" .. #data .. " bytes)")
+        _debug("[TerminalView] Sending input: '" .. data:gsub("\r", "\\r"):gsub("\n", "\\n") .. "' (" .. #data .. " bytes)")
         local ok = self._ssh:send(data)
         if not ok then
             _trace("[TerminalView] send() returned false")
