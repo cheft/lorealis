@@ -332,42 +332,42 @@ void LuaManager::registerSSHBindings(sol::table& brls_ns) {
     );
 
     // connect(host, port, timeout_ms) -> errMsg (空 = 成功)
-    session_type["connect"] = [](LuaSSHSession& self,
-                                  const std::string& host,
-                                  sol::optional<int> port,
-                                  sol::optional<int> timeout) -> std::string {
+    session_type.set_function("connect", [](LuaSSHSession& self,
+                                            const std::string& host,
+                                            sol::optional<int> port,
+                                            sol::optional<int> timeout) -> std::string {
         return self.connect(host, port.value_or(22), timeout.value_or(10000));
-    };
+    });
 
     // authPassword(user, pass) -> errMsg
     session_type["authPassword"] = &LuaSSHSession::authPassword;
 
     // authPublicKey(user, pubkey, privkey, passphrase) -> errMsg
-    session_type["authPublicKey"] = [](LuaSSHSession& self,
-                                        const std::string& user,
-                                        const std::string& pub,
-                                        const std::string& priv,
-                                        sol::optional<std::string> pass) -> std::string {
+    session_type.set_function("authPublicKey", [](LuaSSHSession& self,
+                                                  const std::string& user,
+                                                  const std::string& pub,
+                                                  const std::string& priv,
+                                                  sol::optional<std::string> pass) -> std::string {
         return self.authPublicKey(user, pub, priv, pass.value_or(""));
-    };
+    });
 
     // openShell(cols, rows) -> errMsg
-    session_type["openShell"] = [](LuaSSHSession& self,
-                                    sol::optional<int> cols,
-                                    sol::optional<int> rows) -> std::string {
+    session_type.set_function("openShell", [](LuaSSHSession& self,
+                                              sol::optional<int> cols,
+                                              sol::optional<int> rows) -> std::string {
         return self.openShell(cols.value_or(80), rows.value_or(24));
-    };
+    });
 
     // send(data) -> errMsg
     session_type["send"] = &LuaSSHSession::send;
 
     // recv(maxBytes) -> data, errMsg
-    session_type["recv"] = [](LuaSSHSession& self,
-                               sol::optional<int> maxBytes)
-                            -> std::tuple<std::string, std::string> {
+    session_type.set_function("recv", [](LuaSSHSession& self,
+                                         sol::optional<int> maxBytes)
+                                          -> std::tuple<std::string, std::string> {
         auto [data, err] = self.recv(static_cast<size_t>(maxBytes.value_or(4096)));
         return {data, err};
-    };
+    });
 
     // resizePty(cols, rows) -> errMsg
     session_type["resizePty"] = &LuaSSHSession::resizePty;

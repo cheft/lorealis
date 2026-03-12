@@ -292,9 +292,15 @@ function Keyboard:handleKey(keyCode, mods)
 
     -- 字母数字退避处理 (如果 CharInputEvent 没响应)
     if not ctrl then
-        -- 字母 A-Z (65-90)
+        -- 字母 A-Z (GLFW)
         if keyCode >= 65 and keyCode <= 90 then
             local char = string.char(keyCode + (shift and 0 or 32))
+            self:_emit(char)
+            return true
+        end
+        -- 字母 a-z (部分平台直接给小写 ASCII)
+        if keyCode >= 97 and keyCode <= 122 then
+            local char = string.char(keyCode - (shift and 32 or 0))
             self:_emit(char)
             return true
         end
@@ -303,6 +309,11 @@ function Keyboard:handleKey(keyCode, mods)
         if keyCode >= 48 and keyCode <= 57 then
             local char = shift and numShift[keyCode] or string.char(keyCode)
             self:_emit(char)
+            return true
+        end
+        -- 数字小键盘
+        if keyCode >= 320 and keyCode <= 329 then
+            self:_emit(string.char((keyCode - 320) + 48))
             return true
         end
         -- 其他常用 ASCII 符号

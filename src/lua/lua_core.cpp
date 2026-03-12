@@ -398,54 +398,54 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     brls_ns["NVG_ALIGN_BOTTOM"] = (int)NVG_ALIGN_BOTTOM;
 
     // KeyState
-    auto key_state_ut = brls_ns.new_usertype<brls::KeyState>("KeyState", sol::no_construction());
+    auto key_state_ut = brls_ns.new_usertype<brls::KeyState>("KeyState", sol::no_constructor);
     key_state_ut["key"]     = &brls::KeyState::key;
     key_state_ut["mods"]    = &brls::KeyState::mods;
     key_state_ut["pressed"] = &brls::KeyState::pressed;
 
     // VoidEvent for window size change, etc.
-    auto void_event_ut = brls_ns.new_usertype<brls::VoidEvent>("VoidEvent", sol::no_construction());
-    void_event_ut["subscribe"] = [](brls::VoidEvent& self, sol::protected_function func) {
+    auto void_event_ut = brls_ns.new_usertype<brls::VoidEvent>("VoidEvent", sol::no_constructor);
+    void_event_ut.set_function("subscribe", [](brls::VoidEvent& self, sol::protected_function func) {
         self.subscribe([func]() {
             if (func.valid()) {
                 auto res = func();
                 if (!res.valid()) { sol::error err = res; brls::Logger::error("Lua VoidEvent error: {}", err.what()); }
             }
         });
-    };
+    });
     void_event_ut["clear"] = &brls::VoidEvent::clear;
 
     // KeyStateEvent
     using KeyStateEvent = brls::Event<brls::KeyState>;
-    auto key_state_event_ut = brls_ns.new_usertype<KeyStateEvent>("KeyStateEvent", sol::no_construction());
-    key_state_event_ut["subscribe"] = [](KeyStateEvent& self, sol::protected_function cb) {
+    auto key_state_event_ut = brls_ns.new_usertype<KeyStateEvent>("KeyStateEvent", sol::no_constructor);
+    key_state_event_ut.set_function("subscribe", [](KeyStateEvent& self, sol::protected_function cb) {
         self.subscribe([cb](brls::KeyState s) {
             if (cb.valid()) {
                 auto res = cb(s);
                 if (!res.valid()) { sol::error err = res; brls::Logger::error("Lua error in KeyStateEvent: {}", err.what()); }
             }
         });
-    };
+    });
 
     // CharInputEvent
     using CharInputEvent = brls::Event<unsigned int>;
-    auto char_input_event_ut = brls_ns.new_usertype<CharInputEvent>("CharInputEvent", sol::no_construction());
-    char_input_event_ut["subscribe"] = [](CharInputEvent& self, sol::protected_function cb) {
+    auto char_input_event_ut = brls_ns.new_usertype<CharInputEvent>("CharInputEvent", sol::no_constructor);
+    char_input_event_ut.set_function("subscribe", [](CharInputEvent& self, sol::protected_function cb) {
         self.subscribe([cb](unsigned int c) {
             if (cb.valid()) {
                 auto res = cb(c);
                 if (!res.valid()) { sol::error err = res; brls::Logger::error("Lua error in CharInputEvent: {}", err.what()); }
             }
         });
-    };
+    });
 
-    auto theme_values_ut = brls_ns.new_usertype<brls::Theme>("Theme", sol::no_construction());
+    auto theme_values_ut = brls_ns.new_usertype<brls::Theme>("Theme", sol::no_constructor);
     theme_values_ut["addColor"] = &brls::Theme::addColor;
     theme_values_ut["getColor"] = &brls::Theme::getColor;
     theme_values_ut["getLightTheme"] = &brls::Theme::getLightTheme;
     theme_values_ut["getDarkTheme"] = &brls::Theme::getDarkTheme;
 
-    auto style_ut = brls_ns.new_usertype<brls::Style>("Style", sol::no_construction());
+    auto style_ut = brls_ns.new_usertype<brls::Style>("Style", sol::no_constructor);
     style_ut["addMetric"] = &brls::Style::addMetric;
     style_ut["getMetric"] = &brls::Style::getMetric;
     brls_ns["getStyle"] = &brls::getStyle;
@@ -470,13 +470,13 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
 
     // Dialog
     auto dialog_ut = brls_ns.new_usertype<brls::Dialog>("Dialog",
-        sol::no_construction(),
+        sol::no_constructor,
         sol::base_classes, sol::bases<brls::Box, brls::View>()
     );
-    dialog_ut["new"] = [](const std::string& text) {
+    dialog_ut.set_function("new", [](const std::string& text) {
         return new brls::Dialog(text);
-    };
-    dialog_ut["addButton"] = [](brls::Dialog& self, const std::string& label, sol::protected_function cb) {
+    });
+    dialog_ut.set_function("addButton", [](brls::Dialog& self, const std::string& label, sol::protected_function cb) {
         self.addButton(label, [label, cb]() {
             brls::Logger::info("Dialog button '{}' clicked", label);
             if (cb.valid()) {
@@ -484,22 +484,18 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
                 if (!res.valid()) { sol::error err = res; brls::Logger::error("Lua error in Dialog button: {}", err.what()); }
             }
         });
-    };
-    dialog_ut["getAppletFrame"] = [this](brls::Dialog& self) {
+    });
+    dialog_ut.set_function("getAppletFrame", [this](brls::Dialog& self) {
         return this->pushView(self.getAppletFrame());
-    };
+    });
     dialog_ut["open"] = &brls::Dialog::open;
     dialog_ut["close"] = &brls::Dialog::close;
 
     // Activity
-    auto activity_ut = brls_ns.new_usertype<brls::Activity>("Activity", sol::no_construction());
-    activity_ut["getContentView"] = [this](brls::Activity& self) {
+    auto activity_ut = brls_ns.new_usertype<brls::Activity>("Activity", sol::no_constructor);
+    activity_ut.set_function("getContentView", [this](brls::Activity& self) {
         return this->pushView(self.getContentView());
-    };
-
-    activity_ut["getContentView"] = [this](brls::Activity& self) {
-        return this->pushView(self.getContentView());
-    };
+    });
 
     // Static Bottom Bar visibility control
     brls_ns["getHideBottomBar"] = []() { 
@@ -511,14 +507,14 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     };
 
     // Platform
-    auto platform_ut = brls_ns.new_usertype<brls::Platform>("Platform", sol::no_construction());
+    auto platform_ut = brls_ns.new_usertype<brls::Platform>("Platform", sol::no_constructor);
     platform_ut["getName"] = &brls::Platform::getName;
     platform_ut["getIpAddress"] = &brls::Platform::getIpAddress;
     platform_ut["getDnsServer"] = &brls::Platform::getDnsServer;
     platform_ut["isScreenDimmingDisabled"] = &brls::Platform::isScreenDimmingDisabled;
-    platform_ut["disableScreenDimming"] = [](brls::Platform& self, bool disable) {
+    platform_ut.set_function("disableScreenDimming", [](brls::Platform& self, bool disable) {
         self.disableScreenDimming(disable);
-    };
+    });
     platform_ut["setWindowAlwaysOnTop"] = &brls::Platform::setWindowAlwaysOnTop;
     platform_ut["setWindowSize"] = &brls::Platform::setWindowSize;
     platform_ut["getBacklightBrightness"] = &brls::Platform::getBacklightBrightness;
@@ -529,50 +525,50 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     platform_ut["getInputManager"] = &brls::Platform::getInputManager;
     
     // InputManager
-    auto input_manager_ut = brls_ns.new_usertype<brls::InputManager>("InputManager", sol::no_construction());
+    auto input_manager_ut = brls_ns.new_usertype<brls::InputManager>("InputManager", sol::no_constructor);
     input_manager_ut["getKeyboardKeyStateChanged"] = &brls::InputManager::getKeyboardKeyStateChanged;
     input_manager_ut["getCharInputEvent"] = &brls::InputManager::getCharInputEvent;
-    input_manager_ut["sendRumble"] = [](brls::InputManager& self, unsigned short controller, unsigned short lowFreqMotor, unsigned short highFreqMotor) {
+    input_manager_ut.set_function("sendRumble", [](brls::InputManager& self, unsigned short controller, unsigned short lowFreqMotor, unsigned short highFreqMotor) {
         self.sendRumble(controller, lowFreqMotor, highFreqMotor);
-    };
+    });
 
-    auto controller_state_ut = brls_ns.new_usertype<brls::ControllerState>("ControllerState", sol::no_construction());
-    controller_state_ut["isButtonPressed"] = [](const brls::ControllerState& self, int button) {
+    auto controller_state_ut = brls_ns.new_usertype<brls::ControllerState>("ControllerState", sol::no_constructor);
+    controller_state_ut.set_function("isButtonPressed", [](const brls::ControllerState& self, int button) {
         if (button < 0 || button >= brls::_BUTTON_MAX)
             return false;
         return self.buttons[button];
-    };
-    controller_state_ut["getAxis"] = [](const brls::ControllerState& self, int axis) {
+    });
+    controller_state_ut.set_function("getAxis", [](const brls::ControllerState& self, int axis) {
         if (axis < 0 || axis >= brls::_AXES_MAX)
             return 0.0f;
         return self.axes[axis];
-    };
-    platform_ut["readFile"] = [](brls::Platform& self, const std::string& path) -> std::string {
+    });
+    platform_ut.set_function("readFile", [](brls::Platform& self, const std::string& path) -> std::string {
         std::ifstream file(path);
         if (!file.is_open()) return "";
         std::stringstream buffer;
         buffer << file.rdbuf();
         return buffer.str();
-    };
-    platform_ut["writeFile"] = [](brls::Platform& self, const std::string& path, const std::string& content) -> bool {
+    });
+    platform_ut.set_function("writeFile", [](brls::Platform& self, const std::string& path, const std::string& content) -> bool {
         std::ofstream file(path);
         if (!file.is_open()) return false;
         file << content;
         return true;
-    };
-    platform_ut["mkdir"] = [](brls::Platform& self, const std::string& path) -> bool {
+    });
+    platform_ut.set_function("mkdir", [](brls::Platform& self, const std::string& path) -> bool {
         try {
             return portable_mkdirs(path);
         } catch (...) {
             return false;
         }
-    };
+    });
 
     // ============================================================
     // ZipPackage: brls.ZipPackage.open("/abs/path/to/pkg.zip")
     // ============================================================
     auto zip_ut = brls_ns.new_usertype<ZipLoader>("ZipPackage",
-        sol::no_construction()
+        sol::constructors<ZipLoader(const std::string&)>()
     );
 
     // Static factory: brls.ZipPackage.open(path) -> ZipPackage or nil

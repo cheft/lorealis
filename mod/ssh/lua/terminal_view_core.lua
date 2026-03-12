@@ -583,7 +583,7 @@ function TerminalView.new(sshManager)
     self._overlayFn = false
     self._overlayMeta = false
     self._overlayCn = false
-    self._overlayLayoutMode = "classic"
+    self._overlayLayoutMode = Platform.isDesktop and "compact" or "classic"
     self._overlayFnPage = 1
     self._overlayPinyin = ""
     self._overlayImeCandidates = {}
@@ -629,8 +629,11 @@ function TerminalView:_startFrameLoop()
 end
 
 function TerminalView:bindView(view)
+    local okInit, initResult = pcall(initGlobalKeyboardListeners)
+    print("[TerminalView] bindView input init: ok=" .. tostring(okInit) .. " result=" .. tostring(initResult))
     self._view = view
     if view then
+        _G.__SSH_ACTIVE_TERMINAL = self
         view:setDrawCallback(function(vg, x, y, w, h, style, ctx)
             self:_draw(vg, x, y, w, h)
         end)
@@ -697,13 +700,23 @@ function TerminalView:bindView(view)
         if view.onWillDisappear then
             view:onWillDisappear(function()
                 self._frameLoopActive = false
+                if _G.__SSH_ACTIVE_TERMINAL == self then
+                    _G.__SSH_ACTIVE_TERMINAL = nil
+                end
                 if _G.__SSH_TERMINALS then
                     _G.__SSH_TERMINALS[view:get_address()] = nil
                 end
             end)
         end
 
+        if view.onFocusGained then
+            view:onFocusGained(function()
+                _G.__SSH_ACTIVE_TERMINAL = self
+            end)
+        end
+
         view:onPointerDown(function(event)
+            _G.__SSH_ACTIVE_TERMINAL = self
             return self:_onPointerDown(event)
         end)
         view:onPointerMove(function(event)
@@ -727,102 +740,107 @@ end
 
 local function initGlobalKeyboardListeners()
     local inputManager = brls.Application.getPlatform():getInputManager()
-    if not inputManager or not inputManager.getCharInputEvent then return end
+    if not inputManager then
+        print("[TerminalView] initGlobalKeyboardListeners: no input manager")
+        return false
+    end
+    if not inputManager.getCharInputEvent or not inputManager.getKeyboardKeyStateChanged then
+        print("[TerminalView] initGlobalKeyboardListeners: keyboard APIs unavailable")
+        return false
+    end
     local KEY_K = 75
+    local KEY_K_LOWER = 107
+    local KEY_F2 = 291
     local MOD_CTRL = 0x02
     
-    if _G.__SSH_TERMINAL_INPUT_INITED then return end
+    if _G.__SSH_TERMINAL_INPUT_INITED then
+        print("[TerminalView] initGlobalKeyboardListeners: already initialized")
+        return true
+    end
     _G.__SSH_TERMINAL_INPUT_INITED = true
+    print("[TerminalView] initGlobalKeyboardListeners: registering listeners")
 
-    inputManager:getCharInputEvent():subscribe(function(codepoint)
+    local function resolveTerminalFromFocus()
         local focus = brls.Application.getCurrentFocus()
         if focus and _G.__SSH_TERMINALS then
             local curr = focus
-            local terminal = nil
             while curr do
                 local addr = tostring(curr:get_address())
-                terminal = _G.__SSH_TERMINALS[addr]
-                if terminal then break end
+                local terminal = _G.__SSH_TERMINALS[addr]
+                if terminal then
+                    return terminal
+                end
                 curr = curr:getParent()
             end
+        end
 
-            if terminal then
-                print("[TerminalView] Character input: " .. tostring(codepoint))
-                if terminal._overlayKeyboardVisible and terminal._overlayCn and (not terminal._overlayFn) then
-                    if codepoint >= 65 and codepoint <= 90 then
-                        terminal:_appendOverlayIme(string.lower(string.char(codepoint)))
-                        return
-                    elseif codepoint >= 97 and codepoint <= 122 then
-                        terminal:_appendOverlayIme(string.char(codepoint))
-                        return
-                    elseif codepoint >= 49 and codepoint <= 56 and #(terminal._overlayPinyin or "") > 0 then
-                        terminal:_commitOverlayIme(codepoint - 48, false)
-                        return
-                    elseif codepoint == 32 and #(terminal._overlayPinyin or "") > 0 then
-                        terminal:_commitOverlayIme(1, true)
-                        return
-                    end
+        return _G.__SSH_ACTIVE_TERMINAL
+    end
+
+    inputManager:getCharInputEvent():subscribe(function(codepoint)
+        local terminal = resolveTerminalFromFocus()
+        if terminal then
+            print("[TerminalView] Character input: " .. tostring(codepoint))
+            if terminal._overlayKeyboardVisible and terminal._overlayCn and (not terminal._overlayFn) then
+                if codepoint >= 65 and codepoint <= 90 then
+                    terminal:_appendOverlayIme(string.lower(string.char(codepoint)))
+                    return
+                elseif codepoint >= 97 and codepoint <= 122 then
+                    terminal:_appendOverlayIme(string.char(codepoint))
+                    return
+                elseif codepoint >= 49 and codepoint <= 56 and #(terminal._overlayPinyin or "") > 0 then
+                    terminal:_commitOverlayIme(codepoint - 48, false)
+                    return
+                elseif codepoint == 32 and #(terminal._overlayPinyin or "") > 0 then
+                    terminal:_commitOverlayIme(1, true)
+                    return
                 end
-                terminal._keyboard:handleChar(codepoint)
-            else
-                print("[TerminalView] No mapping for focus addr: " .. tostring(focus:get_address()))
             end
-        else
-            print("[TerminalView] CharInput call ignored: no active focus or terminals")
+            terminal._keyboard:handleChar(codepoint)
         end
     end)
 
     inputManager:getKeyboardKeyStateChanged():subscribe(function(state)
         if state.pressed then
             local focus = brls.Application.getCurrentFocus()
-            print(string.format("[TerminalView] Global Key: key=%d mods=%d focus=%s", 
+            print(string.format("[TerminalView] Global Key: key=%d mods=%d focus=%s",
                 state.key, state.mods, focus and tostring(focus:get_address()) or "nil"))
-            
-            if focus and _G.__SSH_TERMINALS then
-                local curr = focus
-                local terminal = nil
-                while curr do
-                    local addr = tostring(curr:get_address())
-                    terminal = _G.__SSH_TERMINALS[addr]
-                    if terminal then break end
-                    curr = curr:getParent()
+
+            local terminal = resolveTerminalFromFocus()
+            if terminal then
+                local ctrl = (state.mods % 4) >= 2
+                if (ctrl and (state.key == KEY_K or state.key == KEY_K_LOWER)) or state.key == KEY_F2 then
+                    terminal._overlayKeyboardVisible = not terminal._overlayKeyboardVisible
+                    terminal:_invalidate()
+                    return
                 end
 
-                if terminal then
-                    local ctrl = (state.mods % 4) >= 2
-                    if ctrl and state.key == KEY_K then
-                        terminal._overlayKeyboardVisible = not terminal._overlayKeyboardVisible
-                        terminal:_invalidate()
+                if terminal._overlayKeyboardVisible and terminal._overlayCn and (not terminal._overlayFn) and #(terminal._overlayPinyin or "") > 0 then
+                    if state.key == 257 then
+                        terminal:_commitOverlayIme(1, true)
                         return
-                    end
-
-                    if terminal._overlayKeyboardVisible and terminal._overlayCn and (not terminal._overlayFn) and #(terminal._overlayPinyin or "") > 0 then
-                        if state.key == 257 then
-                            terminal:_commitOverlayIme(1, true)
+                    elseif state.key == 259 then
+                        if terminal:_backspaceOverlayIme() then
                             return
-                        elseif state.key == 259 then
-                            if terminal:_backspaceOverlayIme() then
-                                return
-                            end
-                        elseif state.key == 266 then
-                            if terminal:_changeOverlayImePage(-1) then
-                                return
-                            end
-                        elseif state.key == 267 then
-                            if terminal:_changeOverlayImePage(1) then
-                                return
-                            end
+                        end
+                    elseif state.key == 266 then
+                        if terminal:_changeOverlayImePage(-1) then
+                            return
+                        end
+                    elseif state.key == 267 then
+                        if terminal:_changeOverlayImePage(1) then
+                            return
                         end
                     end
-
-                    terminal._keyboard:handleKey(state.key, state.mods)
                 end
+
+                terminal._keyboard:handleKey(state.key, state.mods)
             end
         end
     end)
-end
 
-pcall(initGlobalKeyboardListeners)
+    return true
+end
 
 function TerminalView:feedData(data)
     if not data or #data == 0 then return end
@@ -903,6 +921,16 @@ end
 
 function TerminalView:setOnCloseRequest(callback)
     self._onCloseRequest = callback
+end
+
+function TerminalView:setOverlayKeyboardVisible(visible)
+    self._overlayKeyboardVisible = visible and true or false
+    self:_invalidate()
+end
+
+function TerminalView:ensureInputListeners()
+    local okInit, initResult = pcall(initGlobalKeyboardListeners)
+    print("[TerminalView] ensureInputListeners: ok=" .. tostring(okInit) .. " result=" .. tostring(initResult))
 end
 
 local function _overlayTrim(text)
@@ -1921,6 +1949,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     else
         panelH = math.floor(h * 0.60)
         if panelH < 392 then panelH = 392 end
+        if panelH > h - 12 then panelH = math.max(220, h - 12) end
         local rowAreaH = panelH - headerH - footerH - 6
         keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
         if keyH < 54 then keyH = 54 end

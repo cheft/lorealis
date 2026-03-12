@@ -64,19 +64,19 @@ void LuaManager::registerAnimationBindings(sol::table& brls_ns) {
 
     // LuaImage (subclass of Image)
     auto lua_image_ut = brls_ns.new_usertype<LuaImage>("LuaImage",
-        sol::no_construction(),
+        sol::no_constructor,
         sol::base_classes, sol::bases<brls::Image, brls::View>()
     );
-    lua_image_ut["setDrawCallback"] = [](LuaImage& self, sol::protected_function cb) {
+    lua_image_ut.set_function("setDrawCallback", [](LuaImage& self, sol::protected_function cb) {
         self.setDrawCallback([cb](NVGcontext* vg, float x, float y, float w, float h, brls::Style style, brls::FrameContext* ctx) {
             auto res = cb((void*)vg, x, y, w, h, style, ctx);
             if (!res.valid()) { sol::error err = res; brls::Logger::error("Lua error in drawCallback: {}", err.what()); }
         });
-    };
+    });
     // Workaround for sol2 typing NVGcontext* vs void* inside Lua
-    lua_image_ut["drawBase"] = [](LuaImage& self, void* vg, float x, float y, float w, float h, brls::Style style, brls::FrameContext* ctx) {
+    lua_image_ut.set_function("drawBase", [](LuaImage& self, void* vg, float x, float y, float w, float h, brls::Style style, brls::FrameContext* ctx) {
         self.brls::Image::draw((NVGcontext*)vg, x, y, w, h, style, ctx);
-    };
+    });
     lua_image_ut["rotate_"]     = &LuaImage::rotate_;
     lua_image_ut["skewX_"]      = &LuaImage::skewX_;
     lua_image_ut["skewY_"]      = &LuaImage::skewY_;
@@ -86,13 +86,13 @@ void LuaManager::registerAnimationBindings(sol::table& brls_ns) {
     lua_image_ut["fontScaleY_"] = &LuaImage::fontScaleY_;
     
     // TransformBox aliases
-    lua_image_ut["setRotate"]     = [](LuaImage& self, float v) { self.rotate_ = v; };
-    lua_image_ut["setSkewX"]      = [](LuaImage& self, float v) { self.skewX_ = v; };
-    lua_image_ut["setSkewY"]      = [](LuaImage& self, float v) { self.skewY_ = v; };
-    lua_image_ut["setScaleX"]     = [](LuaImage& self, float v) { self.scaleX_ = v; };
-    lua_image_ut["setScaleY"]     = [](LuaImage& self, float v) { self.scaleY_ = v; };
-    lua_image_ut["setFontScaleX"] = [](LuaImage& self, float v) { self.fontScaleX_ = v; };
-    lua_image_ut["setFontScaleY"] = [](LuaImage& self, float v) { self.fontScaleY_ = v; };
+    lua_image_ut.set_function("setRotate", [](LuaImage& self, float v) { self.rotate_ = v; });
+    lua_image_ut.set_function("setSkewX", [](LuaImage& self, float v) { self.skewX_ = v; });
+    lua_image_ut.set_function("setSkewY", [](LuaImage& self, float v) { self.skewY_ = v; });
+    lua_image_ut.set_function("setScaleX", [](LuaImage& self, float v) { self.scaleX_ = v; });
+    lua_image_ut.set_function("setScaleY", [](LuaImage& self, float v) { self.scaleY_ = v; });
+    lua_image_ut.set_function("setFontScaleX", [](LuaImage& self, float v) { self.fontScaleX_ = v; });
+    lua_image_ut.set_function("setFontScaleY", [](LuaImage& self, float v) { self.fontScaleY_ = v; });
     
     brls_ns["LuaImage"] = lua.create_table();
     brls_ns["LuaImage"]["new"] = []() { return new LuaImage(); };

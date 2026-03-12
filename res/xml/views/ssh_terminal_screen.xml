@@ -3,4 +3,5 @@
     width="auto"
     height="auto"
     axis="column"
+    grow="1.0"
     backgroundColor="#000000"/>

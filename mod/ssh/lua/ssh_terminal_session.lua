@@ -28,6 +28,9 @@ function Session:_createCanvas()
     local canvas = brls.LuaImage.new()
     canvas:setWidth(brls.Application.windowWidth())
     canvas:setHeight(brls.Application.windowHeight())
+    if canvas.setGrow then
+        canvas:setGrow(1.0)
+    end
     canvas:setFocusable(true)
     return canvas
 end
@@ -123,6 +126,9 @@ function Session:open(conn, password)
     self._frame:setHeaderVisibility(brls.Visibility.GONE)
     self._frame:setFooterVisibility(brls.Visibility.GONE)
     if self._root and self._root.addView then
+        if self._root.setGrow then
+            self._root:setGrow(1.0)
+        end
         self._root:addView(self._canvas)
         self._frame:pushContentView(self._root)
     else
@@ -144,14 +150,27 @@ function Session:open(conn, password)
     pcall(function()
         brls.Application.giveFocus(self._canvas)
     end)
+    pcall(function()
+        if self._terminal and self._terminal.ensureInputListeners then
+            self._terminal:ensureInputListeners()
+        end
+    end)
     brls.delay(30, function()
         pcall(function()
             brls.Application.giveFocus(self._canvas)
+        end)
+        pcall(function()
+            if self._terminal and self._terminal.ensureInputListeners then
+                self._terminal:ensureInputListeners()
+            end
         end)
     end)
 
     self._terminal:resize(brls.Application.windowWidth(), brls.Application.windowHeight())
     self._terminal:setStatus("Connecting: " .. self._endpoint, 220, 180, 80)
+    if Platform.isDesktop and self._terminal.setOverlayKeyboardVisible then
+        self._terminal:setOverlayKeyboardVisible(true)
+    end
     self._terminal:_invalidate()
     notify("正在连接 " .. self._endpoint)
 

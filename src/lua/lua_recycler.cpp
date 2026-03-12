@@ -125,22 +125,22 @@ void LuaManager::registerRecyclerBindings(sol::table& brls_ns) {
     };
 
     auto dropdown_ut = brls_ns.new_usertype<brls::Dropdown>("DropdownInst",
-        sol::no_construction(),
+        sol::no_constructor,
         sol::base_classes, sol::bases<brls::Box>()
     );
 
     // Recycler - Register base RecyclerCell first
     auto recycler_cell_ut = brls_ns.new_usertype<brls::RecyclerCell>("RecyclerCell",
-        sol::no_construction(),
+        sol::no_constructor,
         sol::base_classes, sol::bases<brls::Box, brls::View>()
     );
     
     // Also register LuaRecyclerCell with the callback method
     auto lua_recycler_cell_ut = brls_ns.new_usertype<LuaRecyclerCell>("LuaRecyclerCell",
-        sol::no_construction(),
+        sol::no_constructor,
         sol::base_classes, sol::bases<brls::RecyclerCell, brls::Box, brls::View>()
     );
-    lua_recycler_cell_ut["setPrepareForReuseCallback"] = [](LuaRecyclerCell& self, sol::protected_function func) {
+    lua_recycler_cell_ut.set_function("setPrepareForReuseCallback", [](LuaRecyclerCell& self, sol::protected_function func) {
         self.setPrepareForReuseCallback([func]() {
             if (func.valid()) {
                 auto res = func();
@@ -150,7 +150,7 @@ void LuaManager::registerRecyclerBindings(sol::table& brls_ns) {
                 }
             }
         });
-    };
+    });
 
     // Bind static create method on the table, not the usertype
     brls_ns["RecyclerCell"]["create"] = []() -> brls::RecyclerCell* {
@@ -166,7 +166,7 @@ void LuaManager::registerRecyclerBindings(sol::table& brls_ns) {
     };
 
     auto recycler_header_ut = brls_ns.new_usertype<brls::RecyclerHeader>("RecyclerHeader",
-        sol::no_construction(),
+        sol::no_constructor,
         sol::base_classes, sol::bases<brls::RecyclerCell, brls::Box, brls::View>()
     );
     brls_ns["RecyclerHeader"]["create"] = []() -> brls::RecyclerHeader* {
@@ -176,14 +176,14 @@ void LuaManager::registerRecyclerBindings(sol::table& brls_ns) {
     recycler_header_ut["setSubtitle"] = &brls::RecyclerHeader::setSubtitle;
 
     auto recycler_ut = brls_ns.new_usertype<brls::RecyclerFrame>("RecyclerFrame",
-        sol::no_construction(),
+        sol::no_constructor,
         sol::base_classes, sol::bases<brls::View>()
     );
-    recycler_ut["setEstimatedRowHeight"] = [](brls::RecyclerFrame& self, float h) { self.estimatedRowHeight = h; };
-    recycler_ut["setDataSource"] = [](brls::RecyclerFrame& self, sol::table table) {
+    recycler_ut.set_function("setEstimatedRowHeight", [](brls::RecyclerFrame& self, float h) { self.estimatedRowHeight = h; });
+    recycler_ut.set_function("setDataSource", [](brls::RecyclerFrame& self, sol::table table) {
         self.setDataSource(new LuaRecyclerDataSource(table));
-    };
-    recycler_ut["registerCell"] = [](brls::RecyclerFrame& self, const std::string& identifier, sol::protected_function factory) {
+    });
+    recycler_ut.set_function("registerCell", [](brls::RecyclerFrame& self, const std::string& identifier, sol::protected_function factory) {
         self.registerCell(identifier, [factory, identifier]() -> brls::RecyclerCell* {
             if (!factory.valid()) return nullptr;
             auto res = factory();
@@ -201,8 +201,8 @@ void LuaManager::registerRecyclerBindings(sol::table& brls_ns) {
             }
             return nullptr;
         });
-    };
-    recycler_ut["dequeueReusableCell"] = [](brls::RecyclerFrame& self, const std::string& identifier) {
+    });
+    recycler_ut.set_function("dequeueReusableCell", [](brls::RecyclerFrame& self, const std::string& identifier) {
         // Cast to LuaRecyclerCell since that's what we always create
         brls::RecyclerCell* cell = self.dequeueReusableCell(identifier);
         if (cell) {
@@ -210,6 +210,6 @@ void LuaManager::registerRecyclerBindings(sol::table& brls_ns) {
             return LuaManager::getInstance().pushView(static_cast<LuaRecyclerCell*>(cell));
         }
         return LuaManager::getInstance().pushView(static_cast<LuaRecyclerCell*>(nullptr));
-    };
+    });
     recycler_ut["reloadData"] = &brls::RecyclerFrame::reloadData;
 }
