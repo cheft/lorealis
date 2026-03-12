@@ -251,14 +251,16 @@ end
 ---@param mods integer     修饰键位掩码（Shift/Ctrl/Alt）
 ---@return boolean  是否已消费
 function Keyboard:handleKey(keyCode, mods)
-    -- 修饰键掩码常量（GLFW/SDL 兼容）
-    local MOD_CTRL  = 0x02
-    local MOD_SHIFT = 0x01
-    local MOD_ALT   = 0x04
+    local function hasFlag(value, flag)
+        if not value or not flag or flag <= 0 then
+            return false
+        end
+        return (value % (flag * 2)) >= flag
+    end
 
-    -- Lua 5.1 不支持 &，用取模判断位是否设置
-    local ctrl  = (mods % 4) >= 2   -- 检查 MOD_CTRL (0x02) 位
-    local shift = (mods % 2) >= 1   -- 检查 MOD_SHIFT (0x01) 位
+    -- 同时兼容 GLFW 和 SDL 的修饰键掩码
+    local ctrl  = hasFlag(mods, 0x02) or hasFlag(mods, 0x40) or hasFlag(mods, 0x80)
+    local shift = hasFlag(mods, 0x01)
 
     -- 方向键
     local ARROW_UP=265; local ARROW_DOWN=264; local ARROW_LEFT=263; local ARROW_RIGHT=262

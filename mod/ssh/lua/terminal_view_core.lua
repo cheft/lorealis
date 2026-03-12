@@ -583,7 +583,7 @@ function TerminalView.new(sshManager)
     self._overlayFn = false
     self._overlayMeta = false
     self._overlayCn = false
-    self._overlayLayoutMode = Platform.isDesktop and "compact" or "classic"
+    self._overlayLayoutMode = "classic"
     self._overlayFnPage = 1
     self._overlayPinyin = ""
     self._overlayImeCandidates = {}
@@ -751,7 +751,17 @@ local function initGlobalKeyboardListeners()
     local KEY_K = 75
     local KEY_K_LOWER = 107
     local KEY_F2 = 291
-    local MOD_CTRL = 0x02
+
+    local function hasFlag(value, flag)
+        if not value or not flag or flag <= 0 then
+            return false
+        end
+        return (value % (flag * 2)) >= flag
+    end
+
+    local function isCtrlPressed(mods)
+        return hasFlag(mods, 0x02) or hasFlag(mods, 0x40) or hasFlag(mods, 0x80)
+    end
     
     if _G.__SSH_TERMINAL_INPUT_INITED then
         print("[TerminalView] initGlobalKeyboardListeners: already initialized")
@@ -781,6 +791,10 @@ local function initGlobalKeyboardListeners()
         local terminal = resolveTerminalFromFocus()
         if terminal then
             print("[TerminalView] Character input: " .. tostring(codepoint))
+            if codepoint == 11 then -- Ctrl+K
+                terminal:_toggleOverlayKeyboardVisible()
+                return
+            end
             if terminal._overlayKeyboardVisible and terminal._overlayCn and (not terminal._overlayFn) then
                 if codepoint >= 65 and codepoint <= 90 then
                     terminal:_appendOverlayIme(string.lower(string.char(codepoint)))
@@ -808,10 +822,9 @@ local function initGlobalKeyboardListeners()
 
             local terminal = resolveTerminalFromFocus()
             if terminal then
-                local ctrl = (state.mods % 4) >= 2
+                local ctrl = isCtrlPressed(state.mods)
                 if (ctrl and (state.key == KEY_K or state.key == KEY_K_LOWER)) or state.key == KEY_F2 then
-                    terminal._overlayKeyboardVisible = not terminal._overlayKeyboardVisible
-                    terminal:_invalidate()
+                    terminal:_toggleOverlayKeyboardVisible()
                     return
                 end
 
@@ -925,6 +938,18 @@ end
 
 function TerminalView:setOverlayKeyboardVisible(visible)
     self._overlayKeyboardVisible = visible and true or false
+    self:_invalidate()
+end
+
+function TerminalView:_toggleOverlayKeyboardVisible()
+    local nowMs = math.floor((os.clock() or 0) * 1000)
+    local lastMs = self._overlayToggleLastAt or 0
+    if nowMs - lastMs < 120 then
+        return
+    end
+
+    self._overlayToggleLastAt = nowMs
+    self._overlayKeyboardVisible = not self._overlayKeyboardVisible
     self:_invalidate()
 end
 
@@ -1918,10 +1943,13 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     local fnPageName = (self._overlayFn and OVERLAY_COMPACT_FN_PAGES[self._overlayFnPage or 1] and OVERLAY_COMPACT_FN_PAGES[self._overlayFnPage or 1].name) or "-"
     local panelX = x + panelInset
     local panelW = w - panelInset * 2
-    local headerH = compactLayout and 20 or 30
+    local headerH = compactLayout and 20 or ((h < 560) and 26 or 30)
     local suggestions = self:_collectOverlaySuggestions()
     local chipsH = (#suggestions > 0) and 52 or 0
     local chipsGap = (#suggestions > 0) and 8 or 0
+    local topInset = compactLayout and 0 or 8
+    local bottomInset = compactLayout and 0 or 4
+    local chipsReserve = chipsH + chipsGap
     local footerH = 0
     local rowGap = compactLayout and 1 or 2
     local keyGap = compactLayout and 2 or 4
@@ -1947,15 +1975,39 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
         keyH = math.max(24, math.floor((squareKeySize or 0) * 0.75 + 0.5)) -- 键帽高度
         panelH = headerH + 6 + keyH * #rows + rowGap * (#rows - 1)
     else
-        panelH = math.floor(h * 0.60)
-        if panelH < 392 then panelH = 392 end
-        if panelH > h - 12 then panelH = math.max(220, h - 12) end
-        local rowAreaH = panelH - headerH - footerH - 6
-        keyH = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
-        if keyH < 54 then keyH = 54 end
+        local maxPanelH = h - topInset - bottomInset - chipsReserve
+        if maxPanelH < 180 then
+            maxPanelH = h - bottomInset
+        end
+
+        local narrowestUnitW = nil
+        for _, row in ipairs(rows) do
+            local units = 0
+            for _, key in ipairs(row) do
+                units = units + (key.width or 1)
+            end
+
+            local keyUnitW = (contentW - keyGap * (#row - 1)) / units
+            if not narrowestUnitW or keyUnitW < narrowestUnitW then
+                narrowestUnitW = keyUnitW
+            end
+        end
+
+        local keyHByWidth = math.floor((narrowestUnitW or 0) * 0.72 + 0.5)
+        local rowAreaH = math.max(0, maxPanelH - headerH - footerH - 6)
+        local keyHByHeight = math.floor((rowAreaH - rowGap * (#rows - 1)) / #rows)
+        keyH = math.min(keyHByWidth, keyHByHeight)
+        if keyH < 28 then keyH = 28 end
+
+        panelH = headerH + 6 + keyH * #rows + rowGap * (#rows - 1)
+        if panelH > maxPanelH then
+            keyH = math.floor((maxPanelH - headerH - footerH - 6 - rowGap * (#rows - 1)) / #rows)
+            if keyH < 24 then keyH = 24 end
+            panelH = headerH + 6 + keyH * #rows + rowGap * (#rows - 1)
+        end
     end
 
-    local panelY = y + h - panelH - (compactLayout and 0 or 4)
+    local panelY = y + h - panelH - bottomInset
 
     self._overlayTouchTargets = {}
     self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
@@ -2101,7 +2153,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
                 label = self:_resolveOverlayChar(resolved)
             end
 
-            local labelSize = (keyH >= 46 and 18 or 16)
+            local labelSize = math.max(11, math.min(18, math.floor(keyH * 0.38 + 0.5)))
             if #tostring(label or "") >= 4 then
                 labelSize = labelSize - 3
             elseif #tostring(label or "") >= 3 then
