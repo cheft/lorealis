@@ -316,7 +316,21 @@ void LuaManager::registerViewBindings(sol::table& brls_ns) {
     brls_ns["TapGestureConfig"] = [](bool b1, int s1, int s2, int s3) {
         return brls::TapGestureConfig(b1, (brls::Sound)s1, (brls::Sound)s2, (brls::Sound)s3);
     };
-    brls_ns["Sound"] = lua.create_table_with("NONE", brls::SOUND_NONE);
+    brls_ns["Sound"] = lua.create_table_with(
+        "NONE", brls::SOUND_NONE,
+        "FOCUS_CHANGE", brls::SOUND_FOCUS_CHANGE,
+        "FOCUS_ERROR", brls::SOUND_FOCUS_ERROR,
+        "CLICK", brls::SOUND_CLICK,
+        "BACK", brls::SOUND_BACK,
+        "FOCUS_SIDEBAR", brls::SOUND_FOCUS_SIDEBAR,
+        "CLICK_ERROR", brls::SOUND_CLICK_ERROR,
+        "HONK", brls::SOUND_HONK,
+        "CLICK_SIDEBAR", brls::SOUND_CLICK_SIDEBAR,
+        "TOUCH_UNFOCUS", brls::SOUND_TOUCH_UNFOCUS,
+        "TOUCH", brls::SOUND_TOUCH,
+        "SLIDER_TICK", brls::SOUND_SLIDER_TICK,
+        "SLIDER_RELEASE", brls::SOUND_SLIDER_RELEASE
+    );
 
     // ScrollingFrame
     auto scrolling_frame_ut = brls_ns.new_usertype<brls::ScrollingFrame>("ScrollingFrame",

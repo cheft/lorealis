@@ -179,6 +179,16 @@ void LuaManager::registerCoreBindings(sol::table& brls_ns) {
     app["notify"] = [](const std::string& text) {
         brls::Application::notify(text);
     };
+    app["playSound"] = [](int sound, sol::optional<float> pitch) -> bool {
+        if (sound < brls::SOUND_NONE || sound >= brls::_SOUND_MAX)
+            return false;
+
+        brls::AudioPlayer* audioPlayer = brls::Application::getAudioPlayer();
+        if (!audioPlayer)
+            return false;
+
+        return audioPlayer->play((brls::Sound)sound, pitch.value_or(1.0f));
+    };
     app["getControllerState"] = []() -> brls::ControllerState {
         return brls::Application::getControllerState();
     };

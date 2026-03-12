@@ -7,17 +7,17 @@ void LuaManager::registerAnimationBindings(sol::table& brls_ns) {
         sol::constructors<brls::Animatable(), brls::Animatable(float)>()
     );
     animatable_ut["getValue"] = &brls::Animatable::getValue;
-    animatable_ut["reset"] = [](brls::Animatable& self, sol::optional<float> val) {
+    animatable_ut.set_function("reset", [](brls::Animatable& self, sol::optional<float> val) {
         if (val) self.reset(*val);
         else self.reset();
-    };
-    animatable_ut["addStep"] = [](brls::Animatable& self, float target, int duration, int easing) {
+    });
+    animatable_ut.set_function("addStep", [](brls::Animatable& self, float target, int duration, int easing) {
         self.addStep(target, duration, (brls::EasingFunction)easing);
-    };
+    });
     animatable_ut["getProgress"] = &brls::Animatable::getProgress;
-    animatable_ut["start"] = [](brls::Animatable& self) { self.start(); };
-    animatable_ut["stop"] = [](brls::Animatable& self) { self.stop(); };
-    animatable_ut["setTickCallback"] = [](brls::Animatable& self, sol::protected_function cb) {
+    animatable_ut.set_function("start", [](brls::Animatable& self) { self.start(); });
+    animatable_ut.set_function("stop", [](brls::Animatable& self) { self.stop(); });
+    animatable_ut.set_function("setTickCallback", [](brls::Animatable& self, sol::protected_function cb) {
         // Clear existing callback to prevent accumulation on repeated calls
         self.setTickCallback(nullptr);
         self.setTickCallback([cb]() {
@@ -26,7 +26,7 @@ void LuaManager::registerAnimationBindings(sol::table& brls_ns) {
                 if (!res.valid()) { sol::error err = res; brls::Logger::error("Lua Animatable tick error: {}", err.what()); }
             }
         });
-    };
+    });
 
     brls_ns["EasingFunction"] = lua.create_table_with(
         "linear", (int)brls::EasingFunction::linear,

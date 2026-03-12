@@ -73,6 +73,10 @@ local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+K keyboard | Ctrl+C inte
 local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter Submit  + IME  R3 Hide"
 local DPAD_REPEAT_DELAY_MS = 550
 local DPAD_REPEAT_INTERVAL_MS = 180
+local OVERLAY_TOUCH_REPEAT_DELAY_MS = 1250
+local OVERLAY_TOUCH_REPEAT_INTERVAL_TEXT_MS = 260
+local OVERLAY_TOUCH_REPEAT_INTERVAL_NAV_MS = 210
+local OVERLAY_TOUCH_REPEAT_INTERVAL_DELETE_MS = 170
 local OVERLAY_RUMBLE_LOW = 300 -- ms, 震动持续时间
 local OVERLAY_RUMBLE_HIGH = 200 -- 震动强度
 local OVERLAY_RUMBLE_INTERVAL_MS = 1 -- 按键延迟
@@ -369,6 +373,44 @@ local function _overlayChipPalette(index, item)
     }
 end
 
+local function _drawOverlayKeyPreview(vg, keyRect, palette, label)
+    if not keyRect or not label or label == "" then
+        return
+    end
+
+    local previewW = math.max(keyRect.w + 14, math.min(132, 34 + #tostring(label) * 18))
+    local previewH = math.max(48, math.floor(keyRect.h * 1.18 + 0.5))
+    local previewX = keyRect.x + (keyRect.w - previewW) / 2
+    local previewY = keyRect.y - previewH - 10
+
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, previewX + 1, previewY + 3, previewW, previewH, 12)
+    nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_shadow, 54))
+    nvgFill(vg)
+
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, previewX, previewY, previewW, previewH, 12)
+    nvgFillColor(vg, palette.fill)
+    nvgFill(vg)
+
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, previewX + 0.8, previewY + 0.8, previewW - 1.6, previewH - 1.6, 11)
+    nvgStrokeColor(vg, palette.border)
+    nvgStrokeWidth(vg, 1.6)
+    nvgStroke(vg)
+
+    nvgBeginPath(vg)
+    nvgRoundedRect(vg, previewX + 3, previewY + 3, previewW - 6, math.max(10, previewH * 0.26), 9)
+    nvgFillColor(vg, palette.top)
+    nvgFill(vg)
+
+    nvgFontFace(vg, "regular")
+    nvgFontSize(vg, math.max(20, math.min(28, math.floor(previewH * 0.46 + 0.5))))
+    nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+    nvgFillColor(vg, palette.text)
+    nvgText(vg, previewX + previewW / 2, previewY + previewH / 2 + 1, label)
+end
+
 local OVERLAY_QUICK_COMMANDS = { "ls", "cd", "pwd", "clear" }
 local OVERLAY_QUICK_SYMBOLS = { "~", "$", "*", "|", "&&" }
 local OVERLAY_COMMON_COMMANDS = {
@@ -633,6 +675,9 @@ function TerminalView.new(sshManager)
     self._overlayTouchTargets = {}
     self._overlayPanelRect = nil
     self._overlaySelectedKey = _getDefaultOverlayKeyByMode(self._overlayLayoutMode)
+    self._overlayTouchPreviewKey = nil
+    self._overlayTouchPressedTarget = nil
+    self._overlayTouchActiveTarget = nil
     self._overlayRecentCommands = {}
     self._overlayThemeIndex = OVERLAY_THEME_INDEX_DEFAULT
     OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
@@ -979,6 +1024,9 @@ function TerminalView:reset()
     self._overlayTouchTargets = {}
     self._overlayPanelRect = nil
     self._overlaySelectedKey = _getDefaultOverlayKeyByMode(self._overlayLayoutMode)
+    self._overlayTouchPreviewKey = nil
+    self._overlayTouchPressedTarget = nil
+    self._overlayTouchActiveTarget = nil
     self._overlayRecentCommands = {}
     self._overlayThemeIndex = self._overlayThemeIndex or OVERLAY_THEME_INDEX_DEFAULT
     OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
@@ -996,6 +1044,11 @@ end
 function TerminalView:setOverlayKeyboardVisible(visible)
     self._overlayKeyboardVisible = visible and true or false
     self._overlayShortcutLatch = false
+    self._overlayTouchPreviewKey = nil
+    self._overlayTouchPressedTarget = nil
+    self._overlayTouchActiveTarget = nil
+    self._overlayTouchRepeatKey = nil
+    self._overlayTouchRepeatState = nil
     self:_invalidate()
 end
 
@@ -1006,6 +1059,11 @@ function TerminalView:_toggleOverlayKeyboardVisible()
 
     self._overlayShortcutLatch = true
     self._overlayKeyboardVisible = not self._overlayKeyboardVisible
+    self._overlayTouchPreviewKey = nil
+    self._overlayTouchPressedTarget = nil
+    self._overlayTouchActiveTarget = nil
+    self._overlayTouchRepeatKey = nil
+    self._overlayTouchRepeatState = nil
     print("[TerminalView] Overlay keyboard visible = " .. tostring(self._overlayKeyboardVisible))
     self:_invalidate()
 end
@@ -1578,6 +1636,207 @@ local function _nowMs()
     return math.floor(os.clock() * 1000)
 end
 
+local function _cloneOverlayTarget(target)
+    if not target then
+        return nil
+    end
+
+    if target.type == "key" then
+        return {
+            type = "key",
+            key = target.key,
+        }
+    elseif target.type == "suggestion" then
+        local item = target.item or {}
+        return {
+            type = "suggestion",
+            item = {
+                mode = item.mode,
+                text = item.text,
+                display = item.display,
+            },
+        }
+    end
+
+    return {
+        type = target.type,
+    }
+end
+
+local function _overlayTargetsEqual(a, b)
+    if not a or not b or a.type ~= b.type then
+        return false
+    end
+
+    if a.type == "key" then
+        return a.key == b.key
+    elseif a.type == "suggestion" then
+        local itemA = a.item or {}
+        local itemB = b.item or {}
+        return itemA.mode == itemB.mode
+            and itemA.text == itemB.text
+            and itemA.display == itemB.display
+    end
+
+    return true
+end
+
+function TerminalView:_playOverlaySound(sound, pitch)
+    if not Platform.isSwitch then
+        return false
+    end
+
+    if not sound or not brls or not brls.Application or not brls.Application.playSound then
+        return false
+    end
+
+    local ok, played = pcall(function()
+        return brls.Application.playSound(sound, pitch or 1.0)
+    end)
+
+    return ok and played and true or false
+end
+
+function TerminalView:_setOverlayTouchPreviewTarget(target, playSound)
+    local nextPreviewKey = (target and target.type == "key") and target.key or nil
+    local previewChanged = self._overlayTouchPreviewKey ~= nextPreviewKey
+    local targetChanged = not _overlayTargetsEqual(self._overlayTouchActiveTarget, target)
+
+    self._overlayTouchActiveTarget = _cloneOverlayTarget(target)
+    self._overlayTouchPreviewKey = nextPreviewKey
+
+    if nextPreviewKey then
+        self._overlaySelectedKey = nextPreviewKey
+    end
+
+    if playSound and targetChanged and target then
+        self:_playOverlaySound(brls.Sound and brls.Sound.TOUCH, 1.0)
+    end
+
+    if previewChanged or targetChanged then
+        self:_invalidate()
+    end
+end
+
+function TerminalView:_beginOverlayTouchRepeat(target, absX, absY)
+    if not target or target.type ~= "key" then
+        self._overlayTouchRepeatKey = nil
+        self._overlayTouchRepeatState = nil
+        return
+    end
+
+    local resolved = self:_resolveOverlayKey(target.key)
+    if not (resolved and self:_canRepeatOverlayAction(resolved)) then
+        self._overlayTouchRepeatKey = nil
+        self._overlayTouchRepeatState = nil
+        return
+    end
+
+    if self._overlayTouchRepeatKey == target.key and self._overlayTouchRepeatState then
+        return
+    end
+
+    self._overlayTouchRepeatKey = target.key
+    self._overlayTouchRepeatState = {
+        nextAt = _nowMs() + OVERLAY_TOUCH_REPEAT_DELAY_MS,
+        intervalMs = self:_getOverlayRepeatIntervalMs(resolved),
+        repeated = false,
+    }
+end
+
+function TerminalView:_tickOverlayTouchRepeat()
+    if not self._overlayTouchRepeatKey or not self._overlayTouchRepeatState then
+        return
+    end
+
+    local activeTarget = self._overlayTouchActiveTarget
+    if not activeTarget or activeTarget.type ~= "key" or activeTarget.key ~= self._overlayTouchRepeatKey then
+        self._overlayTouchRepeatKey = nil
+        self._overlayTouchRepeatState = nil
+        return
+    end
+
+    local repeatState = self._overlayTouchRepeatState
+    local nowMs = _nowMs()
+    if repeatState.nextAt > 0 and nowMs >= repeatState.nextAt then
+        local resolved = self:_resolveOverlayKey(activeTarget.key)
+        if not (resolved and self:_canRepeatOverlayAction(resolved)) then
+            self._overlayTouchRepeatKey = nil
+            self._overlayTouchRepeatState = nil
+            return
+        end
+
+        repeatState.intervalMs = self:_getOverlayRepeatIntervalMs(resolved)
+        repeatState.nextAt = nowMs + (repeatState.intervalMs or OVERLAY_TOUCH_REPEAT_INTERVAL_TEXT_MS)
+        repeatState.repeated = true
+        self._overlayTouchRepeatState = repeatState
+        self:_commitOverlayTouchTarget(activeTarget, 0.98)
+    end
+end
+
+function TerminalView:_clearOverlayTouchInteraction(cancelSound)
+    local hadPressed = self._overlayTouchPressedTarget ~= nil or self._overlayTouchActiveTarget ~= nil
+    self._overlayTouchPressedTarget = nil
+    self._overlayTouchActiveTarget = nil
+    self._overlayTouchPreviewKey = nil
+    self._overlayTouchRepeatKey = nil
+    self._overlayTouchRepeatState = nil
+
+    if cancelSound and hadPressed then
+        self:_playOverlaySound(brls.Sound and brls.Sound.TOUCH_UNFOCUS, 1.0)
+    end
+
+    self:_invalidate()
+end
+
+function TerminalView:_commitOverlayTouchTarget(target, pitch)
+    if not target then
+        return false
+    end
+
+    self:_playOverlaySound(brls.Sound and brls.Sound.CLICK, pitch or 1.0)
+
+    if target.type == "key" then
+        self:_activateOverlayKey(target.key, "touch")
+        return true
+    elseif target.type == "suggestion" then
+        self:_applySuggestion(target.item, "touch")
+        return true
+    end
+
+    return false
+end
+
+function TerminalView:_canRepeatOverlayAction(resolved)
+    if not resolved or not resolved.action then
+        return false
+    end
+
+    local action = resolved.action
+    return action == "char"
+        or action == "text"
+        or action == "send"
+        or action == "tab"
+        or action == "space"
+        or action == "backspace"
+        or action == "enter"
+end
+
+function TerminalView:_getOverlayRepeatIntervalMs(resolved)
+    if not resolved or not resolved.action then
+        return OVERLAY_TOUCH_REPEAT_INTERVAL_TEXT_MS
+    end
+
+    local action = resolved.action
+    if action == "backspace" then
+        return OVERLAY_TOUCH_REPEAT_INTERVAL_DELETE_MS
+    elseif action == "send" then
+        return OVERLAY_TOUCH_REPEAT_INTERVAL_NAV_MS
+    end
+
+    return OVERLAY_TOUCH_REPEAT_INTERVAL_TEXT_MS
+end
+
 function TerminalView:_openSystemIme()
     local editingOverlay = self._overlayKeyboardVisible
     self._keyboard:openSwkbd({
@@ -1681,33 +1940,62 @@ function TerminalView:_hitOverlayTarget(absX, absY)
     return nil
 end
 
-function TerminalView:_handleOverlayPointer(absX, absY, activate)
+function TerminalView:_handleOverlayPointer(absX, absY, phase)
     if not self._overlayKeyboardVisible then
         return false
     end
 
     local target = self:_hitOverlayTarget(absX, absY)
-    if not target then
-        return self:_isPointInOverlay(absX, absY)
+    local inOverlay = self:_isPointInOverlay(absX, absY)
+
+    if phase == "down" then
+        if target then
+            self._overlayTouchPressedTarget = _cloneOverlayTarget(target)
+            self:_setOverlayTouchPreviewTarget(target, true)
+            self:_beginOverlayTouchRepeat(target, absX, absY)
+            return true
+        end
+        return inOverlay
+    elseif phase == "move" then
+        if self._overlayTouchPressedTarget then
+            self:_setOverlayTouchPreviewTarget(target, target ~= nil)
+            if target and target.type == "key" then
+                self:_beginOverlayTouchRepeat(target, absX, absY)
+            else
+                self._overlayTouchRepeatKey = nil
+                self._overlayTouchRepeatState = nil
+            end
+            return true
+        end
+        return inOverlay
+    elseif phase == "up" then
+        local hadPressed = self._overlayTouchPressedTarget ~= nil
+        local shouldCommit = self._overlayTouchPressedTarget and target
+            and _overlayTargetsEqual(self._overlayTouchPressedTarget, target)
+        local repeated = self._overlayTouchRepeatState and self._overlayTouchRepeatState.repeated
+
+        self._overlayTouchPressedTarget = nil
+        self._overlayTouchActiveTarget = nil
+        self._overlayTouchPreviewKey = nil
+        self._overlayTouchRepeatKey = nil
+        self._overlayTouchRepeatState = nil
+        self:_invalidate()
+
+        if shouldCommit then
+            if repeated then
+                return true
+            end
+            return self:_commitOverlayTouchTarget(target)
+        end
+
+        if inOverlay then
+            self:_playOverlaySound(brls.Sound and brls.Sound.TOUCH_UNFOCUS, 1.0)
+        end
+
+        return hadPressed or inOverlay
     end
 
-    if target.type == "key" then
-        local changed = self._overlaySelectedKey ~= target.key
-        self._overlaySelectedKey = target.key
-        if activate then
-            self:_activateOverlayKey(target.key, "touch")
-        elseif changed then
-            self:_invalidate()
-        end
-        return true
-    elseif target.type == "suggestion" then
-        if activate then
-            self:_applySuggestion(target.item, "touch")
-        end
-        return true
-    end
-
-    return self:_isPointInOverlay(absX, absY)
+    return inOverlay
 end
 
 function TerminalView:_pollOverlayTouch()
@@ -1732,55 +2020,16 @@ function TerminalView:_pollOverlayTouch()
     local wasPressed = self._touchState.pressed and true or false
     local isPressed = touch.pressed and true or false
 
-    -- Handle repeat for backspace key (hold down to continuously delete)
-    local nowMs = _nowMs()
-    if self._overlayTouchRepeatKey and isPressed then
-        local target = self:_hitOverlayTarget(touch.x, touch.y)
-        if target and target.type == "key" then
-            local targetKey = target.key
-            local resolved = self:_resolveOverlayKey(targetKey)
-            if resolved and resolved.action == "backspace" then
-                local repeatState = self._overlayTouchRepeatState
-                if repeatState and repeatState.nextAt > 0 and nowMs >= repeatState.nextAt then
-                    repeatState.nextAt = nowMs + DPAD_REPEAT_INTERVAL_MS
-                    self._overlayTouchRepeatState = repeatState
-                    -- Trigger backspace again without activating (no rumble, no repeat setup)
-                    self:_backspaceOverlayBuffer()
-                end
-            else
-                -- Finger moved off backspace key or key changed
-                self._overlayTouchRepeatKey = nil
-                self._overlayTouchRepeatState = nil
-            end
-        else
-            -- No target under finger
-            self._overlayTouchRepeatKey = nil
-            self._overlayTouchRepeatState = nil
-        end
-    end
-
     if isPressed then
-        local target = self:_hitOverlayTarget(touch.x, touch.y)
-        if target and target.type == "key" then
-            self._overlaySelectedKey = target.key
-            if not wasPressed or self._touchState.id ~= touch.id then
-                self:_activateOverlayKey(target.key, "touch")
-                -- Start repeat for backspace key
-                local resolved = self:_resolveOverlayKey(target.key)
-                if resolved and resolved.action == "backspace" then
-                    self._overlayTouchRepeatKey = target.key
-                    self._overlayTouchRepeatState = { nextAt = nowMs + DPAD_REPEAT_DELAY_MS }
-                end
-            end
-        elseif target and target.type == "suggestion" then
-            if not wasPressed or self._touchState.id ~= touch.id then
-                self:_applySuggestion(target.item, "touch")
-            end
+        if not wasPressed or self._touchState.id ~= touch.id then
+            self:_handleOverlayPointer(touch.x, touch.y, "down")
+        else
+            self:_handleOverlayPointer(touch.x, touch.y, "move")
         end
     else
-        -- Release - stop repeat
-        self._overlayTouchRepeatKey = nil
-        self._overlayTouchRepeatState = nil
+        if wasPressed then
+            self:_handleOverlayPointer(self._touchState.x, self._touchState.y, "up")
+        end
     end
 
     self._touchState = {
@@ -2131,6 +2380,9 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgText(vg, panelX + panelW - 14, panelY + headerH / 2, modeText)
 
     local rowY = panelY + headerH + 4
+    local previewRect = nil
+    local previewPalette = nil
+    local previewLabel = nil
     if chipsH > 0 then
         local chipBandY = panelY - chipsH - chipsGap
         local chipBandH = chipsH
@@ -2201,7 +2453,8 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
 
         for _, key in ipairs(row) do
             local keyW = keyUnitW * (key.width or 1)
-            local selected = (self._overlaySelectedKey == key)
+            local selected = (self._overlayTouchPreviewKey and self._overlayTouchPreviewKey == key)
+                or ((not self._overlayTouchPreviewKey) and self._overlaySelectedKey == key)
             local active = (key.action == "shift" and self._overlayShift)
                 or (key.action == "caps" and self._overlayCaps)
                 or (key.action == "ctrl" and self._overlayCtrl)
@@ -2251,16 +2504,34 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
                 type = "key", key = key,
             })
 
+            if self._overlayTouchActiveTarget
+                and self._overlayTouchActiveTarget.type == "key"
+                and self._overlayTouchActiveTarget.key == key then
+                previewRect = {
+                    x = keyX,
+                    y = rowY,
+                    w = keyW,
+                    h = keyH,
+                }
+                previewPalette = palette
+                previewLabel = label
+            end
+
             keyX = keyX + keyW + keyGap
         end
 
         rowY = rowY + keyH + rowGap
     end
 
+    if previewRect and previewPalette and previewLabel then
+        _drawOverlayKeyPreview(vg, previewRect, previewPalette, previewLabel)
+    end
+
 end
 
 function TerminalView:_onFrame(dt)
     self:_pollControllerShortcuts()
+    self:_tickOverlayTouchRepeat()
 
     self._blinkTimer = self._blinkTimer + dt
     if self._blinkTimer >= CURSOR_BLINK_INTERVAL then
@@ -2494,7 +2765,10 @@ function TerminalView:_onPointerDown(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
     if self._overlayKeyboardVisible then
-        return self:_handleOverlayPointer(event.x, event.y, true)
+        if Platform.isSwitch then
+            return self:_isPointInOverlay(event.x, event.y)
+        end
+        return self:_handleOverlayPointer(event.x, event.y, "down")
     end
 
     local histLen = #self._buf.history
@@ -2519,7 +2793,10 @@ function TerminalView:_onPointerMove(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
     if self._overlayKeyboardVisible then
-        return self:_handleOverlayPointer(event.x, event.y, false)
+        if Platform.isSwitch then
+            return self:_isPointInOverlay(event.x, event.y)
+        end
+        return self:_handleOverlayPointer(event.x, event.y, "move")
     end
 
     if not self._selecting then return false end
@@ -2546,7 +2823,10 @@ function TerminalView:_onPointerUp(event)
     local localEventX, localEventY = self:_toLocalPoint(event.x, event.y)
 
     if self._overlayKeyboardVisible then
-        return self:_handleOverlayPointer(event.x, event.y, false)
+        if Platform.isSwitch then
+            return self:_isPointInOverlay(event.x, event.y)
+        end
+        return self:_handleOverlayPointer(event.x, event.y, "up")
     end
 
     if not self._selecting then return false end

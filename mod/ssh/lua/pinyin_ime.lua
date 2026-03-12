@@ -283,6 +283,15 @@ local SEGMENTS_LEADING_INDEX = {}
 local CANDIDATE_CACHE = {}
 local CANDIDATE_CACHE_ORDER = {}
 local CANDIDATE_CACHE_MAX = 128
+local SOURCE_PRIORITY = {
+    exact = 1,
+    segment = 2,
+    initials = 3,
+    mixed = 4,
+    ["initials-prefix"] = 5,
+    prefix = 6,
+    partial = 7,
+}
 local buildSegmentations
 
 local function clearCandidateCache()
@@ -729,6 +738,14 @@ local function collectSegmentationCandidates(raw, opts, acc, seen)
     end
 end
 
+local function candidateSourcePriority(item)
+    return SOURCE_PRIORITY[item and item.source] or 99
+end
+
+local function candidateHasRemaining(item)
+    return item and item.remaining and item.remaining ~= ""
+end
+
 function PinyinIme.getCandidates(raw, opts)
     raw = normalize(raw)
     opts = opts or {}
@@ -764,7 +781,21 @@ function PinyinIme.getCandidates(raw, opts)
     collectPrefixCandidates(raw, opts, acc, seen)
 
     table.sort(acc, function(a, b)
+        local aSource = candidateSourcePriority(a)
+        local bSource = candidateSourcePriority(b)
+        if aSource ~= bSource and math.abs((a.score or 0) - (b.score or 0)) <= 220 then
+            return aSource < bSource
+        end
+        if candidateHasRemaining(a) ~= candidateHasRemaining(b) and math.abs((a.score or 0) - (b.score or 0)) <= 160 then
+            return not candidateHasRemaining(a)
+        end
         if a.score == b.score then
+            if aSource ~= bSource then
+                return aSource < bSource
+            end
+            if candidateHasRemaining(a) ~= candidateHasRemaining(b) then
+                return not candidateHasRemaining(a)
+            end
             if #a.text == #b.text then return a.text < b.text end
             return #a.text > #b.text
         end
