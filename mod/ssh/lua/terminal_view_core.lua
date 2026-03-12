@@ -244,6 +244,40 @@ local function _withAlpha(color, alpha)
     return nvgRGBA(color[1], color[2], color[3], alpha or 255)
 end
 
+local function _getOverlayLogicalRect(x, y, w, h)
+    local okScale, windowScale = pcall(function()
+        return brls.Application.getWindowScale and brls.Application.getWindowScale() or 1
+    end)
+    local okWindowW, windowW = pcall(function()
+        return brls.Application.windowWidth and brls.Application.windowWidth() or w
+    end)
+    local okWindowH, windowH = pcall(function()
+        return brls.Application.windowHeight and brls.Application.windowHeight() or h
+    end)
+
+    if not okScale or not okWindowW or not okWindowH then
+        return x, y, w, h, 1, 1
+    end
+
+    if not windowScale or windowScale <= 0 then
+        return x, y, w, h, 1, 1
+    end
+
+    local contentW = windowW / windowScale
+    local contentH = windowH / windowScale
+    if contentW <= 0 or contentH <= 0 then
+        return x, y, w, h, 1, 1
+    end
+
+    local scaleX = w / contentW
+    local scaleY = h / contentH
+    if scaleX < 1.25 or scaleY < 1.25 then
+        return x, y, w, h, 1, 1
+    end
+
+    return x / scaleX, y / scaleY, contentW, contentH, scaleX, scaleY
+end
+
 local function _liftColor(color, amount)
     return {
         math.min(255, color[1] + amount),
@@ -605,6 +639,7 @@ function TerminalView.new(sshManager)
     self._overlayRumbleSeq = 0
     self._overlayRumbleCooling = false
     self._frameLoopActive = false
+    self._overlayShortcutLatch = false
 
     return self
 end
@@ -762,6 +797,14 @@ local function initGlobalKeyboardListeners()
     local function isCtrlPressed(mods)
         return hasFlag(mods, 0x02) or hasFlag(mods, 0x40) or hasFlag(mods, 0x80)
     end
+
+    local function isMetaPressed(mods)
+        return hasFlag(mods, 0x08)
+    end
+
+    local function isPrimaryShortcutPressed(mods)
+        return isCtrlPressed(mods) or isMetaPressed(mods)
+    end
     
     if _G.__SSH_TERMINAL_INPUT_INITED then
         print("[TerminalView] initGlobalKeyboardListeners: already initialized")
@@ -815,15 +858,22 @@ local function initGlobalKeyboardListeners()
     end)
 
     inputManager:getKeyboardKeyStateChanged():subscribe(function(state)
+        local terminal = resolveTerminalFromFocus()
+        if terminal and not state.pressed then
+            if state.key == KEY_K or state.key == KEY_K_LOWER or state.key == KEY_F2 or state.key == 341 or state.key == 343 then
+                terminal:_releaseOverlayShortcutLatch()
+            end
+            return
+        end
+
         if state.pressed then
             local focus = brls.Application.getCurrentFocus()
             print(string.format("[TerminalView] Global Key: key=%d mods=%d focus=%s",
                 state.key, state.mods, focus and tostring(focus:get_address()) or "nil"))
 
-            local terminal = resolveTerminalFromFocus()
             if terminal then
-                local ctrl = isCtrlPressed(state.mods)
-                if (ctrl and (state.key == KEY_K or state.key == KEY_K_LOWER)) or state.key == KEY_F2 then
+                local shortcut = isPrimaryShortcutPressed(state.mods)
+                if (shortcut and (state.key == KEY_K or state.key == KEY_K_LOWER)) or state.key == KEY_F2 then
                     terminal:_toggleOverlayKeyboardVisible()
                     return
                 end
@@ -938,19 +988,23 @@ end
 
 function TerminalView:setOverlayKeyboardVisible(visible)
     self._overlayKeyboardVisible = visible and true or false
+    self._overlayShortcutLatch = false
     self:_invalidate()
 end
 
 function TerminalView:_toggleOverlayKeyboardVisible()
-    local nowMs = math.floor((os.clock() or 0) * 1000)
-    local lastMs = self._overlayToggleLastAt or 0
-    if nowMs - lastMs < 120 then
+    if self._overlayShortcutLatch then
         return
     end
 
-    self._overlayToggleLastAt = nowMs
+    self._overlayShortcutLatch = true
     self._overlayKeyboardVisible = not self._overlayKeyboardVisible
+    print("[TerminalView] Overlay keyboard visible = " .. tostring(self._overlayKeyboardVisible))
     self:_invalidate()
+end
+
+function TerminalView:_releaseOverlayShortcutLatch()
+    self._overlayShortcutLatch = false
 end
 
 function TerminalView:ensureInputListeners()
@@ -1600,8 +1654,7 @@ function TerminalView:_handleOverlayActions(justPressed)
         self:_openSystemIme()
     end
     if justPressed(B.BUTTON_RSB) then
-        self._overlayKeyboardVisible = not self._overlayKeyboardVisible
-        self:_invalidate()
+        self:_toggleOverlayKeyboardVisible()
     end
 end
 
@@ -1910,9 +1963,8 @@ function TerminalView:_pollControllerShortcuts()
     end
     if justPressed(B.BUTTON_RSB) or justPressed(B.BUTTON_RB) then
         _trace("[TerminalView] Polled R3 -> Overlay Keyboard")
-        self._overlayKeyboardVisible = not self._overlayKeyboardVisible
+        self:_toggleOverlayKeyboardVisible()
         self:_rumbleOverlayTap("nav", "joycon")
-        self:_invalidate()
     end
     if justPressed(B.BUTTON_START) then
         _trace("[TerminalView] Polled + -> System IME")
@@ -1936,6 +1988,9 @@ function TerminalView:_pollControllerShortcuts()
 end
 
 function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
+    local rawX, rawY, rawW, rawH = x, y, w, h
+    x, y, w, h = _getOverlayLogicalRect(x, y, w, h)
+
     local compactLayout = self:_isCompactOverlayLayout()
     local panelInset = compactLayout and 0 or 12
     local contentInset = compactLayout and 4 or 12
@@ -2011,6 +2066,23 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
 
     self._overlayTouchTargets = {}
     self._overlayPanelRect = { x = panelX, y = panelY, w = panelW, h = panelH }
+
+    local nowMs = math.floor((os.clock() or 0) * 1000)
+    if (not self._overlayDrawLogAt) or (nowMs - self._overlayDrawLogAt >= 800) then
+        self._overlayDrawLogAt = nowMs
+        print(string.format(
+            "[TerminalView] Overlay draw: raw=%dx%d logical=%dx%d panelX=%d panelY=%d panelW=%d panelH=%d mode=%s",
+            math.floor(rawW or 0),
+            math.floor(rawH or 0),
+            math.floor(w or 0),
+            math.floor(h or 0),
+            math.floor(panelX or 0),
+            math.floor(panelY or 0),
+            math.floor(panelW or 0),
+            math.floor(panelH or 0),
+            compactLayout and "compact" or "classic"
+        ))
+    end
 
     nvgBeginPath(vg)
     nvgRect(vg, panelX + 1, panelY + 2, panelW, panelH)
@@ -2195,6 +2267,16 @@ function TerminalView:_draw(vg, x, y, w, h)
     self._drawY = y or 0
     self._drawW = w or 0
     self._drawH = h or 0
+
+    if w and h and w > 0 and h > 0 then
+        if self._lastDrawWidth ~= w or self._lastDrawHeight ~= h then
+            self._lastDrawWidth = w
+            self._lastDrawHeight = h
+            print(string.format("[TerminalView] Draw area changed: x=%d y=%d w=%d h=%d",
+                math.floor(x or 0), math.floor(y or 0), math.floor(w or 0), math.floor(h or 0)))
+            self:resize(w, h)
+        end
+    end
 
     if not self._view.registerFrameCallback then
         self:_onFrame(0.016)

@@ -26,8 +26,12 @@ end
 
 function Session:_createCanvas()
     local canvas = brls.LuaImage.new()
-    canvas:setWidth(brls.Application.windowWidth())
-    canvas:setHeight(brls.Application.windowHeight())
+    if canvas.setWidth then
+        canvas:setWidth(brls.Application.windowWidth())
+    end
+    if canvas.setHeight then
+        canvas:setHeight(brls.Application.windowHeight())
+    end
     if canvas.setGrow then
         canvas:setGrow(1.0)
     end
