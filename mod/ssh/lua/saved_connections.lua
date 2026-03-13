@@ -5,6 +5,8 @@ local Platform = require("platform")
 local SavedConnections = {}
 
 local _inMemoryConnections = {}
+local SWITCH_CONFIG_DIR = "sdmc:/switch/lorealis/config/ssh"
+local SWITCH_LEGACY_CONFIG_DIR = "sdmc:/config/lorealis/ssh"
 
 local function getPlatformIo()
     local okPlatform, platform = pcall(function()
@@ -20,7 +22,7 @@ end
 
 local function getConfigDir()
     if Platform.isSwitch then
-        return "sdmc:/config/lorealis/ssh"
+        return SWITCH_CONFIG_DIR
     end
     return "./config/ssh"
 end
@@ -29,32 +31,62 @@ local function getConfigPath()
     return getConfigDir() .. "/connections.json"
 end
 
-local function ensureConfigDir()
-    local dir = getConfigDir()
-    if Platform.isSwitch or package.config:sub(1, 1) == "/" then
-        os.execute("mkdir -p '" .. dir .. "'")
-    else
-        os.execute('if not exist "' .. dir .. '" mkdir "' .. dir .. '"')
+local function getReadPaths()
+    local paths = { getConfigPath() }
+    if Platform.isSwitch then
+        table.insert(paths, SWITCH_LEGACY_CONFIG_DIR .. "/connections.json")
     end
+    return paths
 end
 
-local function readFile()
-    local path = getConfigPath()
+local function ensureConfigDir()
+    local dir = getConfigDir()
     local platform = getPlatformIo()
 
-    if platform and platform.readFile then
-        local content = platform:readFile(path)
-        if content and content ~= "" then
-            return content
+    if platform and platform.mkdir then
+        local ok, created = pcall(function()
+            return platform:mkdir(dir)
+        end)
+        if ok and created ~= false then
+            return true
         end
     end
 
-    if io then
-        local file = io.open(path, "r")
-        if file then
-            local content = file:read("*a")
-            file:close()
-            return content
+    if Platform.isSwitch then
+        return false
+    end
+
+    local command = nil
+    if package.config:sub(1, 1) == "/" then
+        command = "mkdir -p '" .. dir .. "'"
+    else
+        command = 'if not exist "' .. dir .. '" mkdir "' .. dir .. '"'
+    end
+
+    local result = os.execute(command)
+    return result == true or result == 0
+end
+
+local function readFile()
+    local platform = getPlatformIo()
+
+    for _, path in ipairs(getReadPaths()) do
+        if platform and platform.readFile then
+            local ok, content = pcall(function()
+                return platform:readFile(path)
+            end)
+            if ok and content and content ~= "" then
+                return content
+            end
+        end
+
+        if io then
+            local file = io.open(path, "r")
+            if file then
+                local content = file:read("*a")
+                file:close()
+                return content
+            end
         end
     end
 
@@ -62,16 +94,21 @@ local function readFile()
 end
 
 local function writeFile(content)
-    ensureConfigDir()
+    local dirOk = ensureConfigDir()
 
     local path = getConfigPath()
     local platform = getPlatformIo()
 
     if platform and platform.writeFile then
-        return platform:writeFile(path, content)
+        local ok, written = pcall(function()
+            return platform:writeFile(path, content)
+        end)
+        if ok then
+            return written and true or false
+        end
     end
 
-    if io then
+    if dirOk and io then
         local file = io.open(path, "w")
         if not file then
             return false
@@ -146,7 +183,11 @@ function SavedConnections.save(list)
         return false
     end
 
-    return writeFile(content)
+    local ok = writeFile(content)
+    if not ok and Platform.isSwitch then
+        print("[SSH] Failed to save connections to " .. getConfigPath())
+    end
+    return ok
 end
 
 function SavedConnections.validate(conn)

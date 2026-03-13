@@ -11,7 +11,7 @@
 class LuaPointerRecognizer : public brls::GestureRecognizer
 {
 public:
-    typedef std::function<bool(brls::Point, brls::TouchPhase)> PointerCallback;
+    typedef std::function<bool(brls::Point, brls::TouchPhase, bool, int)> PointerCallback;
     typedef std::function<bool(brls::Point)> ScrollCallback;
 
     LuaPointerRecognizer(brls::View* view)
@@ -30,11 +30,11 @@ public:
         if (mouse.leftButton != brls::TouchPhase::NONE)
         {
             if (mouse.leftButton == brls::TouchPhase::START && pointerDownCb)
-                pointerDownCb(mouse.position, mouse.leftButton);
+                pointerDownCb(mouse.position, mouse.leftButton, false, -1);
             else if (mouse.leftButton == brls::TouchPhase::STAY && pointerMoveCb)
-                pointerMoveCb(mouse.position, mouse.leftButton);
+                pointerMoveCb(mouse.position, mouse.leftButton, false, -1);
             else if (mouse.leftButton == brls::TouchPhase::END && pointerUpCb)
-                pointerUpCb(mouse.position, mouse.leftButton);
+                pointerUpCb(mouse.position, mouse.leftButton, false, -1);
         }
 
         // Handle Scroll
@@ -47,11 +47,11 @@ public:
         if (touch.phase != brls::TouchPhase::NONE)
         {
             if (touch.phase == brls::TouchPhase::START && pointerDownCb)
-                pointerDownCb(touch.position, touch.phase);
+                pointerDownCb(touch.position, touch.phase, true, touch.fingerId);
             else if (touch.phase == brls::TouchPhase::STAY && pointerMoveCb)
-                pointerMoveCb(touch.position, touch.phase);
+                pointerMoveCb(touch.position, touch.phase, true, touch.fingerId);
             else if (touch.phase == brls::TouchPhase::END && pointerUpCb)
-                pointerUpCb(touch.position, touch.phase);
+                pointerUpCb(touch.position, touch.phase, true, touch.fingerId);
         }
 
         return brls::GestureState::STAY;
@@ -167,20 +167,35 @@ void LuaManager::registerViewBindings(sol::table& brls_ns) {
     });
     view_ut.set_function("addGestureRecognizer", [](brls::View& self, brls::GestureRecognizer* g) { self.addGestureRecognizer(g); });
     view_ut.set_function("onPointerDown", [this](brls::View& self, sol::protected_function func) {
-        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerDown([this, func](brls::Point p, brls::TouchPhase phase) {
-            auto res = func(lua.create_table_with("x", p.x, "y", p.y));
+        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerDown([this, func](brls::Point p, brls::TouchPhase phase, bool isTouch, int pointerId) {
+            auto res = func(lua.create_table_with(
+                "x", p.x,
+                "y", p.y,
+                "phase", (int) phase,
+                "source", isTouch ? "touch" : "mouse",
+                "id", pointerId));
             return true;
         });
     });
     view_ut.set_function("onPointerMove", [this](brls::View& self, sol::protected_function func) {
-        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerMove([this, func](brls::Point p, brls::TouchPhase phase) {
-            auto res = func(lua.create_table_with("x", p.x, "y", p.y));
+        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerMove([this, func](brls::Point p, brls::TouchPhase phase, bool isTouch, int pointerId) {
+            auto res = func(lua.create_table_with(
+                "x", p.x,
+                "y", p.y,
+                "phase", (int) phase,
+                "source", isTouch ? "touch" : "mouse",
+                "id", pointerId));
             return true;
         });
     });
     view_ut.set_function("onPointerUp", [this](brls::View& self, sol::protected_function func) {
-        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerUp([this, func](brls::Point p, brls::TouchPhase phase) {
-            auto res = func(lua.create_table_with("x", p.x, "y", p.y));
+        getOrAddLuaPointerRecognizer(this->lua, self)->onPointerUp([this, func](brls::Point p, brls::TouchPhase phase, bool isTouch, int pointerId) {
+            auto res = func(lua.create_table_with(
+                "x", p.x,
+                "y", p.y,
+                "phase", (int) phase,
+                "source", isTouch ? "touch" : "mouse",
+                "id", pointerId));
             return true;
         });
     });

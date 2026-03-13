@@ -233,12 +233,6 @@ function ConnectionView:_showConnectForm()
 end
 
 function ConnectionView:_doConnect(conn)
-    if DebugLog and DebugLog.clear then
-        pcall(function()
-            DebugLog.clear()
-        end)
-    end
-
     self:_closeTransientDialogs()
     self:_popTerminalPageIfNeeded()
     self:_recreateSessionContext()

@@ -100,6 +100,7 @@ docker run --rm -v "${PWD}:/data" devkitpro/devkita64:20260219 bash -c "/data/sc
 docker run --rm -it -v "${PWD}/build_switch":/work devkitpro/devkita64:20260219 bash
 
 /opt/devkitpro/tools/bin/nxlink -a 192.168.31.91 /work/lorealis.nro
+
 ```
 
 

@@ -7,6 +7,7 @@
 local Platform = require("platform")
 
 local DebugLog = {}
+local resetDone = false
 
 local function getLogPath()
     if Platform.isSwitch then
@@ -55,6 +56,15 @@ function DebugLog.clear()
     return ok and true or false
 end
 
+function DebugLog.resetSession()
+    if resetDone then
+        return true
+    end
+
+    resetDone = true
+    return DebugLog.clear()
+end
+
 function DebugLog.append(msg)
     ensureDir()
     local platform = brls.Application.getPlatform()
@@ -80,5 +90,9 @@ function DebugLog.append(msg)
     end)
     return ok and true or false
 end
+
+pcall(function()
+    DebugLog.resetSession()
+end)
 
 return DebugLog

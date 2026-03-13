@@ -77,6 +77,9 @@ local OVERLAY_TOUCH_REPEAT_DELAY_MS = 1250
 local OVERLAY_TOUCH_REPEAT_INTERVAL_TEXT_MS = 260
 local OVERLAY_TOUCH_REPEAT_INTERVAL_NAV_MS = 210
 local OVERLAY_TOUCH_REPEAT_INTERVAL_DELETE_MS = 170
+local OVERLAY_TOUCH_COMMIT_DEBOUNCE_MS = 320
+local OVERLAY_TOUCH_RELEASE_DEBOUNCE_MS = 90
+local OVERLAY_TOUCH_REPRESS_COOLDOWN_MS = 140
 local OVERLAY_RUMBLE_LOW = 300 -- ms, 震动持续时间
 local OVERLAY_RUMBLE_HIGH = 200 -- 震动强度
 local OVERLAY_RUMBLE_INTERVAL_MS = 1 -- 按键延迟
@@ -678,6 +681,15 @@ function TerminalView.new(sshManager)
     self._overlayTouchPreviewKey = nil
     self._overlayTouchPressedTarget = nil
     self._overlayTouchActiveTarget = nil
+    self._overlayTouchCommittedOnDown = false
+    self._overlayLastTouchCommitAt = 0
+    self._overlayLastTouchCommitSig = nil
+    self._overlayTouchReleasePendingAt = nil
+    self._overlayTouchReleasePendingX = 0
+    self._overlayTouchReleasePendingY = 0
+    self._overlayTouchReleasePendingId = -1
+    self._overlayTouchIgnoreDownUntil = 0
+    self._overlaySwitchTouchMode = Platform.isSwitch and "pointer" or nil
     self._overlayRecentCommands = {}
     self._overlayThemeIndex = OVERLAY_THEME_INDEX_DEFAULT
     OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
@@ -1027,6 +1039,15 @@ function TerminalView:reset()
     self._overlayTouchPreviewKey = nil
     self._overlayTouchPressedTarget = nil
     self._overlayTouchActiveTarget = nil
+    self._overlayTouchCommittedOnDown = false
+    self._overlayLastTouchCommitAt = 0
+    self._overlayLastTouchCommitSig = nil
+    self._overlayTouchReleasePendingAt = nil
+    self._overlayTouchReleasePendingX = 0
+    self._overlayTouchReleasePendingY = 0
+    self._overlayTouchReleasePendingId = -1
+    self._overlayTouchIgnoreDownUntil = 0
+    self._overlaySwitchTouchMode = Platform.isSwitch and "pointer" or nil
     self._overlayRecentCommands = {}
     self._overlayThemeIndex = self._overlayThemeIndex or OVERLAY_THEME_INDEX_DEFAULT
     OVERLAY_THEME = OVERLAY_THEMES[self._overlayThemeIndex]
@@ -1047,8 +1068,17 @@ function TerminalView:setOverlayKeyboardVisible(visible)
     self._overlayTouchPreviewKey = nil
     self._overlayTouchPressedTarget = nil
     self._overlayTouchActiveTarget = nil
+    self._overlayTouchCommittedOnDown = false
     self._overlayTouchRepeatKey = nil
     self._overlayTouchRepeatState = nil
+    self._overlayLastTouchCommitAt = 0
+    self._overlayLastTouchCommitSig = nil
+    self._overlayTouchReleasePendingAt = nil
+    self._overlayTouchReleasePendingX = 0
+    self._overlayTouchReleasePendingY = 0
+    self._overlayTouchReleasePendingId = -1
+    self._overlayTouchIgnoreDownUntil = 0
+    self._overlaySwitchTouchMode = Platform.isSwitch and "pointer" or nil
     self:_invalidate()
 end
 
@@ -1062,8 +1092,17 @@ function TerminalView:_toggleOverlayKeyboardVisible()
     self._overlayTouchPreviewKey = nil
     self._overlayTouchPressedTarget = nil
     self._overlayTouchActiveTarget = nil
+    self._overlayTouchCommittedOnDown = false
     self._overlayTouchRepeatKey = nil
     self._overlayTouchRepeatState = nil
+    self._overlayLastTouchCommitAt = 0
+    self._overlayLastTouchCommitSig = nil
+    self._overlayTouchReleasePendingAt = nil
+    self._overlayTouchReleasePendingX = 0
+    self._overlayTouchReleasePendingY = 0
+    self._overlayTouchReleasePendingId = -1
+    self._overlayTouchIgnoreDownUntil = 0
+    self._overlaySwitchTouchMode = Platform.isSwitch and "pointer" or nil
     print("[TerminalView] Overlay keyboard visible = " .. tostring(self._overlayKeyboardVisible))
     self:_invalidate()
 end
@@ -1636,6 +1675,10 @@ local function _nowMs()
     return math.floor(os.clock() * 1000)
 end
 
+local function _isPointerOverlayTouchMode(self)
+    return Platform.isSwitch and self._overlaySwitchTouchMode == "pointer"
+end
+
 local function _cloneOverlayTarget(target)
     if not target then
         return nil
@@ -1679,6 +1722,34 @@ local function _overlayTargetsEqual(a, b)
     end
 
     return true
+end
+
+local function _overlayTargetSignature(target)
+    if not target then
+        return nil
+    end
+
+    if target.type == "key" then
+        local key = target.key or {}
+        return "key:" .. tostring(key.action or "") .. ":" .. tostring(key.label or "") .. ":" .. tostring(key.base or "") .. ":" .. tostring(key.value or "")
+    elseif target.type == "suggestion" then
+        local item = target.item or {}
+        return "suggestion:" .. tostring(item.mode or "") .. ":" .. tostring(item.text or "") .. ":" .. tostring(item.display or "")
+    end
+
+    return tostring(target.type or "unknown")
+end
+
+local function _switchOverlayLog(msg)
+    if Platform.isSwitch then
+        local line = "[OverlayTouch] " .. msg
+        print(line)
+        if DebugLog and DebugLog.append then
+            pcall(function()
+                DebugLog.append(line)
+            end)
+        end
+    end
 end
 
 function TerminalView:_playOverlaySound(sound, pitch)
@@ -1770,7 +1841,7 @@ function TerminalView:_tickOverlayTouchRepeat()
         repeatState.nextAt = nowMs + (repeatState.intervalMs or OVERLAY_TOUCH_REPEAT_INTERVAL_TEXT_MS)
         repeatState.repeated = true
         self._overlayTouchRepeatState = repeatState
-        self:_commitOverlayTouchTarget(activeTarget, 0.98)
+        self:_commitOverlayTouchTarget(activeTarget, 0.98, true)
     end
 end
 
@@ -1779,6 +1850,7 @@ function TerminalView:_clearOverlayTouchInteraction(cancelSound)
     self._overlayTouchPressedTarget = nil
     self._overlayTouchActiveTarget = nil
     self._overlayTouchPreviewKey = nil
+    self._overlayTouchCommittedOnDown = false
     self._overlayTouchRepeatKey = nil
     self._overlayTouchRepeatState = nil
 
@@ -1789,12 +1861,29 @@ function TerminalView:_clearOverlayTouchInteraction(cancelSound)
     self:_invalidate()
 end
 
-function TerminalView:_commitOverlayTouchTarget(target, pitch)
+function TerminalView:_commitOverlayTouchTarget(target, pitch, isRepeat)
     if not target then
         return false
     end
 
+    local nowMs = _nowMs()
+    local signature = _overlayTargetSignature(target)
+    if not isRepeat and Platform.isSwitch and not _isPointerOverlayTouchMode(self)
+        and signature and self._overlayLastTouchCommitSig == signature then
+        local elapsed = nowMs - (self._overlayLastTouchCommitAt or 0)
+        if elapsed >= 0 and elapsed < OVERLAY_TOUCH_COMMIT_DEBOUNCE_MS then
+            _switchOverlayLog(string.format("commit ignored sig=%s elapsed=%d repeat=%s", signature, elapsed, tostring(isRepeat and true or false)))
+            return true
+        end
+    end
+
+    if signature then
+        self._overlayLastTouchCommitAt = nowMs
+        self._overlayLastTouchCommitSig = signature
+    end
+
     self:_playOverlaySound(brls.Sound and brls.Sound.CLICK, pitch or 1.0)
+    _switchOverlayLog(string.format("commit sig=%s repeat=%s", tostring(signature), tostring(isRepeat and true or false)))
 
     if target.type == "key" then
         self:_activateOverlayKey(target.key, "touch")
@@ -1808,18 +1897,7 @@ function TerminalView:_commitOverlayTouchTarget(target, pitch)
 end
 
 function TerminalView:_canRepeatOverlayAction(resolved)
-    if not resolved or not resolved.action then
-        return false
-    end
-
-    local action = resolved.action
-    return action == "char"
-        or action == "text"
-        or action == "send"
-        or action == "tab"
-        or action == "space"
-        or action == "backspace"
-        or action == "enter"
+    return false
 end
 
 function TerminalView:_getOverlayRepeatIntervalMs(resolved)
@@ -1947,17 +2025,35 @@ function TerminalView:_handleOverlayPointer(absX, absY, phase)
 
     local target = self:_hitOverlayTarget(absX, absY)
     local inOverlay = self:_isPointInOverlay(absX, absY)
+    local nowMs = _nowMs()
+    local usingPointerTouch = _isPointerOverlayTouchMode(self)
 
     if phase == "down" then
+        if Platform.isSwitch and not usingPointerTouch and nowMs < (self._overlayTouchIgnoreDownUntil or 0) then
+            _switchOverlayLog(string.format("down ignored x=%.1f y=%.1f until=%d now=%d", absX, absY, self._overlayTouchIgnoreDownUntil or 0, nowMs))
+            return inOverlay
+        end
+
+        self._overlayTouchCommittedOnDown = false
         if target then
+            _switchOverlayLog(string.format("down key=%s x=%.1f y=%.1f", tostring((target.key and target.key.label) or "?"), absX, absY))
             self._overlayTouchPressedTarget = _cloneOverlayTarget(target)
-            self:_setOverlayTouchPreviewTarget(target, true)
-            self:_beginOverlayTouchRepeat(target, absX, absY)
+            self:_setOverlayTouchPreviewTarget(target, not usingPointerTouch)
+            self._overlayTouchRepeatKey = nil
+            self._overlayTouchRepeatState = nil
+            if usingPointerTouch then
+                self._overlayTouchCommittedOnDown = self:_commitOverlayTouchTarget(target) and true or false
+            else
+                self:_beginOverlayTouchRepeat(target, absX, absY)
+            end
             return true
         end
         return inOverlay
     elseif phase == "move" then
         if self._overlayTouchPressedTarget then
+            if self._overlayTouchCommittedOnDown then
+                return true
+            end
             self:_setOverlayTouchPreviewTarget(target, target ~= nil)
             if target and target.type == "key" then
                 self:_beginOverlayTouchRepeat(target, absX, absY)
@@ -1970,16 +2066,29 @@ function TerminalView:_handleOverlayPointer(absX, absY, phase)
         return inOverlay
     elseif phase == "up" then
         local hadPressed = self._overlayTouchPressedTarget ~= nil
+        local committedOnDown = self._overlayTouchCommittedOnDown and true or false
         local shouldCommit = self._overlayTouchPressedTarget and target
             and _overlayTargetsEqual(self._overlayTouchPressedTarget, target)
         local repeated = self._overlayTouchRepeatState and self._overlayTouchRepeatState.repeated
+        local targetLabel = target and target.key and target.key.label or "nil"
 
         self._overlayTouchPressedTarget = nil
         self._overlayTouchActiveTarget = nil
         self._overlayTouchPreviewKey = nil
+        self._overlayTouchCommittedOnDown = false
         self._overlayTouchRepeatKey = nil
         self._overlayTouchRepeatState = nil
+        if Platform.isSwitch and not usingPointerTouch and (hadPressed or inOverlay) then
+            self._overlayTouchIgnoreDownUntil = nowMs + OVERLAY_TOUCH_REPRESS_COOLDOWN_MS
+        else
+            self._overlayTouchIgnoreDownUntil = 0
+        end
+        _switchOverlayLog(string.format("up key=%s commit=%s repeated=%s committed_on_down=%s x=%.1f y=%.1f", tostring(targetLabel), tostring(shouldCommit and true or false), tostring(repeated and true or false), tostring(committedOnDown), absX, absY))
         self:_invalidate()
+
+        if committedOnDown then
+            return hadPressed or inOverlay
+        end
 
         if shouldCommit then
             if repeated then
@@ -1998,14 +2107,39 @@ function TerminalView:_handleOverlayPointer(absX, absY, phase)
     return inOverlay
 end
 
+function TerminalView:_preferSwitchPointerTouch()
+    if not Platform.isSwitch then
+        return
+    end
+
+    self._overlaySwitchTouchMode = "pointer"
+    self._touchState = {
+        pressed = false,
+        x = 0,
+        y = 0,
+        id = -1,
+    }
+    self._overlayTouchReleasePendingAt = nil
+    self._overlayTouchReleasePendingX = 0
+    self._overlayTouchReleasePendingY = 0
+    self._overlayTouchReleasePendingId = -1
+    self._overlayTouchIgnoreDownUntil = 0
+end
+
 function TerminalView:_pollOverlayTouch()
     if not self._overlayKeyboardVisible then
         self._touchState.pressed = false
         self._overlayTouchRepeatKey = nil
+        self._overlayTouchReleasePendingAt = nil
+        self._overlaySwitchTouchMode = Platform.isSwitch and "pointer" or nil
         return
     end
 
     if not Platform.isSwitch or not brls.Application.getSwitchTouchState then
+        return
+    end
+
+    if self._overlaySwitchTouchMode ~= "poll" then
         return
     end
 
@@ -2019,25 +2153,69 @@ function TerminalView:_pollOverlayTouch()
 
     local wasPressed = self._touchState.pressed and true or false
     local isPressed = touch.pressed and true or false
+    local nowMs = _nowMs()
 
     if isPressed then
+        if not wasPressed and nowMs < (self._overlayTouchIgnoreDownUntil or 0) then
+            return
+        end
+
+        self._overlayTouchReleasePendingAt = nil
+
         if not wasPressed or self._touchState.id ~= touch.id then
             self:_handleOverlayPointer(touch.x, touch.y, "down")
         else
             self:_handleOverlayPointer(touch.x, touch.y, "move")
         end
+
+        self._touchState = {
+            pressed = true,
+            x = touch.x or 0,
+            y = touch.y or 0,
+            id = touch.id or -1,
+        }
     else
         if wasPressed then
-            self:_handleOverlayPointer(self._touchState.x, self._touchState.y, "up")
-        end
-    end
+            if not self._overlayTouchReleasePendingAt then
+                self._overlayTouchReleasePendingAt = nowMs
+                self._overlayTouchReleasePendingX = self._touchState.x or 0
+                self._overlayTouchReleasePendingY = self._touchState.y or 0
+                self._overlayTouchReleasePendingId = self._touchState.id or -1
+                self._overlayTouchRepeatKey = nil
+                self._overlayTouchRepeatState = nil
+                return
+            end
 
-    self._touchState = {
-        pressed = isPressed,
-        x = touch.x or 0,
-        y = touch.y or 0,
-        id = touch.id or -1,
-    }
+            if (nowMs - self._overlayTouchReleasePendingAt) < OVERLAY_TOUCH_RELEASE_DEBOUNCE_MS then
+                self._overlayTouchRepeatKey = nil
+                self._overlayTouchRepeatState = nil
+                return
+            end
+
+            self:_handleOverlayPointer(
+                self._overlayTouchReleasePendingX or self._touchState.x,
+                self._overlayTouchReleasePendingY or self._touchState.y,
+                "up"
+            )
+            self._overlayTouchReleasePendingAt = nil
+            self._overlayTouchIgnoreDownUntil = nowMs + OVERLAY_TOUCH_REPRESS_COOLDOWN_MS
+            self._touchState = {
+                pressed = false,
+                x = 0,
+                y = 0,
+                id = -1,
+            }
+            return
+        end
+
+        self._overlayTouchReleasePendingAt = nil
+        self._touchState = {
+            pressed = false,
+            x = 0,
+            y = 0,
+            id = -1,
+        }
+    end
 end
 
 local function _pollPressed(button, controllerState)
@@ -2531,6 +2709,7 @@ end
 
 function TerminalView:_onFrame(dt)
     self:_pollControllerShortcuts()
+    self:_pollOverlayTouch()
     self:_tickOverlayTouchRepeat()
 
     self._blinkTimer = self._blinkTimer + dt
@@ -2766,7 +2945,9 @@ function TerminalView:_onPointerDown(event)
 
     if self._overlayKeyboardVisible then
         if Platform.isSwitch then
-            return self:_isPointInOverlay(event.x, event.y)
+            _switchOverlayLog(string.format("event down source=%s id=%s x=%.1f y=%.1f phase=%s", tostring(event.source), tostring(event.id), event.x or 0, event.y or 0, tostring(event.phase)))
+            self:_preferSwitchPointerTouch()
+            return self:_handleOverlayPointer(event.x, event.y, "down")
         end
         return self:_handleOverlayPointer(event.x, event.y, "down")
     end
@@ -2794,7 +2975,8 @@ function TerminalView:_onPointerMove(event)
 
     if self._overlayKeyboardVisible then
         if Platform.isSwitch then
-            return self:_isPointInOverlay(event.x, event.y)
+            self:_preferSwitchPointerTouch()
+            return self:_handleOverlayPointer(event.x, event.y, "move")
         end
         return self:_handleOverlayPointer(event.x, event.y, "move")
     end
@@ -2824,7 +3006,9 @@ function TerminalView:_onPointerUp(event)
 
     if self._overlayKeyboardVisible then
         if Platform.isSwitch then
-            return self:_isPointInOverlay(event.x, event.y)
+            _switchOverlayLog(string.format("event up source=%s id=%s x=%.1f y=%.1f phase=%s", tostring(event.source), tostring(event.id), event.x or 0, event.y or 0, tostring(event.phase)))
+            self:_preferSwitchPointerTouch()
+            return self:_handleOverlayPointer(event.x, event.y, "up")
         end
         return self:_handleOverlayPointer(event.x, event.y, "up")
     end
