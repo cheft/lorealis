@@ -1,5 +1,6 @@
 -- hello_tab.lua
 local zip_loader = require("utils/zip_view_loader")
+local overlay_keyboard_input = require("overlay_keyboard_input")
 
 local hello_tab = {}
 local selected = 0
@@ -9,19 +10,48 @@ function hello_tab.init(mainView)
     local button = mainView:getView("hello_button")
     local label = mainView:getView("hello_label")
     local hello_box = mainView:getView("hello_box")
-    local hello_input = mainView:getView("hello_virtual_input")
+    local hello_system_input = mainView:getView("hello_system_input")
+    local hello_overlay_input = mainView:getView("hello_overlay_input")
 
-    if hello_input then
-        hello_input:init(
-            "虚拟键盘输入框",
+    if hello_system_input then
+        hello_system_input:init(
+            "系统键盘输入框",
             "",
             function(text) end,
             "点按这里打开系统键盘",
             "输入任意文本",
             256
         )
-        hello_input:registerAction("打开键盘", brls.ControllerButton.BUTTON_X, function()
-            hello_input:openKeyboard(256)
+        hello_system_input:registerAction("打开键盘", brls.ControllerButton.BUTTON_X, function()
+            hello_system_input:openKeyboard(256)
+            return true
+        end)
+    end
+
+    if hello_overlay_input then
+        local overlayInputValue = ""
+        local function openOverlayKeyboard()
+            overlay_keyboard_input.open({
+                initialValue = overlayInputValue,
+                onSubmit = function(text)
+                    overlayInputValue = text or ""
+                    if overlayInputValue == "" then
+                        hello_overlay_input:setDetailText("点按这里打开终端虚拟键盘")
+                    else
+                        hello_overlay_input:setDetailText(overlayInputValue)
+                    end
+                end,
+            })
+        end
+
+        hello_overlay_input:setText("终端虚拟键盘输入框")
+        hello_overlay_input:setDetailText("点按这里打开终端虚拟键盘")
+        hello_overlay_input:onClick(function()
+            openOverlayKeyboard()
+            return true
+        end)
+        hello_overlay_input:registerAction("打开终端键盘", brls.ControllerButton.BUTTON_X, function()
+            openOverlayKeyboard()
             return true
         end)
     end

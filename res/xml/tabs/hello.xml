@@ -28,7 +28,11 @@
                 marginBottom="10px" />
 
             <brls:InputCell
-                id="hello_virtual_input" />
+                id="hello_system_input" />
+
+            <brls:DetailCell
+                id="hello_overlay_input"
+                title="终端虚拟键盘输入框" />
 
             <brls:Button
                 id="hello_button"

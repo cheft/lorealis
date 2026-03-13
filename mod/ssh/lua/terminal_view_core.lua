@@ -632,8 +632,10 @@ end
 local BG_R, BG_G, BG_B = 12, 12, 12
 
 ---@param sshManager SSHManager
-function TerminalView.new(sshManager)
+---@param opts table|nil
+function TerminalView.new(sshManager, opts)
     local self = setmetatable({}, TerminalView)
+    opts = opts or {}
 
     self._ssh      = sshManager
     self._parser   = AnsiParser.new()
@@ -651,7 +653,9 @@ function TerminalView.new(sshManager)
     self._scrollOffset   = 0
     self._maxScroll      = 0
 
-    self._statusText     = "未连接"
+    self._keyboardOnly   = opts.keyboardOnly and true or false
+    self._overlaySubmitHandler = opts.onOverlaySubmit
+    self._statusText     = opts.statusText or "未连接"
     self._statusColor    = {r=150, g=150, b=150}
 
     self._selection      = nil
@@ -710,6 +714,22 @@ function TerminalView.new(sshManager)
     self._overlayShortcutLatch = false
 
     return self
+end
+
+function TerminalView:getOverlayBufferText()
+    return self._overlayBuffer or ""
+end
+
+function TerminalView:setOverlayBufferText(text)
+    self._overlayBuffer = text or ""
+    self._overlayPinyin = ""
+    self._overlayImePage = 1
+    self:_refreshOverlayImeCandidates()
+    self:_invalidate()
+end
+
+function TerminalView:setOverlaySubmitHandler(callback)
+    self._overlaySubmitHandler = callback
 end
 
 function TerminalView:_startFrameLoop()
@@ -1091,6 +1111,14 @@ function TerminalView:_toggleOverlayKeyboardVisible()
         return
     end
 
+    if self._keyboardOnly and self._overlayKeyboardVisible then
+        self._overlayShortcutLatch = true
+        if self._onCloseRequest then
+            self._onCloseRequest()
+        end
+        return
+    end
+
     self._overlayShortcutLatch = true
     self._overlayKeyboardVisible = not self._overlayKeyboardVisible
     self._overlayTouchPreviewKey = nil
@@ -1424,6 +1452,16 @@ function TerminalView:_backspaceOverlayBuffer()
 end
 
 function TerminalView:_submitOverlayBuffer()
+    if self._keyboardOnly and self._overlaySubmitHandler then
+        local text = self._overlayBuffer or ""
+        self:_clearOverlayModifiers(false)
+        self._overlayPinyin = ""
+        self._overlayImePage = 1
+        self:_refreshOverlayImeCandidates()
+        self._overlaySubmitHandler(text)
+        return
+    end
+
     local command = _overlayTrim(self._overlayBuffer)
     if command ~= "" then
         self:_rememberCommand(command)
@@ -2441,8 +2479,12 @@ function TerminalView:_pollControllerShortcuts()
     if justPressed(B.BUTTON_BACK) then
         _trace("[TerminalView] Polled - -> Close")
         if self._overlayKeyboardVisible then
-            self._overlayKeyboardVisible = false
-            self:_invalidate()
+            if self._keyboardOnly and self._onCloseRequest then
+                self._onCloseRequest()
+            else
+                self._overlayKeyboardVisible = false
+                self:_invalidate()
+            end
         else
             if self._onCloseRequest then
                 self._onCloseRequest()
@@ -2467,12 +2509,15 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     local panelX = x + panelInset
     local panelW = w - panelInset * 2
     local headerH = compactLayout and 20 or ((h < 560) and 26 or 30)
+    local previewText = _overlayPreviewText(self, compactLayout and 72 or 120)
+    local previewReserveH = compactLayout and 52 or 84
+    local previewGap = 10
     local suggestions = self:_collectOverlaySuggestions()
     local chipsH = (#suggestions > 0) and 52 or 0
     local chipsGap = (#suggestions > 0) and 8 or 0
     local topInset = compactLayout and 0 or 8
     local bottomInset = compactLayout and 0 or 4
-    local chipsReserve = chipsH + chipsGap
+    local chipsReserve = chipsH + chipsGap + previewReserveH + previewGap
     local footerH = 0
     local rowGap = compactLayout and 1 or 2
     local keyGap = compactLayout and 2 or 4
@@ -2568,10 +2613,9 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgStrokeWidth(vg, 1.2)
     nvgStroke(vg)
 
-    local previewText = _overlayPreviewText(self, compactLayout and 24 or OVERLAY_PREVIEW_MAX_CHARS)
-    local titleText = previewText and ("> " .. previewText) or (compactLayout and "Touch Keyboard Compact" or "Touch Keyboard")
+    local titleText = compactLayout and "Touch Keyboard Compact" or "Touch Keyboard"
     nvgFontFace(vg, "regular")
-    nvgFontSize(vg, previewText and 11 or 12)
+    nvgFontSize(vg, 12)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.title_text, 255))
     nvgText(vg, panelX + 10, panelY + headerH / 2, titleText)
@@ -2592,12 +2636,52 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 255))
     nvgText(vg, panelX + panelW - 14, panelY + headerH / 2, modeText)
 
+    local chipBandY = nil
+    if chipsH > 0 then
+        chipBandY = panelY - chipsGap - chipsH
+    end
+
+    local previewBandY = y
+    local previewBandBottom = (chipBandY or panelY) - previewGap
+    local previewBandH = math.max(0, previewBandBottom - previewBandY)
+    local previewInset = compactLayout and 8 or 10
+    local previewInnerX = panelX + previewInset
+    local previewInnerY = previewBandY + (compactLayout and 9 or 12)
+    local previewDisplayText = previewText or "输入内容将显示在这里"
+
+    if previewBandH > 0 then
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX + 1, previewBandY + 2, panelW, previewBandH)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_shadow, 28))
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX, previewBandY, panelW, previewBandH)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_fill, 236))
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX + 0.5, previewBandY + 0.5, panelW - 1, previewBandH - 1)
+        nvgStrokeColor(vg, _withAlpha(OVERLAY_THEME.panel_border, 255))
+        nvgStrokeWidth(vg, 1.0)
+        nvgStroke(vg)
+
+        nvgFontFace(vg, "regular")
+        nvgFontSize(vg, compactLayout and 10 or 11)
+        nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_TOP)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
+        nvgText(vg, previewInnerX, previewInnerY, "当前输入")
+
+        nvgFontSize(vg, compactLayout and 15 or 18)
+        nvgFillColor(vg, _withAlpha(previewText and OVERLAY_THEME.title_text or OVERLAY_THEME.hint_text, 255))
+        nvgText(vg, previewInnerX, previewInnerY + (compactLayout and 16 or 18), previewDisplayText)
+    end
+
     local rowY = panelY + headerH + 4
     local previewRect = nil
     local previewPalette = nil
     local previewLabel = nil
     if chipsH > 0 then
-        local chipBandY = panelY - chipsH - chipsGap
         local chipBandH = chipsH
         local chipInset = compactLayout and 4 or 10
         local chipX = panelX + chipInset
@@ -2779,6 +2863,13 @@ function TerminalView:_draw(vg, x, y, w, h)
     nvgRect(vg, x, y, w, h)
     nvgFillColor(vg, nvgRGBA(BG_R, BG_G, BG_B, 255))
     nvgFill(vg)
+
+    if self._keyboardOnly then
+        if self._overlayKeyboardVisible then
+            self:_drawKeyboardOverlay(vg, x, y, w, h)
+        end
+        return
+    end
 
     nvgFontSize(vg, FONT_SIZE)
     nvgFontFace(vg, "monospace")
