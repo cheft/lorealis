@@ -712,6 +712,8 @@ function TerminalView.new(sshManager, opts)
     self._overlayRumbleCooling = false
     self._frameLoopActive = false
     self._overlayShortcutLatch = false
+    self._keyboardOnlyLastFallbackText = nil
+    self._keyboardOnlyLastFallbackAt = 0
 
     return self
 end
@@ -926,6 +928,10 @@ local function initGlobalKeyboardListeners()
                 terminal:_toggleOverlayKeyboardVisible()
                 return
             end
+            if terminal._keyboardOnly then
+                terminal:_handleKeyboardOnlyCharInput(codepoint)
+                return
+            end
             if terminal._overlayKeyboardVisible and terminal._overlayCn and (not terminal._overlayFn) then
                 if codepoint >= 65 and codepoint <= 90 then
                     terminal:_appendOverlayIme(string.lower(string.char(codepoint)))
@@ -960,6 +966,11 @@ local function initGlobalKeyboardListeners()
                 state.key, state.mods, focus and tostring(focus:get_address()) or "nil"))
 
             if terminal then
+                if terminal._keyboardOnly then
+                    terminal:_handleKeyboardOnlyKeyInput(state.key, state.mods)
+                    return
+                end
+
                 local shortcut = isPrimaryShortcutPressed(state.mods)
                 if (shortcut and (state.key == KEY_K or state.key == KEY_K_LOWER)) or state.key == KEY_F2 then
                     terminal:_toggleOverlayKeyboardVisible()
@@ -1079,6 +1090,8 @@ function TerminalView:reset()
     self._touchState = { pressed = false, x = 0, y = 0, id = -1 }
     self._overlayRumbleCooling = false
     self._overlayRumbleSeq = 0
+    self._keyboardOnlyLastFallbackText = nil
+    self._keyboardOnlyLastFallbackAt = 0
     self:_invalidate()
 end
 
@@ -1111,14 +1124,6 @@ function TerminalView:_toggleOverlayKeyboardVisible()
         return
     end
 
-    if self._keyboardOnly and self._overlayKeyboardVisible then
-        self._overlayShortcutLatch = true
-        if self._onCloseRequest then
-            self._onCloseRequest()
-        end
-        return
-    end
-
     self._overlayShortcutLatch = true
     self._overlayKeyboardVisible = not self._overlayKeyboardVisible
     self._overlayTouchPreviewKey = nil
@@ -1141,6 +1146,217 @@ end
 
 function TerminalView:_releaseOverlayShortcutLatch()
     self._overlayShortcutLatch = false
+end
+
+function TerminalView:_hideOverlayKeyboardForHardwareInput()
+    if self._keyboardOnly and self._overlayKeyboardVisible then
+        self:setOverlayKeyboardVisible(false)
+    end
+end
+
+function TerminalView:_handleKeyboardOnlyCharInput(codepoint)
+    if (not self._keyboardOnly) or (not codepoint) or codepoint < 32 then
+        return false
+    end
+
+    local function nowMs()
+        return math.floor((os.clock() or 0) * 1000)
+    end
+
+    local text
+    if codepoint < 0x80 then
+        text = string.char(codepoint)
+    elseif codepoint < 0x800 then
+        text = string.char(
+            0xC0 + math.floor(codepoint / 64),
+            0x80 + (codepoint % 0x40)
+        )
+    elseif codepoint < 0x10000 then
+        text = string.char(
+            0xE0 + math.floor(codepoint / 4096),
+            0x80 + (math.floor(codepoint / 64) % 0x40),
+            0x80 + (codepoint % 0x40)
+        )
+    else
+        text = string.char(
+            0xF0 + math.floor(codepoint / 262144),
+            0x80 + (math.floor(codepoint / 4096) % 0x40),
+            0x80 + (math.floor(codepoint / 64) % 0x40),
+            0x80 + (codepoint % 0x40)
+        )
+    end
+
+    local now = nowMs()
+    if self._keyboardOnlyLastFallbackText == text and (now - (self._keyboardOnlyLastFallbackAt or 0)) <= 80 then
+        self._keyboardOnlyLastFallbackText = nil
+        self._keyboardOnlyLastFallbackAt = 0
+        return true
+    end
+
+    self:_hideOverlayKeyboardForHardwareInput()
+
+    if self._overlayCn and (not self._overlayFn) then
+        if codepoint >= 65 and codepoint <= 90 then
+            self:_appendOverlayIme(string.lower(string.char(codepoint)))
+            return true
+        elseif codepoint >= 97 and codepoint <= 122 then
+            self:_appendOverlayIme(string.char(codepoint))
+            return true
+        elseif codepoint >= 49 and codepoint <= 56 and #(self._overlayPinyin or "") > 0 then
+            self:_commitOverlayIme(codepoint - 48, false)
+            return true
+        elseif codepoint == 32 and #(self._overlayPinyin or "") > 0 then
+            self:_commitOverlayIme(1, true)
+            return true
+        end
+    end
+
+    self:_appendOverlayText(text)
+    return true
+end
+
+function TerminalView:_handleKeyboardOnlyKeyInput(keyCode, mods)
+    if not self._keyboardOnly then
+        return false
+    end
+
+    local function nowMs()
+        return math.floor((os.clock() or 0) * 1000)
+    end
+
+    local function hasFlag(value, flag)
+        if not value or not flag or flag <= 0 then
+            return false
+        end
+        return (value % (flag * 2)) >= flag
+    end
+
+    local KEY_K = 75
+    local KEY_K_LOWER = 107
+    local KEY_F2 = 291
+    local shortcut = hasFlag(mods, 0x02) or hasFlag(mods, 0x40) or hasFlag(mods, 0x80) or hasFlag(mods, 0x08)
+    local shift = hasFlag(mods, 0x01)
+
+    if (shortcut and (keyCode == KEY_K or keyCode == KEY_K_LOWER)) or keyCode == KEY_F2 then
+        self:_toggleOverlayKeyboardVisible()
+        return true
+    end
+
+    if keyCode == 340 or keyCode == 341 or keyCode == 342 or keyCode == 343
+        or keyCode == 344 or keyCode == 345 or keyCode == 346 or keyCode == 347 then
+        return true
+    end
+
+    self:_hideOverlayKeyboardForHardwareInput()
+
+    local composingCn = self._overlayCn and (not self._overlayFn) and #(self._overlayPinyin or "") > 0
+    if composingCn then
+        if keyCode == 257 then
+            self:_commitOverlayIme(1, true)
+            return true
+        elseif keyCode == 259 or keyCode == 261 then
+            if self:_backspaceOverlayIme() then
+                return true
+            end
+        elseif keyCode == 266 then
+            if self:_changeOverlayImePage(-1) then
+                return true
+            end
+        elseif keyCode == 267 then
+            if self:_changeOverlayImePage(1) then
+                return true
+            end
+        end
+    end
+
+    if keyCode == 257 then
+        self:_hideOverlayKeyboardForHardwareInput()
+        self:_submitOverlayBuffer()
+        return true
+    elseif keyCode == 259 or keyCode == 261 then
+        self:_hideOverlayKeyboardForHardwareInput()
+        self:_backspaceOverlayBuffer()
+        return true
+    elseif keyCode == 258 then
+        self:_hideOverlayKeyboardForHardwareInput()
+        self:_appendOverlayText("\t")
+        return true
+    elseif keyCode == 256 then
+        if self._onCloseRequest then
+            self._onCloseRequest()
+        end
+        return true
+    end
+
+    if not shortcut then
+        if self._overlayCn and (not self._overlayFn) then
+            if keyCode >= 65 and keyCode <= 90 then
+                self._keyboardOnlyLastFallbackText = string.char(keyCode + (shift and 0 or 32))
+                self._keyboardOnlyLastFallbackAt = nowMs()
+                self:_appendOverlayIme(string.lower(string.char(keyCode)))
+                return true
+            elseif keyCode >= 97 and keyCode <= 122 then
+                self._keyboardOnlyLastFallbackText = string.char(keyCode - (shift and 32 or 0))
+                self._keyboardOnlyLastFallbackAt = nowMs()
+                self:_appendOverlayIme(string.char(keyCode))
+                return true
+            elseif composingCn and keyCode >= 49 and keyCode <= 56 then
+                self._keyboardOnlyLastFallbackText = string.char(keyCode)
+                self._keyboardOnlyLastFallbackAt = nowMs()
+                self:_commitOverlayIme(keyCode - 48, false)
+                return true
+            elseif composingCn and keyCode == 32 then
+                self._keyboardOnlyLastFallbackText = " "
+                self._keyboardOnlyLastFallbackAt = nowMs()
+                self:_commitOverlayIme(1, true)
+                return true
+            end
+        end
+
+        local text = nil
+        local numShift = {
+            [48] = ")", [49] = "!", [50] = "@", [51] = "#", [52] = "$",
+            [53] = "%", [54] = "^", [55] = "&", [56] = "*", [57] = "(",
+        }
+        local symMap = {
+            [32] = { " ", " " },
+            [39] = { "'", "\"" },
+            [44] = { ",", "<" },
+            [45] = { "-", "_" },
+            [46] = { ".", ">" },
+            [47] = { "/", "?" },
+            [59] = { ";", ":" },
+            [61] = { "=", "+" },
+            [91] = { "[", "{" },
+            [92] = { "\\", "|" },
+            [93] = { "]", "}" },
+            [96] = { "`", "~" },
+        }
+
+        if keyCode >= 65 and keyCode <= 90 then
+            text = string.char(keyCode + (shift and 0 or 32))
+        elseif keyCode >= 97 and keyCode <= 122 then
+            text = string.char(keyCode - (shift and 32 or 0))
+        elseif keyCode >= 48 and keyCode <= 57 then
+            text = shift and numShift[keyCode] or string.char(keyCode)
+        elseif keyCode >= 320 and keyCode <= 329 then
+            text = string.char((keyCode - 320) + 48)
+        else
+            local sym = symMap[keyCode]
+            if sym then
+                text = shift and sym[2] or sym[1]
+            end
+        end
+
+        if text and text ~= "" then
+            self._keyboardOnlyLastFallbackText = text
+            self._keyboardOnlyLastFallbackAt = nowMs()
+            self:_appendOverlayText(text)
+            return true
+        end
+    end
+
+    return false
 end
 
 function TerminalView:ensureInputListeners()
@@ -2839,6 +3055,131 @@ function TerminalView:_onFrame(dt)
     end
 end
 
+function TerminalView:_drawKeyboardOnlyPreview(vg, x, y, w, h)
+    x, y, w, h = _getOverlayLogicalRect(x, y, w, h)
+
+    local compactLayout = self:_isCompactOverlayLayout()
+    local panelInset = compactLayout and 0 or 12
+    local panelX = x + panelInset
+    local panelW = w - panelInset * 2
+    local previewText = _overlayPreviewText(self, compactLayout and 120 or 220)
+    local previewDisplayText = previewText or "输入内容将显示在这里"
+    local suggestions = self:_collectOverlaySuggestions()
+    local chipsH = (#suggestions > 0) and 52 or 0
+    local footerH = compactLayout and 34 or 40
+    local gap = 10
+    local chipBandY = nil
+
+    if chipsH > 0 then
+        chipBandY = y + h - footerH - gap - chipsH
+    end
+
+    local previewY = y
+    local previewBottom = (chipBandY or (y + h - footerH)) - gap
+    local previewH = math.max(0, previewBottom - previewY)
+    local previewInset = compactLayout and 8 or 12
+    local previewInnerX = panelX + previewInset
+    local previewInnerY = previewY + (compactLayout and 10 or 14)
+    local footerY = y + h - footerH
+
+    if previewH > 0 then
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX + 1, previewY + 2, panelW, previewH)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_shadow, 28))
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX, previewY, panelW, previewH)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_fill, 236))
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX + 0.5, previewY + 0.5, panelW - 1, previewH - 1)
+        nvgStrokeColor(vg, _withAlpha(OVERLAY_THEME.panel_border, 255))
+        nvgStrokeWidth(vg, 1.0)
+        nvgStroke(vg)
+
+        nvgFontFace(vg, "regular")
+        nvgFontSize(vg, compactLayout and 10 or 11)
+        nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_TOP)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
+        nvgText(vg, previewInnerX, previewInnerY, "当前输入")
+
+        nvgFontSize(vg, compactLayout and 15 or 18)
+        nvgFillColor(vg, _withAlpha(previewText and OVERLAY_THEME.title_text or OVERLAY_THEME.hint_text, 255))
+        nvgText(vg, previewInnerX, previewInnerY + (compactLayout and 16 or 18), previewDisplayText)
+    end
+
+    if chipsH > 0 and chipBandY then
+        local chipInset = compactLayout and 4 or 10
+        local chipX = panelX + chipInset
+        local chipY = chipBandY + 4
+        local chipH = chipsH - 8
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX + 1, chipBandY + 2, panelW, chipsH)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_shadow, 26))
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX, chipBandY, panelW, chipsH)
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_fill, 238))
+        nvgFill(vg)
+
+        nvgBeginPath(vg)
+        nvgRect(vg, panelX + 0.5, chipBandY + 0.5, panelW - 1, chipsH - 1)
+        nvgStrokeColor(vg, _withAlpha(OVERLAY_THEME.panel_border, 255))
+        nvgStrokeWidth(vg, 1.0)
+        nvgStroke(vg)
+
+        for index, item in ipairs(suggestions) do
+            local chipLabel = item.display or item.text
+            nvgFontSize(vg, 13)
+            local chipW = math.max(82, math.min(196, 26 + #tostring(chipLabel) * 15))
+            if chipX + chipW > panelX + panelW - chipInset then
+                break
+            end
+
+            local chipPalette = _overlayChipPalette(index, item)
+            nvgBeginPath(vg)
+            nvgRect(vg, chipX, chipY, chipW, chipH)
+            nvgFillColor(vg, chipPalette.fill)
+            nvgFill(vg)
+
+            nvgBeginPath(vg)
+            nvgRect(vg, chipX + 0.5, chipY + 0.5, chipW - 1, chipH - 1)
+            nvgStrokeColor(vg, chipPalette.border)
+            nvgStrokeWidth(vg, 1.0)
+            nvgStroke(vg)
+
+            nvgFontFace(vg, "regular")
+            nvgFontSize(vg, 13)
+            nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
+            nvgFillColor(vg, chipPalette.text)
+            nvgText(vg, chipX + chipW / 2, chipY + chipH / 2, tostring(chipLabel))
+
+            chipX = chipX + chipW + 8
+        end
+    end
+
+    nvgBeginPath(vg)
+    nvgRect(vg, panelX, footerY, panelW, footerH)
+    nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_fill, 224))
+    nvgFill(vg)
+
+    nvgBeginPath(vg)
+    nvgRect(vg, panelX + 0.5, footerY + 0.5, panelW - 1, footerH - 1)
+    nvgStrokeColor(vg, _withAlpha(OVERLAY_THEME.panel_border, 220))
+    nvgStrokeWidth(vg, 1.0)
+    nvgStroke(vg)
+
+    nvgFontFace(vg, "regular")
+    nvgFontSize(vg, compactLayout and 10 or 11)
+    nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
+    nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
+    nvgText(vg, panelX + 10, footerY + footerH / 2, "实体键盘输入中  Ctrl+K 切换虚拟键盘  Enter 提交  Esc 关闭")
+end
+
 function TerminalView:_draw(vg, x, y, w, h)
     self._drawX = x or 0
     self._drawY = y or 0
@@ -2867,6 +3208,8 @@ function TerminalView:_draw(vg, x, y, w, h)
     if self._keyboardOnly then
         if self._overlayKeyboardVisible then
             self:_drawKeyboardOverlay(vg, x, y, w, h)
+        else
+            self:_drawKeyboardOnlyPreview(vg, x, y, w, h)
         end
         return
     end
