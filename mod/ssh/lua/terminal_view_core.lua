@@ -80,6 +80,10 @@ local OVERLAY_TOUCH_REPEAT_INTERVAL_DELETE_MS = 170
 local OVERLAY_TOUCH_COMMIT_DEBOUNCE_MS = 320
 local OVERLAY_TOUCH_RELEASE_DEBOUNCE_MS = 90
 local OVERLAY_TOUCH_REPRESS_COOLDOWN_MS = 140
+local OVERLAY_TOUCH_DEBUG = false
+local OVERLAY_TOUCH_DISABLE_AUDIO = true
+local OVERLAY_TOUCH_DISABLE_RUMBLE = true
+local OVERLAY_PREVIEW_MAX_CHARS = 36
 local OVERLAY_RUMBLE_LOW = 300 -- ms, 震动持续时间
 local OVERLAY_RUMBLE_HIGH = 200 -- 震动强度
 local OVERLAY_RUMBLE_INTERVAL_MS = 1 -- 按键延迟
@@ -1120,6 +1124,27 @@ local function _overlayTrim(text)
     return (text or ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
+local function _overlayPreviewText(self, maxChars)
+    local buffer = self._overlayBuffer or ""
+    local pinyin = self._overlayPinyin or ""
+    local preview = buffer
+
+    if pinyin ~= "" then
+        preview = preview .. " [" .. pinyin .. "]"
+    end
+
+    if preview == "" then
+        return nil
+    end
+
+    local limit = maxChars or OVERLAY_PREVIEW_MAX_CHARS
+    if #preview <= limit then
+        return preview
+    end
+
+    return "..." .. string.sub(preview, #preview - limit + 4)
+end
+
 function TerminalView:_refreshOverlayImeCandidates()
     if self._overlayCn and not self._overlayFn and #self._overlayPinyin > 0 then
         self._overlayImeCandidates = PinyinIme.getCandidates(self._overlayPinyin, {
@@ -1512,6 +1537,7 @@ end
 
 function TerminalView:_rumbleOverlayTap(kind, source)
     if not Platform.isSwitch then return end
+    if source == "touch" and OVERLAY_TOUCH_DISABLE_RUMBLE then return end
     if self._overlayRumbleCooling then return end
 
     self._overlayRumbleCooling = true
@@ -1741,7 +1767,7 @@ local function _overlayTargetSignature(target)
 end
 
 local function _switchOverlayLog(msg)
-    if Platform.isSwitch then
+    if Platform.isSwitch and OVERLAY_TOUCH_DEBUG then
         local line = "[OverlayTouch] " .. msg
         print(line)
         if DebugLog and DebugLog.append then
@@ -1882,7 +1908,9 @@ function TerminalView:_commitOverlayTouchTarget(target, pitch, isRepeat)
         self._overlayLastTouchCommitSig = signature
     end
 
-    self:_playOverlaySound(brls.Sound and brls.Sound.CLICK, pitch or 1.0)
+    if not OVERLAY_TOUCH_DISABLE_AUDIO then
+        self:_playOverlaySound(brls.Sound and brls.Sound.CLICK, pitch or 1.0)
+    end
     _switchOverlayLog(string.format("commit sig=%s repeat=%s", tostring(signature), tostring(isRepeat and true or false)))
 
     if target.type == "key" then
@@ -2038,12 +2066,17 @@ function TerminalView:_handleOverlayPointer(absX, absY, phase)
         if target then
             _switchOverlayLog(string.format("down key=%s x=%.1f y=%.1f", tostring((target.key and target.key.label) or "?"), absX, absY))
             self._overlayTouchPressedTarget = _cloneOverlayTarget(target)
-            self:_setOverlayTouchPreviewTarget(target, not usingPointerTouch)
             self._overlayTouchRepeatKey = nil
             self._overlayTouchRepeatState = nil
             if usingPointerTouch then
+                self._overlayTouchActiveTarget = _cloneOverlayTarget(target)
+                self._overlayTouchPreviewKey = nil
+                if target.type == "key" then
+                    self._overlaySelectedKey = target.key
+                end
                 self._overlayTouchCommittedOnDown = self:_commitOverlayTouchTarget(target) and true or false
             else
+                self:_setOverlayTouchPreviewTarget(target, true)
                 self:_beginOverlayTouchRepeat(target, absX, absY)
             end
             return true
@@ -2097,7 +2130,7 @@ function TerminalView:_handleOverlayPointer(absX, absY, phase)
             return self:_commitOverlayTouchTarget(target)
         end
 
-        if inOverlay then
+        if inOverlay and not OVERLAY_TOUCH_DISABLE_AUDIO then
             self:_playOverlaySound(brls.Sound and brls.Sound.TOUCH_UNFOCUS, 1.0)
         end
 
@@ -2535,11 +2568,13 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgStrokeWidth(vg, 1.2)
     nvgStroke(vg)
 
+    local previewText = _overlayPreviewText(self, compactLayout and 24 or OVERLAY_PREVIEW_MAX_CHARS)
+    local titleText = previewText and ("> " .. previewText) or (compactLayout and "Touch Keyboard Compact" or "Touch Keyboard")
     nvgFontFace(vg, "regular")
-    nvgFontSize(vg, 12)
+    nvgFontSize(vg, previewText and 11 or 12)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.title_text, 255))
-    nvgText(vg, panelX + 10, panelY + headerH / 2, compactLayout and "Touch Keyboard Compact" or "Touch Keyboard")
+    nvgText(vg, panelX + 10, panelY + headerH / 2, titleText)
 
     local overlayHintText = compactLayout and "Touch/A Type  B BS  X Shift  Y Space  Win+Fn Layout  ... More" or OVERLAY_HINT_TEXT
     nvgFontSize(vg, 10)
