@@ -34,6 +34,10 @@
                 id="hello_overlay_input"
                 title="终端虚拟键盘输入框" />
 
+            <brls:InputCell
+                id="hello_overlay_ime_bridge"
+                visibility="gone" />
+
             <brls:Button
                 id="hello_button"
                 width="auto"

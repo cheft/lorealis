@@ -1,6 +1,6 @@
 -- hello_tab.lua
 local zip_loader = require("utils/zip_view_loader")
-local overlay_keyboard_input = require("overlay_keyboard_input")
+local custom_text_input = require("custom_text_input")
 
 local hello_tab = {}
 local selected = 0
@@ -12,6 +12,7 @@ function hello_tab.init(mainView)
     local hello_box = mainView:getView("hello_box")
     local hello_system_input = mainView:getView("hello_system_input")
     local hello_overlay_input = mainView:getView("hello_overlay_input")
+    local hello_overlay_ime_bridge = mainView:getView("hello_overlay_ime_bridge")
 
     if hello_system_input then
         hello_system_input:init(
@@ -29,31 +30,16 @@ function hello_tab.init(mainView)
     end
 
     if hello_overlay_input then
-        local overlayInputValue = ""
-        local function openOverlayKeyboard()
-            overlay_keyboard_input.open({
-                initialValue = overlayInputValue,
-                onSubmit = function(text)
-                    overlayInputValue = text or ""
-                    if overlayInputValue == "" then
-                        hello_overlay_input:setDetailText("点按这里打开终端虚拟键盘")
-                    else
-                        hello_overlay_input:setDetailText(overlayInputValue)
-                    end
-                end,
-            })
-        end
-
-        hello_overlay_input:setText("终端虚拟键盘输入框")
-        hello_overlay_input:setDetailText("点按这里打开终端虚拟键盘")
-        hello_overlay_input:onClick(function()
-            openOverlayKeyboard()
-            return true
-        end)
-        hello_overlay_input:registerAction("打开终端键盘", brls.ControllerButton.BUTTON_X, function()
-            openOverlayKeyboard()
-            return true
-        end)
+        custom_text_input.bind(hello_overlay_input, hello_overlay_ime_bridge, {
+            title = "自定义文本框",
+            placeholder = "点按打开虚拟键盘，或按 + 使用系统输入法",
+            imeTitle = "系统输入法输入",
+            imeHint = "支持中文输入法",
+            overlayStatusText = "自定义文本框输入",
+            maxLen = 256,
+            overlayActionLabel = "打开虚拟键盘",
+            systemActionLabel = "系统输入法",
+        })
     end
 
     -- 注意: 不要在这里预先创建 view，因为 popActivity 后 Borealis 会释放它

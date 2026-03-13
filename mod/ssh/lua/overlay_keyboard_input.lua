@@ -41,6 +41,25 @@ function OverlayKeyboardInput.open(opts)
     local terminal = TerminalView.new(transport, {
         keyboardOnly = true,
         statusText = opts.statusText or "终端虚拟键盘输入",
+        onOpenSystemIme = function(currentText)
+            if not opts.onRequestSystemIme then
+                return
+            end
+
+            pcall(function()
+                opts.onRequestSystemIme(currentText or "", function(text)
+                    if closed then
+                        return
+                    end
+
+                    terminal:setOverlayBufferText(text or "")
+                    terminal:setOverlayKeyboardVisible(true)
+                    pcall(function()
+                        brls.Application.giveFocus(canvas)
+                    end)
+                end)
+            end)
+        end,
         onOverlaySubmit = function(text)
             if closed then
                 return

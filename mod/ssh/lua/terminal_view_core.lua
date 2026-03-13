@@ -68,7 +68,7 @@ local CURSOR_BLINK_RATE = 0.5
 local CURSOR_BLINK_INTERVAL = 500  -- ms
 
 local SWITCH_HINT_TEXT = "DPad Arrows  A Enter  B BS  L Tab  + IME  R3 Keyboard  - Close"
-local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+K keyboard | Ctrl+C interrupt | PageUp/Down history"
+local DESKTOP_HINT_TEXT = "Direct keyboard input | Ctrl+I IME | Ctrl+K keyboard | Ctrl+C interrupt | PageUp/Down history"
 
 local OVERLAY_HINT_TEXT = "Touch/A Type  B BS  X Shift  Y Space  L Tab  Enter Submit  + IME  R3 Hide"
 local DPAD_REPEAT_DELAY_MS = 550
@@ -655,6 +655,7 @@ function TerminalView.new(sshManager, opts)
 
     self._keyboardOnly   = opts.keyboardOnly and true or false
     self._overlaySubmitHandler = opts.onOverlaySubmit
+    self._overlaySystemImeHandler = opts.onOpenSystemIme
     self._statusText     = opts.statusText or "未连接"
     self._statusColor    = {r=150, g=150, b=150}
 
@@ -873,6 +874,8 @@ local function initGlobalKeyboardListeners()
         _debug("[TerminalView] initGlobalKeyboardListeners: keyboard APIs unavailable")
         return false
     end
+    local KEY_I = 73
+    local KEY_I_LOWER = 105
     local KEY_K = 75
     local KEY_K_LOWER = 107
     local KEY_F2 = 291
@@ -928,6 +931,10 @@ local function initGlobalKeyboardListeners()
                 terminal:_toggleOverlayKeyboardVisible()
                 return
             end
+            if codepoint == 9 and (terminal._keyboardOnly or terminal._overlayKeyboardVisible) then
+                terminal:_openSystemIme()
+                return
+            end
             if terminal._keyboardOnly then
                 terminal:_handleKeyboardOnlyCharInput(codepoint)
                 return
@@ -972,6 +979,10 @@ local function initGlobalKeyboardListeners()
                 end
 
                 local shortcut = isPrimaryShortcutPressed(state.mods)
+                if (terminal._keyboardOnly or terminal._overlayKeyboardVisible) and shortcut and (state.key == KEY_I or state.key == KEY_I_LOWER) then
+                    terminal:_openSystemIme()
+                    return
+                end
                 if (shortcut and (state.key == KEY_K or state.key == KEY_K_LOWER)) or state.key == KEY_F2 then
                     terminal:_toggleOverlayKeyboardVisible()
                     return
@@ -1233,9 +1244,16 @@ function TerminalView:_handleKeyboardOnlyKeyInput(keyCode, mods)
 
     local KEY_K = 75
     local KEY_K_LOWER = 107
+    local KEY_I = 73
+    local KEY_I_LOWER = 105
     local KEY_F2 = 291
     local shortcut = hasFlag(mods, 0x02) or hasFlag(mods, 0x40) or hasFlag(mods, 0x80) or hasFlag(mods, 0x08)
     local shift = hasFlag(mods, 0x01)
+
+    if shortcut and (keyCode == KEY_I or keyCode == KEY_I_LOWER) then
+        self:_openSystemIme()
+        return true
+    end
 
     if (shortcut and (keyCode == KEY_K or keyCode == KEY_K_LOWER)) or keyCode == KEY_F2 then
         self:_toggleOverlayKeyboardVisible()
@@ -2198,12 +2216,18 @@ function TerminalView:_getOverlayRepeatIntervalMs(resolved)
 end
 
 function TerminalView:_openSystemIme()
-    local editingOverlay = self._overlayKeyboardVisible
+    if self._keyboardOnly and self._overlaySystemImeHandler then
+        self._overlaySystemImeHandler(self._overlayBuffer or "")
+        return
+    end
+
+    local editingOverlay = self._overlayKeyboardVisible or self._keyboardOnly
     self._keyboard:openSwkbd({
-        header = editingOverlay and "SSH Command" or "SSH Input",
-        guide = editingOverlay and "Edit current command buffer" or "Input a full command",
+        header = editingOverlay and "Edit Input" or "SSH Input",
+        guide = editingOverlay and "Edit current input buffer" or "Input a full command",
         initial = self._overlayBuffer,
         maxLen = 256,
+        preferInputCell = self._keyboardOnly,
         onSubmit = function(inputText)
             local text = inputText or ""
             if editingOverlay then
@@ -2836,7 +2860,7 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.title_text, 255))
     nvgText(vg, panelX + 10, panelY + headerH / 2, titleText)
 
-    local overlayHintText = compactLayout and "Touch/A Type  B BS  X Shift  Y Space  Win+Fn Layout  ... More" or OVERLAY_HINT_TEXT
+    local overlayHintText = compactLayout and "Touch/A Type  B BS  X Shift  Y Space  + IME  Win+Fn Layout" or OVERLAY_HINT_TEXT
     nvgFontSize(vg, 10)
     nvgTextAlign(vg, NVG_ALIGN_CENTER + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
@@ -3177,7 +3201,10 @@ function TerminalView:_drawKeyboardOnlyPreview(vg, x, y, w, h)
     nvgFontSize(vg, compactLayout and 10 or 11)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
-    nvgText(vg, panelX + 10, footerY + footerH / 2, "实体键盘输入中  Ctrl+K 切换虚拟键盘  Enter 提交  Esc 关闭")
+    local imeHintText = Platform.isSwitch
+        and "实体键盘输入中  + 系统输入法  Ctrl+K 虚拟键盘  Enter 提交  Esc 关闭"
+        or "System IME: Ctrl+I  |  Overlay Keyboard: Ctrl+K  |  Enter Submit  |  Esc Close"
+    nvgText(vg, panelX + 10, footerY + footerH / 2, imeHintText)
 end
 
 function TerminalView:_draw(vg, x, y, w, h)

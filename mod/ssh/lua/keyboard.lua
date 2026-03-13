@@ -155,6 +155,49 @@ function Keyboard:openSwkbd(opts)
         end
     end
 
+    local function _openInputCellIme()
+        local ok, inputCell = pcall(function()
+            return brls.InputCell.new()
+        end)
+
+        if not ok or not inputCell then
+            return false
+        end
+
+        local okInit, initErr = pcall(function()
+            inputCell:init(title, initial, function(text)
+                _handleSubmit(text)
+            end, "", hint, maxLen)
+        end)
+
+        if not okInit then
+            _trace("[SSH Keyboard] InputCell.init failed: " .. tostring(initErr))
+            return false
+        end
+
+        local okOpen, inputImeOpenedOrErr = pcall(function()
+            return inputCell:openKeyboard(maxLen)
+        end)
+
+        if (not okOpen) or inputImeOpenedOrErr == false then
+            _trace("[SSH Keyboard] InputCell.openKeyboard failed: " .. tostring(inputImeOpenedOrErr))
+            return false
+        end
+
+        _trace("[SSH Keyboard] InputCell.openKeyboard accepted by IME")
+        return true
+    end
+
+    if opts.preferInputCell then
+        if _openInputCellIme() then
+            return
+        end
+
+        self._swkbdOpen = false
+        self:_openFallbackInput(opts)
+        return
+    end
+
     local okIme, imeOpenedOrErr = pcall(function()
         return brls.Application.openTextIME(function(inputText)
             _handleSubmit(inputText)
@@ -170,36 +213,7 @@ function Keyboard:openSwkbd(opts)
         _trace("[SSH Keyboard] Application.openTextIME failed: " .. tostring(imeOpenedOrErr))
     end
 
-    -- Fallback to InputCell.openKeyboard for compatibility
-    local ok, inputCell = pcall(function()
-        return brls.InputCell.new()
-    end)
-
-    if ok and inputCell then
-        local okInit, initErr = pcall(function()
-            inputCell:init(title, initial, function(text)
-                _handleSubmit(text)
-            end, "", hint, maxLen)
-        end)
-
-        if not okInit then
-            self._swkbdOpen = false
-            _trace("[SSH Keyboard] InputCell.init failed: " .. tostring(initErr))
-            self:_openFallbackInput(opts)
-            return
-        end
-
-        local ok2, inputImeOpenedOrErr = pcall(function()
-            return inputCell:openKeyboard(maxLen)
-        end)
-
-        if (not ok2) or inputImeOpenedOrErr == false then
-            self._swkbdOpen = false
-            _trace("[SSH Keyboard] InputCell.openKeyboard failed: " .. tostring(inputImeOpenedOrErr))
-            self:_openFallbackInput(opts)
-        else
-            _trace("[SSH Keyboard] InputCell.openKeyboard accepted by IME")
-        end
+    if _openInputCellIme() then
         return
     end
 
