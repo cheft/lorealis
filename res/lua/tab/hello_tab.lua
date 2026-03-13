@@ -9,6 +9,22 @@ function hello_tab.init(mainView)
     local button = mainView:getView("hello_button")
     local label = mainView:getView("hello_label")
     local hello_box = mainView:getView("hello_box")
+    local hello_input = mainView:getView("hello_virtual_input")
+
+    if hello_input then
+        hello_input:init(
+            "虚拟键盘输入框",
+            "",
+            function(text) end,
+            "点按这里打开系统键盘",
+            "输入任意文本",
+            256
+        )
+        hello_input:registerAction("打开键盘", brls.ControllerButton.BUTTON_X, function()
+            hello_input:openKeyboard(256)
+            return true
+        end)
+    end
 
     -- 注意: 不要在这里预先创建 view，因为 popActivity 后 Borealis 会释放它
     -- 每次按钮点击时重新创建，见下方 onClick 回调

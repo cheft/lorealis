@@ -20,8 +20,30 @@ function Session.new()
     self._frame = nil
     self._activityOpen = false
     self._closing = false
+    self._cleanupInProgress = false
     self._endpoint = nil
+    self._lifecycleToken = 0
     return self
+end
+
+function Session:_nextLifecycleToken()
+    self._lifecycleToken = (self._lifecycleToken or 0) + 1
+    return self._lifecycleToken
+end
+
+function Session:_currentLifecycleToken()
+    return self._lifecycleToken or 0
+end
+
+function Session:_clearSSHCallbacks()
+    if not self._ssh then
+        return
+    end
+
+    self._ssh.onData = nil
+    self._ssh.onError = nil
+    self._ssh.onDisconnect = nil
+    self._ssh.onConnect = nil
 end
 
 function Session:_createCanvas()
@@ -45,9 +67,12 @@ function Session:_createRoot()
 end
 
 function Session:_teardownSession()
-    if self._ssh then
+    local ssh = self._ssh
+    self:_nextLifecycleToken()
+    self:_clearSSHCallbacks()
+    if ssh then
         pcall(function()
-            self._ssh:disconnect()
+            ssh:disconnect()
         end)
     end
     self._ssh = nil
@@ -57,15 +82,21 @@ function Session:_teardownSession()
     self._frame = nil
     self._activityOpen = false
     self._closing = false
+    self._cleanupInProgress = false
     self._endpoint = nil
 end
 
 function Session:_closeActivity()
+    if self._cleanupInProgress then
+        return
+    end
+
     if not self._activityOpen then
         self:_teardownSession()
         return
     end
 
+    self._cleanupInProgress = true
     self._activityOpen = false
     pcall(function()
         brls.Application.popActivity()
@@ -74,13 +105,23 @@ function Session:_closeActivity()
 end
 
 function Session:_bindCallbacks()
+    local token = self:_currentLifecycleToken()
+
     self._ssh.onData = function(data)
+        if token ~= self:_currentLifecycleToken() then
+            return
+        end
+
         if self._terminal then
             self._terminal:feedData(data)
         end
     end
 
     self._ssh.onConnect = function()
+        if token ~= self:_currentLifecycleToken() then
+            return
+        end
+
         if self._terminal then
             self._terminal:setStatus("Connected: " .. self._ssh:getInfo(), 80, 220, 80)
             self._terminal:_invalidate()
@@ -89,6 +130,9 @@ function Session:_bindCallbacks()
             self._ssh:send("\r")
         end)
         brls.delay(30, function()
+            if token ~= self:_currentLifecycleToken() then
+                return
+            end
             pcall(function()
                 brls.Application.giveFocus(self._canvas)
             end)
@@ -97,6 +141,10 @@ function Session:_bindCallbacks()
     end
 
     self._ssh.onError = function(message)
+        if token ~= self:_currentLifecycleToken() then
+            return
+        end
+
         if self._terminal then
             self._terminal:setStatus("SSH Error: " .. tostring(message), 220, 120, 80)
         end
@@ -104,6 +152,10 @@ function Session:_bindCallbacks()
     end
 
     self._ssh.onDisconnect = function()
+        if token ~= self:_currentLifecycleToken() or self._cleanupInProgress then
+            return
+        end
+
         local shouldNotify = not self._closing
         self._closing = true
         if self._terminal then
@@ -113,6 +165,9 @@ function Session:_bindCallbacks()
             notify("SSH 已断开: " .. tostring(self._endpoint))
         end
         brls.delay(50, function()
+            if token ~= self:_currentLifecycleToken() then
+                return
+            end
             self:_closeActivity()
         end)
     end
@@ -120,6 +175,7 @@ end
 
 function Session:open(conn, password)
     self:_teardownSession()
+    self:_nextLifecycleToken()
 
     self._endpoint = conn.endpoint or string.format("%s@%s:%d", conn.user, conn.host, conn.port or 22)
     self._ssh = SSHManager.new()
@@ -141,11 +197,7 @@ function Session:open(conn, password)
     self._terminal:bindView(self._canvas)
     self._terminal:setOnCloseRequest(function()
         self._closing = true
-        if self._ssh and self._ssh:isConnected() then
-            self._ssh:disconnect()
-        else
-            self:_closeActivity()
-        end
+        self:_closeActivity()
     end)
     self:_bindCallbacks()
 
@@ -159,7 +211,11 @@ function Session:open(conn, password)
             self._terminal:ensureInputListeners()
         end
     end)
+    local token = self:_currentLifecycleToken()
     brls.delay(30, function()
+        if token ~= self:_currentLifecycleToken() then
+            return
+        end
         pcall(function()
             brls.Application.giveFocus(self._canvas)
         end)
@@ -194,12 +250,24 @@ function Session:open(conn, password)
         end
         notify("连接失败: " .. tostring(err))
         brls.delay(80, function()
+            if token ~= self:_currentLifecycleToken() then
+                return
+            end
             self:_closeActivity()
         end)
         return false, err
     end
 
     return true
+end
+
+function Session:cleanup(skipPop)
+    if skipPop then
+        self:_teardownSession()
+        return
+    end
+
+    self:_closeActivity()
 end
 
 return Session

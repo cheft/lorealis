@@ -27,6 +27,9 @@
                 text="功能测试页(整个App程序都已使用 Lua+XML 全动态编写)"
                 marginBottom="10px" />
 
+            <brls:InputCell
+                id="hello_virtual_input" />
+
             <brls:Button
                 id="hello_button"
                 width="auto"

@@ -27,6 +27,13 @@ function Controller.new(view)
     return self
 end
 
+function Controller:cleanup()
+    if self._session and self._session.cleanup then
+        self._session:cleanup(true)
+    end
+    self._session = nil
+end
+
 function Controller:_bind()
     if self._addButton then
         self._addButton:onClick(function()
@@ -181,7 +188,13 @@ function Controller:confirmDelete(conn)
 end
 
 function SSHClientView.init(view)
-    return Controller.new(view)
+    local controller = Controller.new(view)
+    if view and view.onWillDisappear then
+        view:onWillDisappear(function()
+            controller:cleanup()
+        end)
+    end
+    return controller
 end
 
 function SSHClientView.createView()
