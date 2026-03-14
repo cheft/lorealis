@@ -89,6 +89,44 @@ local OVERLAY_RUMBLE_HIGH = 200 -- 震动强度
 local OVERLAY_RUMBLE_INTERVAL_MS = 1 -- 按键延迟
 local OVERLAY_RUMBLE_PULSE_MS = 28 -- ms, 震动脉冲持续时间
 
+local function _clamp(value, minValue, maxValue)
+    if value < minValue then
+        return minValue
+    end
+    if value > maxValue then
+        return maxValue
+    end
+    return value
+end
+
+local function _utf8Chars(text)
+    local chars = {}
+    text = text or ""
+    local i = 1
+    local len = #text
+
+    while i <= len do
+        local byte = string.byte(text, i) or 0
+        local size = 1
+        if byte >= 0xF0 then
+            size = 4
+        elseif byte >= 0xE0 then
+            size = 3
+        elseif byte >= 0xC0 then
+            size = 2
+        end
+
+        chars[#chars + 1] = string.sub(text, i, math.min(len, i + size - 1))
+        i = i + size
+    end
+
+    return chars
+end
+
+local function _utf8Count(text)
+    return #_utf8Chars(text)
+end
+
 local function _key(label, opts)
     opts = opts or {}
     opts.label = label
@@ -671,6 +709,8 @@ function TerminalView.new(sshManager, opts)
     self._debugFrameCount = 0
     self._overlayKeyboardVisible = false
     self._overlayBuffer = ""
+    self._overlayCursor = 0
+    self._overlaySelectionAnchor = nil
     self._overlayShift = false
     self._overlayCaps = false
     self._overlayCtrl = false
@@ -724,11 +764,7 @@ function TerminalView:getOverlayBufferText()
 end
 
 function TerminalView:setOverlayBufferText(text)
-    self._overlayBuffer = text or ""
-    self._overlayPinyin = ""
-    self._overlayImePage = 1
-    self:_refreshOverlayImeCandidates()
-    self:_invalidate()
+    self:_setOverlayEditorText(text or "")
 end
 
 function TerminalView:setOverlaySubmitHandler(callback)
@@ -1075,6 +1111,8 @@ function TerminalView:reset()
     self._overlayCn = false
     self._overlayLayoutMode = self._overlayLayoutMode or "classic"
     self._overlayFnPage = 1
+    self._overlayCursor = 0
+    self._overlaySelectionAnchor = nil
     self._overlayPinyin = ""
     self._overlayImeCandidates = {}
     self._overlayImePage = 1
@@ -1265,6 +1303,11 @@ function TerminalView:_handleKeyboardOnlyKeyInput(keyCode, mods)
         return true
     end
 
+    if shortcut and (keyCode == 65 or keyCode == 97) then
+        self:_selectAllOverlayText()
+        return true
+    end
+
     self:_hideOverlayKeyboardForHardwareInput()
 
     local composingCn = self._overlayCn and (not self._overlayFn) and #(self._overlayPinyin or "") > 0
@@ -1287,13 +1330,29 @@ function TerminalView:_handleKeyboardOnlyKeyInput(keyCode, mods)
         end
     end
 
-    if keyCode == 257 then
+    if keyCode == 263 then
+        self:_moveOverlayCursor(-1, shift)
+        return true
+    elseif keyCode == 262 then
+        self:_moveOverlayCursor(1, shift)
+        return true
+    elseif keyCode == 264 or keyCode == 268 then
+        self:_moveOverlayCursorToBoundary("start", shift)
+        return true
+    elseif keyCode == 265 or keyCode == 269 then
+        self:_moveOverlayCursorToBoundary("end", shift)
+        return true
+    elseif keyCode == 257 then
         self:_hideOverlayKeyboardForHardwareInput()
         self:_submitOverlayBuffer()
         return true
-    elseif keyCode == 259 or keyCode == 261 then
+    elseif keyCode == 259 then
         self:_hideOverlayKeyboardForHardwareInput()
         self:_backspaceOverlayBuffer()
+        return true
+    elseif keyCode == 261 then
+        self:_hideOverlayKeyboardForHardwareInput()
+        self:_deleteOverlayEditorForward()
         return true
     elseif keyCode == 258 then
         self:_hideOverlayKeyboardForHardwareInput()
@@ -1407,6 +1466,232 @@ local function _overlayPreviewText(self, maxChars)
     return "..." .. string.sub(preview, #preview - limit + 4)
 end
 
+local function _overlayEditorMeasureText(vg, text)
+    if not text or text == "" then
+        return 0
+    end
+
+    local ok, width = pcall(function()
+        return nvgText(vg, 0, -10000, text)
+    end)
+
+    if not ok or type(width) ~= "number" then
+        return #text * 10
+    end
+
+    return math.max(0, width)
+end
+
+local function _buildOverlayEditorDisplay(self)
+    local bufferChars = _utf8Chars(self._overlayBuffer or "")
+    local cursor = _clamp(self._overlayCursor or #bufferChars, 0, #bufferChars)
+    local selectionStart = nil
+    local selectionEnd = nil
+
+    if self:_hasOverlaySelection() then
+        selectionStart, selectionEnd = self:_getOverlaySelectionRange()
+    end
+
+    local function sanitizeChar(ch)
+        if ch == "\n" or ch == "\r" then
+            return "\226\134\181"
+        elseif ch == "\t" then
+            return "\226\135\165"
+        end
+        return ch
+    end
+
+    local displayChars = {}
+    for index = 1, cursor do
+        displayChars[#displayChars + 1] = sanitizeChar(bufferChars[index])
+    end
+
+    local composeText = ""
+    if self._overlayCn and (not self._overlayFn) and #(self._overlayPinyin or "") > 0 then
+        composeText = "[" .. tostring(self._overlayPinyin or "") .. "]"
+    end
+    local composeChars = _utf8Chars(composeText)
+    local composeLen = #composeChars
+    for _, ch in ipairs(composeChars) do
+        displayChars[#displayChars + 1] = ch
+    end
+    for index = cursor + 1, #bufferChars do
+        displayChars[#displayChars + 1] = sanitizeChar(bufferChars[index])
+    end
+
+    if selectionStart and selectionStart > cursor then
+        selectionStart = selectionStart + composeLen
+    end
+    if selectionEnd and selectionEnd > cursor then
+        selectionEnd = selectionEnd + composeLen
+    end
+
+    return {
+        chars = displayChars,
+        cursor = cursor + composeLen,
+        selectionStart = selectionStart,
+        selectionEnd = selectionEnd,
+        isPlaceholder = (#displayChars == 0),
+    }
+end
+
+local function _layoutOverlayEditorLines(vg, chars, maxWidth)
+    local lines = {}
+    local lineStart = 0
+    local lineChars = {}
+    local lineText = ""
+    local lineWidth = 0
+    local prefixWidths = { 0 }
+
+    local function pushLine()
+        local copiedChars = {}
+        for index, ch in ipairs(lineChars) do
+            copiedChars[index] = ch
+        end
+
+        local copiedWidths = {}
+        for index, value in ipairs(prefixWidths) do
+            copiedWidths[index] = value
+        end
+
+        lines[#lines + 1] = {
+            startIndex = lineStart,
+            endIndex = lineStart + #lineChars,
+            chars = copiedChars,
+            text = table.concat(copiedChars),
+            width = lineWidth,
+            prefixWidths = copiedWidths,
+        }
+
+        lineStart = lineStart + #lineChars
+        lineChars = {}
+        lineText = ""
+        lineWidth = 0
+        prefixWidths = { 0 }
+    end
+
+    if #chars == 0 then
+        pushLine()
+        return lines
+    end
+
+    for _, ch in ipairs(chars) do
+        local candidateText = lineText .. ch
+        local candidateWidth = _overlayEditorMeasureText(vg, candidateText)
+
+        if lineText ~= "" and candidateWidth > maxWidth then
+            pushLine()
+            lineChars[#lineChars + 1] = ch
+            lineText = ch
+            lineWidth = _overlayEditorMeasureText(vg, lineText)
+            prefixWidths[#prefixWidths + 1] = lineWidth
+        else
+            lineChars[#lineChars + 1] = ch
+            lineText = candidateText
+            lineWidth = candidateWidth
+            prefixWidths[#prefixWidths + 1] = lineWidth
+        end
+    end
+
+    pushLine()
+    return lines
+end
+
+local function _drawOverlayEditorBuffer(self, vg, x, y, width, height, fontSize, placeholderText)
+    nvgFontFace(vg, "regular")
+    nvgFontSize(vg, fontSize)
+    nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_TOP)
+
+    local display = _buildOverlayEditorDisplay(self)
+    local selectionStart = display.selectionStart
+    local selectionEnd = display.selectionEnd
+    local caretIndex = display.cursor or 0
+    local lineHeight = math.max(fontSize + 8, math.floor(fontSize * 1.45))
+
+    if display.isPlaceholder then
+        nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
+        nvgText(vg, x, y, placeholderText or "输入内容将显示在这里")
+        if self._blinkOn then
+            nvgBeginPath(vg)
+            nvgRect(vg, x, y + 1, 2, math.max(fontSize + 4, lineHeight - 4))
+            nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 255))
+            nvgFill(vg)
+        end
+        return
+    end
+
+    local lines = _layoutOverlayEditorLines(vg, display.chars or {}, width)
+    local visibleLines = math.max(1, math.floor(height / lineHeight))
+    local caretLine = 1
+
+    for index, line in ipairs(lines) do
+        if caretIndex >= line.startIndex and caretIndex <= line.endIndex then
+            caretLine = index
+            break
+        end
+    end
+
+    local firstLine = 1
+    if #lines > visibleLines then
+        firstLine = _clamp(caretLine - visibleLines + 1, 1, #lines - visibleLines + 1)
+    end
+
+    for lineIndex = firstLine, math.min(#lines, firstLine + visibleLines - 1) do
+        local line = lines[lineIndex]
+        local drawY = y + (lineIndex - firstLine) * lineHeight
+
+        local localSelStart = nil
+        local localSelEnd = nil
+        if selectionStart and selectionEnd then
+            local overlapStart = math.max(selectionStart, line.startIndex)
+            local overlapEnd = math.min(selectionEnd, line.endIndex)
+            if overlapEnd > overlapStart then
+                localSelStart = overlapStart - line.startIndex
+                localSelEnd = overlapEnd - line.startIndex
+            end
+        end
+
+        if localSelStart ~= nil and localSelEnd ~= nil then
+            local selX1 = x + (line.prefixWidths[localSelStart + 1] or 0)
+            local selX2 = x + (line.prefixWidths[localSelEnd + 1] or line.width or 0)
+
+            nvgBeginPath(vg)
+            nvgRect(vg, selX1, drawY + 1, math.max(2, selX2 - selX1), lineHeight - 4)
+            nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 92))
+            nvgFill(vg)
+
+            local beforeText = table.concat(line.chars, "", 1, localSelStart)
+            local selectedText = table.concat(line.chars, "", localSelStart + 1, localSelEnd)
+            local afterText = table.concat(line.chars, "", localSelEnd + 1)
+
+            if beforeText ~= "" then
+                nvgFillColor(vg, _withAlpha(OVERLAY_THEME.title_text, 255))
+                nvgText(vg, x, drawY, beforeText)
+            end
+            if selectedText ~= "" then
+                nvgFillColor(vg, _withAlpha(OVERLAY_THEME.panel_fill, 255))
+                nvgText(vg, selX1, drawY, selectedText)
+            end
+            if afterText ~= "" then
+                nvgFillColor(vg, _withAlpha(OVERLAY_THEME.title_text, 255))
+                nvgText(vg, selX2, drawY, afterText)
+            end
+        else
+            nvgFillColor(vg, _withAlpha(OVERLAY_THEME.title_text, 255))
+            nvgText(vg, x, drawY, line.text or "")
+        end
+
+        if self._blinkOn and caretIndex >= line.startIndex and caretIndex <= line.endIndex then
+            local caretLocal = caretIndex - line.startIndex
+            local caretX = x + (line.prefixWidths[caretLocal + 1] or 0)
+            nvgBeginPath(vg)
+            nvgRect(vg, caretX, drawY + 1, 2, lineHeight - 4)
+            nvgFillColor(vg, _withAlpha(OVERLAY_THEME.mode_text, 255))
+            nvgFill(vg)
+        end
+    end
+end
+
 function TerminalView:_refreshOverlayImeCandidates()
     if self._overlayCn and not self._overlayFn and #self._overlayPinyin > 0 then
         self._overlayImeCandidates = PinyinIme.getCandidates(self._overlayPinyin, {
@@ -1434,6 +1719,9 @@ end
 
 function TerminalView:_appendOverlayIme(char)
     if not char or char == "" then return end
+    if self._keyboardOnly and self:_hasOverlaySelection() then
+        self:_deleteOverlaySelection()
+    end
     self._overlayPinyin = string.lower((self._overlayPinyin or "") .. char)
     self._overlayImePage = 1
     self:_refreshOverlayImeCandidates()
@@ -1593,8 +1881,200 @@ function TerminalView:_rememberCommand(command)
     self._overlayRecentCommands = nextRecent
 end
 
+function TerminalView:_getOverlayTextLength()
+    return _utf8Count(self._overlayBuffer or "")
+end
+
+function TerminalView:_normalizeOverlayCursor()
+    local length = self:_getOverlayTextLength()
+    self._overlayCursor = _clamp(self._overlayCursor or length, 0, length)
+
+    if self._overlaySelectionAnchor ~= nil then
+        self._overlaySelectionAnchor = _clamp(self._overlaySelectionAnchor, 0, length)
+        if self._overlaySelectionAnchor == self._overlayCursor then
+            self._overlaySelectionAnchor = nil
+        end
+    end
+
+    return self._overlayCursor, length
+end
+
+function TerminalView:_hasOverlaySelection()
+    self:_normalizeOverlayCursor()
+    return self._overlaySelectionAnchor ~= nil
+        and self._overlaySelectionAnchor ~= self._overlayCursor
+end
+
+function TerminalView:_getOverlaySelectionRange()
+    if not self:_hasOverlaySelection() then
+        local cursor = self._overlayCursor or 0
+        return cursor, cursor
+    end
+
+    local anchor = self._overlaySelectionAnchor or 0
+    local cursor = self._overlayCursor or 0
+    if anchor <= cursor then
+        return anchor, cursor
+    end
+    return cursor, anchor
+end
+
+function TerminalView:_setOverlayEditorText(text, cursor)
+    self._overlayBuffer = text or ""
+    self._overlayCursor = _clamp(cursor or _utf8Count(self._overlayBuffer), 0, _utf8Count(self._overlayBuffer))
+    self._overlaySelectionAnchor = nil
+    self._overlayPinyin = ""
+    self._overlayImePage = 1
+    self:_refreshOverlayImeCandidates()
+    self:_invalidate()
+end
+
+function TerminalView:_replaceOverlayEditorRange(startIndex, endIndex, text)
+    if not self._keyboardOnly then
+        return false
+    end
+
+    local bufferChars = _utf8Chars(self._overlayBuffer or "")
+    local insertChars = _utf8Chars(text or "")
+    local length = #bufferChars
+    startIndex = _clamp(startIndex or 0, 0, length)
+    endIndex = _clamp(endIndex or startIndex, 0, length)
+    if endIndex < startIndex then
+        startIndex, endIndex = endIndex, startIndex
+    end
+
+    local nextChars = {}
+    for index = 1, startIndex do
+        nextChars[#nextChars + 1] = bufferChars[index]
+    end
+    for _, ch in ipairs(insertChars) do
+        nextChars[#nextChars + 1] = ch
+    end
+    for index = endIndex + 1, length do
+        nextChars[#nextChars + 1] = bufferChars[index]
+    end
+
+    self._overlayBuffer = table.concat(nextChars)
+    self._overlayCursor = startIndex + #insertChars
+    self._overlaySelectionAnchor = nil
+    self:_invalidate()
+    return true
+end
+
+function TerminalView:_deleteOverlaySelection()
+    if not self:_hasOverlaySelection() then
+        return false
+    end
+
+    local startIndex, endIndex = self:_getOverlaySelectionRange()
+    return self:_replaceOverlayEditorRange(startIndex, endIndex, "")
+end
+
+function TerminalView:_insertOverlayEditorText(text)
+    text = text or ""
+    if text == "" then
+        return false
+    end
+
+    self:_normalizeOverlayCursor()
+    local startIndex, endIndex = self:_getOverlaySelectionRange()
+    if not self:_hasOverlaySelection() then
+        startIndex = self._overlayCursor or 0
+        endIndex = startIndex
+    end
+
+    return self:_replaceOverlayEditorRange(startIndex, endIndex, text)
+end
+
+function TerminalView:_moveOverlayCursor(delta, extendSelection)
+    self:_normalizeOverlayCursor()
+    local target = _clamp((self._overlayCursor or 0) + (delta or 0), 0, self:_getOverlayTextLength())
+
+    if extendSelection then
+        if self._overlaySelectionAnchor == nil then
+            self._overlaySelectionAnchor = self._overlayCursor or 0
+        end
+    else
+        self._overlaySelectionAnchor = nil
+    end
+
+    self._overlayCursor = target
+    if self._overlaySelectionAnchor ~= nil and self._overlaySelectionAnchor == self._overlayCursor then
+        self._overlaySelectionAnchor = nil
+    end
+    self:_invalidate()
+    return true
+end
+
+function TerminalView:_moveOverlayCursorToBoundary(boundary, extendSelection)
+    local target = 0
+    if boundary == "end" then
+        target = self:_getOverlayTextLength()
+    end
+
+    self:_normalizeOverlayCursor()
+    if extendSelection then
+        if self._overlaySelectionAnchor == nil then
+            self._overlaySelectionAnchor = self._overlayCursor or 0
+        end
+    else
+        self._overlaySelectionAnchor = nil
+    end
+
+    self._overlayCursor = target
+    if self._overlaySelectionAnchor ~= nil and self._overlaySelectionAnchor == self._overlayCursor then
+        self._overlaySelectionAnchor = nil
+    end
+    self:_invalidate()
+    return true
+end
+
+function TerminalView:_deleteOverlayEditorBackward()
+    self:_normalizeOverlayCursor()
+    if self:_deleteOverlaySelection() then
+        return true
+    end
+
+    local cursor = self._overlayCursor or 0
+    if cursor <= 0 then
+        return false
+    end
+
+    return self:_replaceOverlayEditorRange(cursor - 1, cursor, "")
+end
+
+function TerminalView:_deleteOverlayEditorForward()
+    self:_normalizeOverlayCursor()
+    if self:_deleteOverlaySelection() then
+        return true
+    end
+
+    local cursor = self._overlayCursor or 0
+    local length = self:_getOverlayTextLength()
+    if cursor >= length then
+        return false
+    end
+
+    return self:_replaceOverlayEditorRange(cursor, cursor + 1, "")
+end
+
+function TerminalView:_selectAllOverlayText()
+    local length = self:_getOverlayTextLength()
+    self._overlayCursor = length
+    self._overlaySelectionAnchor = 0
+    if length == 0 then
+        self._overlaySelectionAnchor = nil
+    end
+    self:_invalidate()
+    return true
+end
+
 function TerminalView:_appendOverlayText(text)
     if not text or text == "" then return end
+    if self._keyboardOnly then
+        self:_insertOverlayEditorText(text)
+        return
+    end
     self:_sendInput(text)
     self._overlayBuffer = self._overlayBuffer .. text
     self:_invalidate()
@@ -1674,6 +2154,16 @@ function TerminalView:_resolveOverlayChar(key)
 end
 
 function TerminalView:_backspaceOverlayBuffer()
+    if self._keyboardOnly then
+        self:_deleteOverlayEditorBackward()
+        self._overlayShift = false
+        self._overlayCtrl = false
+        self._overlayAlt = false
+        self._overlayMeta = false
+        self:_invalidate()
+        return
+    end
+
     self:_sendInput(Platform.keyMap.BS)
     if #self._overlayBuffer > 0 then
         self._overlayBuffer = string.sub(self._overlayBuffer, 1, #self._overlayBuffer - 1)
@@ -1686,11 +2176,17 @@ function TerminalView:_backspaceOverlayBuffer()
 end
 
 function TerminalView:_submitOverlayBuffer()
+    if self._keyboardOnly and #self._overlayPinyin > 0 then
+        self:_flushOverlayIme(true)
+    end
+
     if self._keyboardOnly and self._overlaySubmitHandler then
         local text = self._overlayBuffer or ""
         self:_clearOverlayModifiers(false)
         self._overlayPinyin = ""
         self._overlayImePage = 1
+        self._overlaySelectionAnchor = nil
+        self._overlayCursor = _utf8Count(text)
         self:_refreshOverlayImeCandidates()
         self._overlaySubmitHandler(text)
         return
@@ -1708,6 +2204,10 @@ end
 
 function TerminalView:_syncOverlayBuffer(text)
     text = text or ""
+    if self._keyboardOnly then
+        self:_setOverlayEditorText(text)
+        return
+    end
     self:_sendInput(Platform.keyMap.CTRL_U)
     if #text > 0 then
         self:_sendInput(text)
@@ -1715,6 +2215,33 @@ function TerminalView:_syncOverlayBuffer(text)
     self._overlayBuffer = text
     self:_clearOverlayModifiers(false)
     self:_invalidate()
+end
+
+function TerminalView:_handleKeyboardOnlyOverlaySend(value)
+    if not self._keyboardOnly or not value then
+        return false
+    end
+
+    local extendSelection = self._overlayShift and true or false
+
+    if value == Platform.keyMap.LEFT then
+        self:_moveOverlayCursor(-1, extendSelection)
+    elseif value == Platform.keyMap.RIGHT then
+        self:_moveOverlayCursor(1, extendSelection)
+    elseif value == Platform.keyMap.HOME or value == Platform.keyMap.UP or value == Platform.keyMap.PGUP then
+        self:_moveOverlayCursorToBoundary("start", extendSelection)
+    elseif value == Platform.keyMap.END or value == Platform.keyMap.DOWN or value == Platform.keyMap.PGDN then
+        self:_moveOverlayCursorToBoundary("end", extendSelection)
+    elseif value == Platform.keyMap.DEL then
+        self:_deleteOverlayEditorForward()
+    else
+        return false
+    end
+
+    self._overlayCtrl = false
+    self._overlayAlt = false
+    self._overlayMeta = false
+    return true
 end
 
 function TerminalView:_activateOverlayKey(key, source)
@@ -1755,9 +2282,17 @@ function TerminalView:_activateOverlayKey(key, source)
     elseif resolved.action == "space" then
         self:_appendOverlayText(self:_applyOverlayModifiers(" "))
     elseif resolved.action == "send" then
+        if self:_handleKeyboardOnlyOverlaySend(resolved.value or "") then
+            self:_invalidate()
+            return
+        end
         self:_sendInput(self:_applyOverlayModifiers(resolved.value or ""))
         self:_invalidate()
     elseif resolved.action == "tab" then
+        if self._keyboardOnly then
+            self:_appendOverlayText("\t")
+            return
+        end
         self:_sendInput(Platform.keyMap.TAB)
         self:_clearOverlayModifiers(false)
         self:_invalidate()
@@ -2674,6 +3209,51 @@ function TerminalView:_pollControllerShortcuts()
         return
     end
 
+    if self._keyboardOnly then
+        if justPressed(B.BUTTON_LEFT, true) then
+            self:_moveOverlayCursor(-1, false)
+        end
+        if justPressed(B.BUTTON_RIGHT, true) then
+            self:_moveOverlayCursor(1, false)
+        end
+        if justPressed(B.BUTTON_UP, true) then
+            self:_moveOverlayCursorToBoundary("start", false)
+        end
+        if justPressed(B.BUTTON_DOWN, true) then
+            self:_moveOverlayCursorToBoundary("end", false)
+        end
+        if justPressed(B.BUTTON_A) then
+            self:_submitOverlayBuffer()
+        end
+        if justPressed(B.BUTTON_B) then
+            self:_backspaceOverlayBuffer()
+        end
+        if justPressed(B.BUTTON_X) then
+            self:_selectAllOverlayText()
+        end
+        if justPressed(B.BUTTON_Y) then
+            self:_appendOverlayText(" ")
+        end
+        if justPressed(B.BUTTON_LB) then
+            self:_appendOverlayText("\t")
+        end
+        if justPressed(B.BUTTON_RSB) or justPressed(B.BUTTON_RB) then
+            self:_toggleOverlayKeyboardVisible()
+            self:_rumbleOverlayTap("nav", "joycon")
+        end
+        if justPressed(B.BUTTON_START) then
+            self:_openSystemIme()
+        end
+        if justPressed(B.BUTTON_BACK) then
+            if self._onCloseRequest then
+                self._onCloseRequest()
+            end
+        end
+
+        self._lastPolledButtons = current
+        return
+    end
+
     if justPressed(B.BUTTON_UP, true) then
         self:_sendInput(Platform.keyMap.UP)
     end
@@ -2912,9 +3492,22 @@ function TerminalView:_drawKeyboardOverlay(vg, x, y, w, h)
         nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
         nvgText(vg, previewInnerX, previewInnerY, "当前输入")
 
-        nvgFontSize(vg, compactLayout and 15 or 18)
-        nvgFillColor(vg, _withAlpha(previewText and OVERLAY_THEME.title_text or OVERLAY_THEME.hint_text, 255))
-        nvgText(vg, previewInnerX, previewInnerY + (compactLayout and 16 or 18), previewDisplayText)
+        if self._keyboardOnly then
+            _drawOverlayEditorBuffer(
+                self,
+                vg,
+                previewInnerX,
+                previewInnerY + (compactLayout and 16 or 18),
+                panelW - previewInset * 2 - 4,
+                previewBandH - (compactLayout and 26 or 32),
+                compactLayout and 15 or 18,
+                "输入内容将显示在这里"
+            )
+        else
+            nvgFontSize(vg, compactLayout and 15 or 18)
+            nvgFillColor(vg, _withAlpha(previewText and OVERLAY_THEME.title_text or OVERLAY_THEME.hint_text, 255))
+            nvgText(vg, previewInnerX, previewInnerY + (compactLayout and 16 or 18), previewDisplayText)
+        end
     end
 
     local rowY = panelY + headerH + 4
@@ -3129,9 +3722,16 @@ function TerminalView:_drawKeyboardOnlyPreview(vg, x, y, w, h)
         nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
         nvgText(vg, previewInnerX, previewInnerY, "当前输入")
 
-        nvgFontSize(vg, compactLayout and 15 or 18)
-        nvgFillColor(vg, _withAlpha(previewText and OVERLAY_THEME.title_text or OVERLAY_THEME.hint_text, 255))
-        nvgText(vg, previewInnerX, previewInnerY + (compactLayout and 16 or 18), previewDisplayText)
+        _drawOverlayEditorBuffer(
+            self,
+            vg,
+            previewInnerX,
+            previewInnerY + (compactLayout and 16 or 18),
+            panelW - previewInset * 2 - 4,
+            previewH - (compactLayout and 26 or 32),
+            compactLayout and 15 or 18,
+            "输入内容将显示在这里"
+        )
     end
 
     if chipsH > 0 and chipBandY then
@@ -3202,8 +3802,8 @@ function TerminalView:_drawKeyboardOnlyPreview(vg, x, y, w, h)
     nvgTextAlign(vg, NVG_ALIGN_LEFT + NVG_ALIGN_MIDDLE)
     nvgFillColor(vg, _withAlpha(OVERLAY_THEME.hint_text, 255))
     local imeHintText = Platform.isSwitch
-        and "实体键盘输入中  + 系统输入法  Ctrl+K 虚拟键盘  Enter 提交  Esc 关闭"
-        or "System IME: Ctrl+I  |  Overlay Keyboard: Ctrl+K  |  Enter Submit  |  Esc Close"
+        and "实体键盘输入中  左右移动  Shift+左右选中  + 系统输入法  Ctrl+K 虚拟键盘"
+        or "Arrows move | Shift+Arrows select | Ctrl+A select all | Ctrl+I IME | Ctrl+K keyboard"
     nvgText(vg, panelX + 10, footerY + footerH / 2, imeHintText)
 end
 

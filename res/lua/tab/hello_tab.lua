@@ -31,11 +31,11 @@ function hello_tab.init(mainView)
 
     if hello_overlay_input then
         custom_text_input.bind(hello_overlay_input, hello_overlay_ime_bridge, {
-            title = "自定义文本框",
+            title = "自定义文本编辑器",
             placeholder = "点按打开虚拟键盘，或按 + 使用系统输入法",
             imeTitle = "系统输入法输入",
             imeHint = "支持中文输入法",
-            overlayStatusText = "自定义文本框输入",
+            overlayStatusText = "自定义文本编辑器",
             maxLen = 256,
             overlayActionLabel = "打开虚拟键盘",
             systemActionLabel = "系统输入法",
