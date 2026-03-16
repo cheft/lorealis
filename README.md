@@ -87,6 +87,20 @@ cmake --build build --config Release
 "C:\Program Files\CMake\bin\cmake.exe" --build build --config Release
 ```
 
+## Linux BUild
+```shell
+sudo apt install -y build-essential cmake pkg-config git libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev libxext-dev libxkbcommon-dev libdbus-1-dev libgl1-mesa-dev libegl1-mesa-dev
+
+cmake -B build -DPLATFORM_DESKTOP=ON -DGLFW_BUILD_X11=ON -DGLFW_BUILD_WAYLAND=OFF
+```
+
+### Mac Build
+```shell
+cmake --build build --config Release
+
+```
+
+
 ## NRO Build (Docker)
 
 ### PowerShell
