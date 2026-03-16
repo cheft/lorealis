@@ -1,4 +1,5 @@
 build
+build-sdl
 build_windows
 build_switch
 build_pc
